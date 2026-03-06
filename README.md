@@ -58,3 +58,15 @@ See [action.yml](/Users/jaredboynton/__devlocal/postman-api-onboarding-action/ac
 npm install
 npm test
 ```
+
+## Beta Release Strategy
+
+- Beta channel tags use `v0.x.y`.
+- Consumers can pin immutable tags such as `v0.2.0` for reproducibility.
+- Moving tag `v0` is used only as the rolling beta channel.
+
+## REST Migration Seam
+
+This composite interface is backend-neutral and only passes stable inputs and outputs between bootstrap and repo-sync. `integration-backend` defaults to `bifrost` now, and future REST migration should occur inside the lower-level actions without changing this composite contract.
+
+Migration details are documented in [REST_MIGRATION_SEAM.md](/Users/jaredboynton/__devlocal/postman-api-onboarding-action/REST_MIGRATION_SEAM.md).
