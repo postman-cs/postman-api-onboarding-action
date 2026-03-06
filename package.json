@@ -1,0 +1,25 @@
+{
+  "name": "postman-api-onboarding-action",
+  "version": "0.1.0-beta.1",
+  "description": "Public beta scaffold for the Postman API onboarding GitHub Action.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "action.yml",
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "keywords": [
+    "github-action",
+    "postman"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.8.2",
+    "vitest": "^3.1.1"
+  }
+}

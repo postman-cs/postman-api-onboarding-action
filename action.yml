@@ -1,0 +1,80 @@
+name: postman-api-onboarding-action
+description: Public beta action contract for Postman API onboarding orchestration.
+runs:
+  using: node20
+  main: dist/index.js
+inputs:
+  project-name:
+    description: Service project name used across bootstrap and repo sync phases.
+    required: true
+  domain:
+    description: Business domain used for governance assignment.
+    required: false
+  domain-code:
+    description: Short domain code used in workspace naming.
+    required: false
+  requester-email:
+    description: Requester email used for workspace membership.
+    required: false
+  spec-url:
+    description: URL to the OpenAPI document to bootstrap.
+    required: true
+  environments-json:
+    description: JSON array of environment slugs to materialize.
+    required: false
+    default: '["prod"]'
+  system-env-map-json:
+    description: JSON map of environment slug to system environment id.
+    required: false
+    default: '{}'
+  governance-mapping-json:
+    description: JSON map of business domain to governance group name.
+    required: false
+    default: '{}'
+  postman-api-key:
+    description: Postman API key used for bootstrap and sync operations.
+    required: true
+  postman-access-token:
+    description: Postman access token used for Bifrost and governance integration.
+    required: false
+  github-token:
+    description: GitHub token used for repo variables and generated commits.
+    required: false
+  gh-fallback-token:
+    description: Fallback GitHub token for variable and workflow-file APIs.
+    required: false
+  github-auth-mode:
+    description: GitHub auth mode for repository APIs.
+    required: false
+    default: github_token_first
+  repo-write-mode:
+    description: Repo mutation mode for generated assets and workflow files.
+    required: false
+    default: commit-and-push
+  integration-backend:
+    description: Integration backend used to coordinate onboarding phases.
+    required: false
+    default: bifrost
+outputs:
+  integration-backend:
+    description: Resolved integration backend for the onboarding run.
+  workspace-id:
+    description: Postman workspace ID.
+  workspace-url:
+    description: Postman workspace URL.
+  spec-id:
+    description: Uploaded Postman spec ID.
+  collections-json:
+    description: JSON summary of generated collections.
+  environment-uids-json:
+    description: JSON map of environment slug to Postman environment uid.
+  mock-url:
+    description: Mock server URL.
+  monitor-id:
+    description: Smoke monitor ID.
+  repo-sync-summary-json:
+    description: JSON summary of repo materialization and workspace sync planning.
+  commit-sha:
+    description: Commit SHA placeholder for repo-write-mode.
+  orchestration-summary:
+    description: Human-readable summary of the onboarding orchestration plan.
