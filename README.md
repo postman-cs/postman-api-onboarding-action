@@ -7,6 +7,8 @@ Public beta composite GitHub Action that orchestrates Postman onboarding by chai
 
 This is the primary partner-facing entrypoint for the beta suite.
 
+For existing services, the composite action can target an existing workspace/spec/collection set and can suppress or redirect generated CI workflow output for repos that already have their own pipeline layout.
+
 ## Contract
 
 - Default `integration-backend` is `bifrost`.
@@ -41,6 +43,25 @@ jobs:
           postman-access-token: ${{ secrets.POSTMAN_ACCESS_TOKEN }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
           gh-fallback-token: ${{ secrets.GH_FALLBACK_TOKEN }}
+
+  onboarding-existing:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: postman-cs/postman-api-onboarding-action@v0
+        with:
+          project-name: core-payments
+          workspace-id: ws-123
+          spec-id: spec-123
+          baseline-collection-id: col-baseline
+          smoke-collection-id: col-smoke
+          contract-collection-id: col-contract
+          spec-url: https://example.com/openapi.yaml
+          generate-ci-workflow: false
+          postman-api-key: ${{ secrets.POSTMAN_API_KEY }}
 ```
 
 ## Output Mapping
@@ -49,6 +70,8 @@ The composite action wires:
 
 - `workspace-id`, `workspace-url`, `spec-id`, and `collections-json` from `bootstrap`.
 - `environment-uids-json`, `mock-url`, `monitor-id`, `repo-sync-summary-json`, and `commit-sha` from `repo_sync`.
+- Existing-service passthrough inputs to `bootstrap`: `workspace-id`, `spec-id`, `baseline-collection-id`, `smoke-collection-id`, and `contract-collection-id`.
+- Existing-repo passthrough inputs to `repo_sync`: `generate-ci-workflow` and `ci-workflow-path`.
 
 See [action.yml](/Users/jaredboynton/__devlocal/postman-api-onboarding-action/action.yml) for exact step mappings.
 

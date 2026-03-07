@@ -1,6 +1,30 @@
 name: postman-api-onboarding-action
 description: Public beta composite action that orchestrates Postman bootstrap and repo sync.
 inputs:
+
+  workspace-id:
+    description: Existing Postman workspace ID.
+    required: false
+  spec-id:
+    description: Existing Postman spec ID.
+    required: false
+  baseline-collection-id:
+    description: Existing baseline collection ID.
+    required: false
+  smoke-collection-id:
+    description: Existing smoke collection ID.
+    required: false
+  contract-collection-id:
+    description: Existing contract collection ID.
+    required: false
+  generate-ci-workflow:
+    description: Whether to generate the CI workflow file.
+    required: false
+    default: "true"
+  ci-workflow-path:
+    description: Path to write the generated CI workflow file.
+    required: false
+    default: .github/workflows/ci.yml
   project-name:
     description: Service project name used across bootstrap and repo sync phases.
     required: true
@@ -109,6 +133,11 @@ runs:
       uses: postman-cs/postman-bootstrap-action@v0
       with:
         project-name: ${{ inputs.project-name }}
+        workspace-id: ${{ inputs.workspace-id }}
+        spec-id: ${{ inputs.spec-id }}
+        baseline-collection-id: ${{ inputs.baseline-collection-id }}
+        smoke-collection-id: ${{ inputs.smoke-collection-id }}
+        contract-collection-id: ${{ inputs.contract-collection-id }}
         domain: ${{ inputs.domain }}
         domain-code: ${{ inputs.domain-code }}
         requester-email: ${{ inputs.requester-email }}
@@ -132,6 +161,8 @@ runs:
         baseline-collection-id: ${{ steps.bootstrap.outputs.baseline-collection-id }}
         smoke-collection-id: ${{ steps.bootstrap.outputs.smoke-collection-id }}
         contract-collection-id: ${{ steps.bootstrap.outputs.contract-collection-id }}
+        generate-ci-workflow: ${{ inputs.generate-ci-workflow }}
+        ci-workflow-path: ${{ inputs.ci-workflow-path }}
         environments-json: ${{ inputs.environments-json }}
         system-env-map-json: ${{ inputs.system-env-map-json }}
         environment-uids-json: '{}'

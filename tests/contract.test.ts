@@ -34,6 +34,35 @@ describe('postman-api-onboarding-action composite contract', () => {
 
     expect(manifest.runs.using).toBe('composite');
     expect(manifest.inputs['integration-backend']?.default).toBe('bifrost');
+    expect(Object.keys(manifest.inputs)).toEqual([
+      'workspace-id',
+      'spec-id',
+      'baseline-collection-id',
+      'smoke-collection-id',
+      'contract-collection-id',
+      'generate-ci-workflow',
+      'ci-workflow-path',
+      'project-name',
+      'domain',
+      'domain-code',
+      'requester-email',
+      'workspace-admin-user-ids',
+      'spec-url',
+      'environments-json',
+      'system-env-map-json',
+      'governance-mapping-json',
+      'env-runtime-urls-json',
+      'postman-api-key',
+      'postman-access-token',
+      'github-token',
+      'gh-fallback-token',
+      'github-auth-mode',
+      'repo-write-mode',
+      'current-ref',
+      'committer-name',
+      'committer-email',
+      'integration-backend'
+    ]);
   });
 
   it('uses the postman-cs bootstrap and repo-sync actions as steps', () => {
@@ -49,8 +78,20 @@ describe('postman-api-onboarding-action composite contract', () => {
 
   it('maps bootstrap outputs explicitly into repo-sync inputs', () => {
     const manifest = loadManifest();
+    const bootstrapStep = manifest.runs.steps.find((step) => step.id === 'bootstrap');
     const repoSyncStep = manifest.runs.steps.find((step) => step.id === 'repo_sync');
 
+    expect(bootstrapStep?.with?.['workspace-id']).toBe('${{ inputs.workspace-id }}');
+    expect(bootstrapStep?.with?.['spec-id']).toBe('${{ inputs.spec-id }}');
+    expect(bootstrapStep?.with?.['baseline-collection-id']).toBe(
+      '${{ inputs.baseline-collection-id }}'
+    );
+    expect(bootstrapStep?.with?.['smoke-collection-id']).toBe(
+      '${{ inputs.smoke-collection-id }}'
+    );
+    expect(bootstrapStep?.with?.['contract-collection-id']).toBe(
+      '${{ inputs.contract-collection-id }}'
+    );
     expect(repoSyncStep?.with?.['workspace-id']).toBe(
       '${{ steps.bootstrap.outputs.workspace-id }}'
     );
@@ -62,6 +103,12 @@ describe('postman-api-onboarding-action composite contract', () => {
     );
     expect(repoSyncStep?.with?.['contract-collection-id']).toBe(
       '${{ steps.bootstrap.outputs.contract-collection-id }}'
+    );
+    expect(repoSyncStep?.with?.['generate-ci-workflow']).toBe(
+      '${{ inputs.generate-ci-workflow }}'
+    );
+    expect(repoSyncStep?.with?.['ci-workflow-path']).toBe(
+      '${{ inputs.ci-workflow-path }}'
     );
   });
 
