@@ -1,5 +1,5 @@
 name: postman-api-onboarding-action
-description: Public beta composite action that orchestrates Postman bootstrap and repo sync.
+description: Public open-alpha composite action that orchestrates Postman bootstrap and repo sync.
 inputs:
 
   workspace-id:

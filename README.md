@@ -1,11 +1,11 @@
 # postman-api-onboarding-action
 
-Public beta composite GitHub Action that orchestrates Postman onboarding by chaining:
+Public open-alpha composite GitHub Action that orchestrates Postman onboarding by chaining:
 
 - `postman-cs/postman-bootstrap-action@v0`
 - `postman-cs/postman-repo-sync-action@v0`
 
-This is the primary partner-facing entrypoint for the beta suite.
+This is the primary partner-facing entrypoint for the open-alpha suite.
 
 For existing services, the composite action can target an existing workspace/spec/collection set and can suppress or redirect generated CI workflow output for repos that already have their own pipeline layout.
 
@@ -97,7 +97,7 @@ Even when reusing an existing `spec-id`, the composite action still requires `sp
 | `current-ref` | | Optional explicit ref override for detached checkouts. |
 | `committer-name` | `Postman FDE` | Commit author name for generated sync commits. |
 | `committer-email` | `fde@postman.com` | Commit author email for generated sync commits. |
-| `integration-backend` | `bifrost` | Current public beta backend. |
+| `integration-backend` | `bifrost` | Current public open-alpha backend. |
 
 ### Obtaining `postman-api-key`
 
@@ -115,9 +115,9 @@ The `postman-api-key` is a Postman API key (PMAK) used for all standard Postman 
 
 > **Note:** The PMAK is a long-lived key tied to your Postman account. It does not require periodic renewal like the `postman-access-token`.
 
-### Obtaining `postman-access-token` (Beta)
+### Obtaining `postman-access-token` (Open Alpha)
 
-> **⚠️ Beta limitation:** The `postman-access-token` input requires a manually-extracted session token. There is currently no public API to exchange a Postman API key (PMAK) for an access token programmatically. This manual step will be eliminated before GA.
+> **⚠️ Open-alpha limitation:** The `postman-access-token` input requires a manually-extracted session token. There is currently no public API to exchange a Postman API key (PMAK) for an access token programmatically. This manual step will be eliminated before GA.
 
 The `postman-access-token` is a Postman session token (`x-access-token`) required for internal API operations that the standard PMAK API key cannot perform — specifically workspace ↔ repo git sync (Bifrost), governance group assignment, and system environment associations. Without it, those steps are silently skipped during the onboarding pipeline.
 
@@ -166,11 +166,11 @@ npm install
 npm test
 ```
 
-## Beta Release Strategy
+## Open-Alpha Release Strategy
 
-- Beta channel tags use `v0.x.y`.
+- Open-alpha channel tags use `v0.x.y`.
 - Consumers can pin immutable tags such as `v0.2.0` for reproducibility.
-- Moving tag `v0` is used only as the rolling beta channel.
+- Moving tag `v0` is used only as the rolling open-alpha channel.
 
 ## REST Migration Seam
 
