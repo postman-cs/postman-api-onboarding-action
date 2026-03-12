@@ -15,6 +15,7 @@ For existing services, the composite action can target an existing workspace/spe
 - Inputs are backend-neutral and kebab-case.
 - Bootstrap outputs are explicitly mapped into repo-sync inputs in `action.yml`.
 - Final outputs are surfaced from the two lower-level actions without exposing internal step mode controls.
+- Collection artifacts are exported in the Postman Collection v3 multi-file YAML directory structure (produced during the repo-sync step).
 
 ## Usage
 
@@ -43,6 +44,7 @@ jobs:
           postman-access-token: ${{ secrets.POSTMAN_ACCESS_TOKEN }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
           gh-fallback-token: ${{ secrets.GH_FALLBACK_TOKEN }}
+          # enable-insights: true  # Chain Insights onboarding after bootstrap and repo sync
 
   onboarding-existing:
     runs-on: ubuntu-latest
@@ -97,7 +99,10 @@ Even when reusing an existing `spec-id`, the composite action still requires `sp
 | `current-ref` | | Optional explicit ref override for detached checkouts. |
 | `committer-name` | `Postman FDE` | Commit author name for generated sync commits. |
 | `committer-email` | `fde@postman.com` | Commit author email for generated sync commits. |
+| `enable-insights` | `false` | When `true`, chains `postman-cs/postman-insights-onboarding-action@v0` after bootstrap and repo sync. |
 | `integration-backend` | `bifrost` | Current public open-alpha backend. |
+
+> **Note:** Team ID is automatically derived from `postman-api-key` by the underlying actions. There is no explicit team ID input on this composite action.
 
 ### Obtaining `postman-api-key`
 
@@ -156,6 +161,7 @@ The composite action wires:
 - `environment-uids-json`, `mock-url`, `monitor-id`, `repo-sync-summary-json`, and `commit-sha` from `repo_sync`.
 - Existing-service passthrough inputs to `bootstrap`: `workspace-id`, `spec-id`, `baseline-collection-id`, `smoke-collection-id`, and `contract-collection-id`.
 - Existing-repo passthrough inputs to `repo_sync`: `generate-ci-workflow` and `ci-workflow-path`.
+- When `enable-insights: true`, the Insights onboarding step runs after repo sync using the workspace ID from bootstrap.
 
 See [action.yml](/Users/jaredboynton/__devlocal/postman-api-onboarding-action/action.yml) for exact step mappings.
 
