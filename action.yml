@@ -90,6 +90,10 @@ inputs:
     description: Commit author email for generated sync commits.
     required: false
     default: fde@postman.com
+  enable-insights:
+    description: Whether to enable Postman Insights.
+    required: false
+    default: 'false'
   integration-backend:
     description: Integration backend used to coordinate onboarding phases.
     required: false
@@ -177,3 +181,13 @@ runs:
         gh-fallback-token: ${{ inputs.gh-fallback-token }}
         github-auth-mode: ${{ inputs.github-auth-mode }}
         integration-backend: ${{ inputs.integration-backend }}
+    - id: insights_onboarding
+      if: inputs.enable-insights == 'true'
+      name: Onboard Postman Insights
+      uses: postman-cs/postman-insights-onboarding-action@v0
+      with:
+        project-name: ${{ inputs.project-name }}
+        workspace-id: ${{ steps.bootstrap.outputs.workspace-id }}
+        postman-api-key: ${{ inputs.postman-api-key }}
+        postman-access-token: ${{ inputs.postman-access-token }}
+        github-token: ${{ inputs.github-token }}
