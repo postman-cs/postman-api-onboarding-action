@@ -78,6 +78,9 @@ Even when reusing an existing `spec-id`, the composite action still requires `sp
 | `baseline-collection-id` | | Reuse an existing baseline collection. |
 | `smoke-collection-id` | | Reuse an existing smoke collection. |
 | `contract-collection-id` | | Reuse an existing contract collection. |
+| `monitor-id` | | Existing smoke monitor ID. When set the action skips monitor creation. |
+| `mock-url` | | Existing mock server URL. When set the action skips mock creation. |
+| `monitor-cron` | `""` | Cron expression for monitor scheduling (e.g. `0 */6 * * *`). When empty the monitor is created without a schedule. |
 | `generate-ci-workflow` | `true` | Pass through to repo sync; set `false` for repos that already manage CI. |
 | `ci-workflow-path` | `.github/workflows/ci.yml` | Pass through to repo sync to redirect generated workflow output. |
 | `project-name` | | Service name used across bootstrap and repo sync. |

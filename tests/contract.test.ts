@@ -40,6 +40,9 @@ describe('postman-api-onboarding-action composite contract', () => {
       'baseline-collection-id',
       'smoke-collection-id',
       'contract-collection-id',
+      'monitor-id',
+      'mock-url',
+      'monitor-cron',
       'generate-ci-workflow',
       'ci-workflow-path',
       'project-name',
@@ -61,6 +64,7 @@ describe('postman-api-onboarding-action composite contract', () => {
       'current-ref',
       'committer-name',
       'committer-email',
+      'enable-insights',
       'integration-backend'
     ]);
   });
@@ -69,7 +73,7 @@ describe('postman-api-onboarding-action composite contract', () => {
     const manifest = loadManifest();
     const steps = manifest.runs.steps;
 
-    expect(steps).toHaveLength(2);
+    expect(steps).toHaveLength(3);
     expect(steps[0]?.id).toBe('bootstrap');
     expect(steps[0]?.uses).toBe('postman-cs/postman-bootstrap-action@v0');
     expect(steps[1]?.id).toBe('repo_sync');

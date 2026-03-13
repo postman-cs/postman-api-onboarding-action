@@ -17,6 +17,16 @@ inputs:
   contract-collection-id:
     description: Existing contract collection ID.
     required: false
+  monitor-id:
+    description: Existing smoke monitor ID. When set the action skips monitor creation.
+    required: false
+  mock-url:
+    description: Existing mock server URL. When set the action skips mock creation.
+    required: false
+  monitor-cron:
+    description: Cron expression for monitor scheduling (e.g. "0 */6 * * *"). When empty the monitor is created without a schedule.
+    required: false
+    default: ""
   generate-ci-workflow:
     description: Whether to generate the CI workflow file.
     required: false
@@ -165,6 +175,9 @@ runs:
         baseline-collection-id: ${{ steps.bootstrap.outputs.baseline-collection-id }}
         smoke-collection-id: ${{ steps.bootstrap.outputs.smoke-collection-id }}
         contract-collection-id: ${{ steps.bootstrap.outputs.contract-collection-id }}
+        monitor-id: ${{ inputs.monitor-id }}
+        mock-url: ${{ inputs.mock-url }}
+        monitor-cron: ${{ inputs.monitor-cron }}
         generate-ci-workflow: ${{ inputs.generate-ci-workflow }}
         ci-workflow-path: ${{ inputs.ci-workflow-path }}
         environments-json: ${{ inputs.environments-json }}
