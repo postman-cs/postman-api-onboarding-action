@@ -168,7 +168,7 @@ runs:
         integration-backend: ${{ inputs.integration-backend }}
     - id: repo_sync
       name: Sync Repository and Workspace
-      uses: postman-cs/postman-repo-sync-action@v0
+      uses: postman-cs/postman-repo-sync-action@hammad-dev
       with:
         project-name: ${{ inputs.project-name }}
         workspace-id: ${{ steps.bootstrap.outputs.workspace-id }}

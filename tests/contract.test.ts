@@ -77,7 +77,7 @@ describe('postman-api-onboarding-action composite contract', () => {
     expect(steps[0]?.id).toBe('bootstrap');
     expect(steps[0]?.uses).toBe('postman-cs/postman-bootstrap-action@v0');
     expect(steps[1]?.id).toBe('repo_sync');
-    expect(steps[1]?.uses).toBe('postman-cs/postman-repo-sync-action@v0');
+    expect(steps[1]?.uses).toBe('postman-cs/postman-repo-sync-action@hammad-dev');
   });
 
   it('maps bootstrap outputs explicitly into repo-sync inputs', () => {
