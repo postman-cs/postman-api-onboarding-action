@@ -46,6 +46,7 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           gh-fallback-token: ${{ secrets.GH_FALLBACK_TOKEN }}
           # enable-insights: true  # Chain Insights onboarding after bootstrap and repo sync
+          # cluster-name: my-cluster
 
   onboarding-existing:
     runs-on: ubuntu-latest
@@ -91,9 +92,9 @@ Even when reusing an existing `spec-id`, the composite action still requires `sp
 | `system-env-map-json` | `{}` | Map of environment slug to system environment ID. |
 | `governance-mapping-json` | `{}` | Map of domain to governance group name. |
 | `env-runtime-urls-json` | `{}` | Map of environment slug to runtime base URL. |
-| `postman-api-key` | | Postman API key for bootstrap and sync. If omitted or invalid, a new key is generated from `postman-access-token` by the underlying actions. |
+| `postman-api-key` | | Required Postman API key for the bootstrap and sync phases. The composite always runs `postman-bootstrap-action`, which still requires a PMAK. |
 | `postman-access-token` | | Enables governance assignment, Bifrost integration, and API key generation fallback. |
-| `postman-team-id` | | Explicit Postman team ID. Auto-derived from `postman-api-key` via `/me` when omitted. Passed as `POSTMAN_TEAM_ID` env to sub-actions. |
+| `postman-team-id` | | Explicit Postman team ID override for org-mode Bifrost calls. Passed to the downstream actions when provided. |
 | `github-token` | | Enables repository variable persistence and generated commits. |
 | `gh-fallback-token` | | Optional fallback token for workflow and variable APIs. |
 | `github-auth-mode` | `github_token_first` | GitHub auth mode for repository APIs. |
@@ -102,19 +103,20 @@ Even when reusing an existing `spec-id`, the composite action still requires `sp
 | `committer-name` | `Postman FDE` | Commit author name for generated sync commits. |
 | `committer-email` | `fde@postman.com` | Commit author email for generated sync commits. |
 | `enable-insights` | `false` | When `true`, chains `postman-cs/postman-insights-onboarding-action@v0` after bootstrap and repo sync. |
+| `cluster-name` | | Optional Insights cluster name passed to the downstream Insights onboarding step. |
 | `integration-backend` | `bifrost` | Current public open-alpha backend. |
 
 ### Team ID derivation
 
-Team ID is automatically derived from `postman-api-key` by the underlying actions via the Postman `/me` API. If you need to override this (for example, when using an org-mode token that spans multiple teams), pass `postman-team-id` explicitly. The value is injected as the `POSTMAN_TEAM_ID` environment variable for all sub-action steps.
+Pass `postman-team-id` only when a downstream org-mode Bifrost call needs an explicit team header. When omitted, the lower-level actions can leave `x-entity-team-id` unset and let Bifrost resolve team context from the access token.
 
 ### API key auto-creation
 
-When `postman-api-key` is omitted or invalid, the underlying bootstrap and repo-sync actions will attempt to generate a new API key using `postman-access-token` via the Bifrost identity service. The generated key is automatically persisted to the repository's `POSTMAN_API_KEY` secret when a GitHub token is available.
+`postman-repo-sync-action` and `postman-insights-onboarding-action` can create or rotate a PMAK from `postman-access-token` when they encounter a clear auth failure, but this composite still requires `postman-api-key` up front because `postman-bootstrap-action` cannot start without it.
 
 ### Org-mode Bifrost headers
 
-The underlying actions include the `x-entity-team-id` header on Bifrost proxy calls only when a team ID is resolved. For non-org-mode tokens, omit `postman-team-id` and ensure `POSTMAN_TEAM_ID` is not set in the environment so the header is excluded.
+The underlying actions include the `x-entity-team-id` header on Bifrost proxy calls only when an explicit team override is supplied. For non-org-mode tokens, omit `postman-team-id` so the header stays unset.
 
 ### Obtaining `postman-api-key`
 
@@ -173,7 +175,7 @@ The composite action wires:
 - `environment-uids-json`, `mock-url`, `monitor-id`, `repo-sync-summary-json`, and `commit-sha` from `repo_sync`.
 - Existing-service passthrough inputs to `bootstrap`: `workspace-id`, `spec-id`, `baseline-collection-id`, `smoke-collection-id`, and `contract-collection-id`.
 - Existing-repo passthrough inputs to `repo_sync`: `generate-ci-workflow` and `ci-workflow-path`.
-- When `enable-insights: true`, the Insights onboarding step runs after repo sync using the workspace ID from bootstrap.
+- When `enable-insights: true`, the Insights onboarding step runs after repo sync using the workspace ID from bootstrap plus the first environment from `environments-json` for `environment-id` and `system-env-map-json` lookup.
 
 See [action.yml](action.yml) for exact step mappings.
 

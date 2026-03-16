@@ -153,20 +153,21 @@ describe('postman-api-onboarding-action composite contract', () => {
         'committer-name',
         'committer-email',
         'enable-insights',
+        'cluster-name',
         'integration-backend'
       ]);
     });
 
-    it('postman-api-key is not required (can be auto-created from access-token)', () => {
+    it('postman-api-key is required because bootstrap depends on it', () => {
       const manifest = loadManifest();
-      expect(manifest.inputs['postman-api-key']?.required).not.toBe(true);
+      expect(manifest.inputs['postman-api-key']?.required).toBe(true);
     });
 
-    it('postman-team-id is optional with auto-derivation', () => {
+    it('postman-team-id remains an optional explicit override', () => {
       const manifest = loadManifest();
       expect(manifest.inputs['postman-team-id']).toBeDefined();
       expect(manifest.inputs['postman-team-id']?.required).toBe(false);
-      expect(manifest.inputs['postman-team-id']?.description).toContain('Auto-derived');
+      expect(manifest.inputs['postman-team-id']?.description).toContain('Explicit');
     });
 
     it('project-name and spec-url remain required', () => {
@@ -318,6 +319,20 @@ describe('postman-api-onboarding-action composite contract', () => {
       expect(insightsStep?.with?.['workspace-id']).toBe(
         '${{ steps.bootstrap.outputs.workspace-id }}'
       );
+    });
+
+    it('insights step receives required downstream onboarding inputs', () => {
+      const manifest = loadManifest();
+      const insightsStep = manifest.runs.steps.find((s) => s.id === 'insights_onboarding');
+
+      expect(insightsStep?.with?.['environment-id']).toBe(
+        '${{ fromJSON(steps.repo_sync.outputs.environment-uids-json)[fromJSON(inputs.environments-json)[0]] }}'
+      );
+      expect(insightsStep?.with?.['system-environment-id']).toBe(
+        '${{ fromJSON(inputs.system-env-map-json)[fromJSON(inputs.environments-json)[0]] }}'
+      );
+      expect(insightsStep?.with?.['cluster-name']).toBe('${{ inputs.cluster-name }}');
+      expect(insightsStep?.with?.['postman-team-id']).toBe('${{ inputs.postman-team-id }}');
     });
   });
 

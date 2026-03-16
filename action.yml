@@ -60,13 +60,13 @@ inputs:
     required: false
     default: '{}'
   postman-api-key:
-    description: Postman API key used for bootstrap and sync operations. If omitted or invalid, a new key is generated from postman-access-token by the underlying actions.
-    required: false
+    description: Postman API key used for bootstrap and sync operations.
+    required: true
   postman-access-token:
     description: Postman access token used for Bifrost and governance integration.
     required: false
   postman-team-id:
-    description: Explicit Postman team ID. Auto-derived from postman-api-key via /me when omitted.
+    description: Explicit Postman team ID override for org-mode Bifrost calls.
     required: false
   github-token:
     description: GitHub token used for repo variables and generated commits.
@@ -97,6 +97,9 @@ inputs:
     description: Whether to enable Postman Insights.
     required: false
     default: 'false'
+  cluster-name:
+    description: Insights cluster name passed to the downstream Insights onboarding step.
+    required: false
   integration-backend:
     description: Integration backend used to coordinate onboarding phases.
     required: false
@@ -197,6 +200,10 @@ runs:
       with:
         project-name: ${{ inputs.project-name }}
         workspace-id: ${{ steps.bootstrap.outputs.workspace-id }}
+        environment-id: ${{ fromJSON(steps.repo_sync.outputs.environment-uids-json)[fromJSON(inputs.environments-json)[0]] }}
+        system-environment-id: ${{ fromJSON(inputs.system-env-map-json)[fromJSON(inputs.environments-json)[0]] }}
+        cluster-name: ${{ inputs.cluster-name }}
         postman-api-key: ${{ inputs.postman-api-key }}
         postman-access-token: ${{ inputs.postman-access-token }}
+        postman-team-id: ${{ inputs.postman-team-id }}
         github-token: ${{ inputs.github-token }}
