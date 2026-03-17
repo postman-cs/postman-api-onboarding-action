@@ -133,6 +133,9 @@ outputs:
   monitor-id:
     description: Smoke monitor ID.
     value: ${{ steps.repo_sync.outputs.monitor-id }}
+  monitor-type:
+    description: Monitor type — "cli" (triggered from CI/CD) or "cloud" (runs on a Postman schedule).
+    value: ${{ steps.repo_sync.outputs.monitor-type }}
   repo-sync-summary-json:
     description: JSON summary of repo materialization and workspace sync planning.
     value: ${{ steps.repo_sync.outputs.repo-sync-summary-json }}
@@ -168,7 +171,7 @@ runs:
         integration-backend: ${{ inputs.integration-backend }}
     - id: repo_sync
       name: Sync Repository and Workspace
-      uses: postman-cs/postman-repo-sync-action@hammad-dev
+      uses: postman-cs/postman-repo-sync-action@hammad/cli-monitor
       with:
         project-name: ${{ inputs.project-name }}
         workspace-id: ${{ steps.bootstrap.outputs.workspace-id }}
