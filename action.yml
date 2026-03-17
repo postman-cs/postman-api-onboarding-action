@@ -124,6 +124,9 @@ outputs:
   collections-json:
     description: JSON summary of generated collections.
     value: ${{ steps.bootstrap.outputs.collections-json }}
+  spec-server-url:
+    description: First server URL extracted from the OpenAPI spec.
+    value: ${{ steps.bootstrap.outputs.spec-server-url }}
   environment-uids-json:
     description: JSON map of environment slug to Postman environment uid.
     value: ${{ steps.repo_sync.outputs.environment-uids-json }}
@@ -147,7 +150,7 @@ runs:
   steps:
     - id: bootstrap
       name: Bootstrap Postman Assets
-      uses: postman-cs/postman-bootstrap-action@v0
+      uses: postman-cs/postman-bootstrap-action@hammad/infer-env-urls
       with:
         project-name: ${{ inputs.project-name }}
         workspace-id: ${{ inputs.workspace-id }}
@@ -169,6 +172,19 @@ runs:
         gh-fallback-token: ${{ inputs.gh-fallback-token }}
         github-auth-mode: ${{ inputs.github-auth-mode }}
         integration-backend: ${{ inputs.integration-backend }}
+    - id: resolve_env_urls
+      name: Resolve runtime URLs
+      shell: bash
+      run: |
+        EXPLICIT='${{ inputs.env-runtime-urls-json }}'
+        SERVER='${{ steps.bootstrap.outputs.spec-server-url }}'
+        if [ "$EXPLICIT" != '{}' ] && [ -n "$EXPLICIT" ]; then
+          echo "json=$EXPLICIT" >> "$GITHUB_OUTPUT"
+        elif [ -n "$SERVER" ]; then
+          echo "json=$(echo '${{ inputs.environments-json }}' | jq -c --arg u "$SERVER" '[.[] | {(.): $u}] | add // {}')" >> "$GITHUB_OUTPUT"
+        else
+          echo "json={}" >> "$GITHUB_OUTPUT"
+        fi
     - id: repo_sync
       name: Sync Repository and Workspace
       uses: postman-cs/postman-repo-sync-action@hammad/cli-monitor
@@ -186,7 +202,7 @@ runs:
         environments-json: ${{ inputs.environments-json }}
         system-env-map-json: ${{ inputs.system-env-map-json }}
         environment-uids-json: '{}'
-        env-runtime-urls-json: ${{ inputs.env-runtime-urls-json }}
+        env-runtime-urls-json: ${{ steps.resolve_env_urls.outputs.json }}
         repo-write-mode: ${{ inputs.repo-write-mode }}
         current-ref: ${{ inputs.current-ref }}
         committer-name: ${{ inputs.committer-name }}

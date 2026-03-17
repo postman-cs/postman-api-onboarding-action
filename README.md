@@ -2,10 +2,11 @@
 
 Public open-alpha composite GitHub Action that orchestrates Postman onboarding by chaining:
 
-- `postman-cs/postman-bootstrap-action@v0`
-- `postman-cs/postman-repo-sync-action@v0`
+- `postman-cs/postman-bootstrap-action`
+- a resolve step that infers env runtime URLs from the spec when not provided
+- `postman-cs/postman-repo-sync-action`
 
-This is the primary partner-facing entrypoint for the open-alpha suite.
+This is the primary partner-facing entrypoint for the open-alpha suite. When `env-runtime-urls-json` is empty, the first server URL from the OpenAPI spec is used for all environments. Monitors are created as CLI monitors (run on every CI pipeline) unless `monitor-cron` is set for a cloud schedule.
 
 For existing services, the composite action can target an existing workspace/spec/collection set and can suppress or redirect generated CI workflow output for repos that already have their own pipeline layout.
 
@@ -80,7 +81,7 @@ Even when reusing an existing `spec-id`, the composite action still requires `sp
 | `contract-collection-id` | | Reuse an existing contract collection. |
 | `monitor-id` | | Existing smoke monitor ID. When set the action skips monitor creation. |
 | `mock-url` | | Existing mock server URL. When set the action skips mock creation. |
-| `monitor-cron` | `""` | Cron expression for monitor scheduling (e.g. `0 */6 * * *`). When empty the monitor is created without a schedule. |
+| `monitor-cron` | `""` | Cron expression for monitor scheduling (e.g. `0 */6 * * *`). When empty a **CLI monitor** is created and runs on every pipeline run; when set, a **cloud monitor** runs on that schedule. |
 | `generate-ci-workflow` | `true` | Pass through to repo sync; set `false` for repos that already manage CI. |
 | `ci-workflow-path` | `.github/workflows/ci.yml` | Pass through to repo sync to redirect generated workflow output. |
 | `project-name` | | Service name used across bootstrap and repo sync. |
@@ -92,7 +93,7 @@ Even when reusing an existing `spec-id`, the composite action still requires `sp
 | `environments-json` | `["prod"]` | Environment slugs to materialize downstream. |
 | `system-env-map-json` | `{}` | Map of environment slug to system environment ID. |
 | `governance-mapping-json` | `{}` | Map of domain to governance group name. |
-| `env-runtime-urls-json` | `{}` | Map of environment slug to runtime base URL. |
+| `env-runtime-urls-json` | `{}` | Map of environment slug to runtime base URL. When empty, the first server URL from the OpenAPI spec is inferred and used for all environments (see **Inferring runtime URLs** below). |
 | `postman-api-key` | | Required for bootstrap and repo sync Postman operations. |
 | `postman-access-token` | | Enables governance assignment and Bifrost integration work. |
 | `github-token` | | Enables repository variable persistence and generated commits. |
@@ -156,17 +157,28 @@ The `postman-access-token` is a Postman session token (`x-access-token`) require
 
 > **Note:** `postman login --with-api-key` stores a PMAK — **not** the session token these APIs require. You must use the interactive browser login.
 
+### Inferring runtime URLs
+
+If `env-runtime-urls-json` is not provided (or is `{}`), the composite uses the bootstrap step’s **spec-server-url** output — the first entry in the OpenAPI spec’s `servers` array — and applies it to every environment in `environments-json`. Set `env-runtime-urls-json` explicitly when your deployed URLs differ from the spec or you have multiple environments with different base URLs.
+
+### Monitors: CLI vs cloud
+
+- **No `monitor-cron`** (default): A CLI monitor is created. The generated CI workflow runs `postman monitor run` on every pipeline run, so smoke tests run in your CI without a Postman cloud schedule.
+- **`monitor-cron` set**: A cloud monitor is created and runs on that schedule from Postman’s infrastructure.
+
+The composite outputs **monitor-type** (`cli` or `cloud`) from the repo-sync step.
+
 ## Output Mapping
 
 The composite action wires:
 
-- `workspace-id`, `workspace-url`, `spec-id`, and `collections-json` from `bootstrap`.
-- `environment-uids-json`, `mock-url`, `monitor-id`, `repo-sync-summary-json`, and `commit-sha` from `repo_sync`.
+- `workspace-id`, `workspace-url`, `spec-id`, `collections-json`, and `spec-server-url` from `bootstrap`.
+- `environment-uids-json`, `mock-url`, `monitor-id`, `monitor-type`, `repo-sync-summary-json`, and `commit-sha` from `repo_sync`.
 - Existing-service passthrough inputs to `bootstrap`: `workspace-id`, `spec-id`, `baseline-collection-id`, `smoke-collection-id`, and `contract-collection-id`.
 - Existing-repo passthrough inputs to `repo_sync`: `generate-ci-workflow` and `ci-workflow-path`.
 - When `enable-insights: true`, the Insights onboarding step runs after repo sync using the workspace ID from bootstrap.
 
-See [action.yml](/Users/jaredboynton/__devlocal/postman-api-onboarding-action/action.yml) for exact step mappings.
+See [action.yml](action.yml) for exact step mappings.
 
 ## Local Development
 

@@ -73,11 +73,12 @@ describe('postman-api-onboarding-action composite contract', () => {
     const manifest = loadManifest();
     const steps = manifest.runs.steps;
 
-    expect(steps).toHaveLength(3);
+    expect(steps).toHaveLength(4);
     expect(steps[0]?.id).toBe('bootstrap');
-    expect(steps[0]?.uses).toBe('postman-cs/postman-bootstrap-action@v0');
-    expect(steps[1]?.id).toBe('repo_sync');
-    expect(steps[1]?.uses).toBe('postman-cs/postman-repo-sync-action@hammad/cli-monitor');
+    expect(steps[0]?.uses).toBe('postman-cs/postman-bootstrap-action@hammad/infer-env-urls');
+    expect(steps[1]?.id).toBe('resolve_env_urls');
+    expect(steps[2]?.id).toBe('repo_sync');
+    expect(steps[2]?.uses).toBe('postman-cs/postman-repo-sync-action@hammad/cli-monitor');
   });
 
   it('maps bootstrap outputs explicitly into repo-sync inputs', () => {
@@ -114,6 +115,9 @@ describe('postman-api-onboarding-action composite contract', () => {
     expect(repoSyncStep?.with?.['ci-workflow-path']).toBe(
       '${{ inputs.ci-workflow-path }}'
     );
+    expect(repoSyncStep?.with?.['env-runtime-urls-json']).toBe(
+      '${{ steps.resolve_env_urls.outputs.json }}'
+    );
   });
 
   it('surfaces final outputs from bootstrap and repo-sync steps', () => {
@@ -124,6 +128,9 @@ describe('postman-api-onboarding-action composite contract', () => {
     );
     expect(manifest.outputs['collections-json']?.value).toBe(
       '${{ steps.bootstrap.outputs.collections-json }}'
+    );
+    expect(manifest.outputs['spec-server-url']?.value).toBe(
+      '${{ steps.bootstrap.outputs.spec-server-url }}'
     );
     expect(manifest.outputs['environment-uids-json']?.value).toBe(
       '${{ steps.repo_sync.outputs.environment-uids-json }}'
