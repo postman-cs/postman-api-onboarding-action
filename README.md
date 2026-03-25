@@ -72,6 +72,14 @@ jobs:
 
 Even when reusing an existing `spec-id`, the composite action still requires `spec-url` because the bootstrap step updates the existing Spec Hub asset from that source of truth.
 
+The collection and spec lifecycle controls are backward-compatible by default:
+
+- `collection-sync-mode: reuse`
+- `spec-sync-mode: update`
+- `set-as-current: true`
+
+If you do not set those inputs, the action preserves today’s behavior.
+
 ## Inputs
 
 | Input | Default | Notes |
@@ -81,6 +89,10 @@ Even when reusing an existing `spec-id`, the composite action still requires `sp
 | `baseline-collection-id` | | Reuse an existing baseline collection. |
 | `smoke-collection-id` | | Reuse an existing smoke collection. |
 | `contract-collection-id` | | Reuse an existing contract collection. |
+| `collection-sync-mode` | `reuse` | Controls collection lifecycle. `reuse` keeps the current collections, `refresh` regenerates them from the latest spec, and `version` creates or reuses release-scoped collections. |
+| `spec-sync-mode` | `update` | Controls spec lifecycle. `update` keeps a canonical latest spec in Spec Hub, while `version` creates or reuses a release-scoped spec. |
+| `release-label` | | Optional release label for versioned specs and collections. When omitted during versioned sync, the lower-level actions derive one from GitHub tag or branch metadata. |
+| `set-as-current` | `true` | Whether the resolved assets should update the current/default GitHub repo variables. Set `false` to publish a side-by-side version without moving the current pointers. |
 | `monitor-id` | | Existing smoke monitor ID. When set, the action validates and reuses this monitor instead of creating a new one. |
 | `mock-url` | | Existing mock server URL. When set, the action validates and reuses this mock instead of creating a new one. |
 | `monitor-cron` | `""` | Cron expression for monitor scheduling (e.g. `0 */6 * * *`). When empty, the monitor is created in a disabled state. |
@@ -110,6 +122,29 @@ Even when reusing an existing `spec-id`, the composite action still requires `sp
 | `cluster-name` | | Optional Insights cluster name passed to the downstream Insights onboarding step. |
 | `integration-backend` | `bifrost` | Current public open-alpha backend. |
 | `org-mode` | `false` | When `true`, includes `x-entity-team-id` header in Bifrost proxy calls. Non-org teams must omit this header. |
+
+## Lifecycle Modes
+
+### Collection sync
+
+- `reuse`: current behavior. Existing collections are reused when IDs are available.
+- `refresh`: the existing collections are regenerated from the updated spec and become the current/default pointers.
+- `version`: a release-scoped collection set is created or reused. By default it becomes current, but you can keep the old current pointers by setting `set-as-current: false`.
+
+### Spec sync
+
+- `update`: current behavior. The canonical spec in Spec Hub is updated from `spec-url`.
+- `version`: a release-scoped spec is created or reused instead of updating the current canonical spec.
+
+### Release label derivation
+
+When versioned sync is requested and `release-label` is omitted, the lower-level actions derive one using:
+
+1. explicit `release-label`
+2. Git tag name
+3. branch name / ref metadata
+
+If versioned sync is requested and no usable label can be derived, the run fails with a clear error.
 
 ### Team ID derivation
 
@@ -183,6 +218,34 @@ The composite action wires:
 - When `enable-insights: true`, the Insights onboarding step runs after repo sync using the workspace ID from bootstrap plus the first environment from `environments-json` for `environment-id` and `system-env-map-json` lookup.
 
 See [action.yml](action.yml) for exact step mappings.
+
+## Versioning Examples
+
+Refresh the current collections in place while keeping one canonical spec:
+
+```yaml
+- uses: postman-cs/postman-api-onboarding-action@v0
+  with:
+    project-name: core-payments
+    spec-url: https://example.com/openapi.yaml
+    collection-sync-mode: refresh
+    spec-sync-mode: update
+    postman-api-key: ${{ secrets.POSTMAN_API_KEY }}
+```
+
+Create a side-by-side versioned release without moving the current/default pointers:
+
+```yaml
+- uses: postman-cs/postman-api-onboarding-action@v0
+  with:
+    project-name: core-payments
+    spec-url: https://example.com/openapi.yaml
+    collection-sync-mode: version
+    spec-sync-mode: version
+    release-label: v1.1.1
+    set-as-current: false
+    postman-api-key: ${{ secrets.POSTMAN_API_KEY }}
+```
 
 ## Local Development
 

@@ -130,6 +130,10 @@ describe('postman-api-onboarding-action composite contract', () => {
         'baseline-collection-id',
         'smoke-collection-id',
         'contract-collection-id',
+        'collection-sync-mode',
+        'spec-sync-mode',
+        'release-label',
+        'set-as-current',
         'monitor-id',
         'mock-url',
         'monitor-cron',
@@ -183,6 +187,13 @@ describe('postman-api-onboarding-action composite contract', () => {
     it('defaults integration-backend to bifrost', () => {
       const manifest = loadManifest();
       expect(manifest.inputs['integration-backend']?.default).toBe('bifrost');
+    });
+
+    it('defaults lifecycle controls to backward-compatible values', () => {
+      const manifest = loadManifest();
+      expect(manifest.inputs['collection-sync-mode']?.default).toBe('reuse');
+      expect(manifest.inputs['spec-sync-mode']?.default).toBe('update');
+      expect(manifest.inputs['set-as-current']?.default).toBe('true');
     });
 
     it('defaults enable-insights to false', () => {
@@ -249,6 +260,18 @@ describe('postman-api-onboarding-action composite contract', () => {
       expect(bootstrapStep?.with?.['contract-collection-id']).toBe(
         '${{ inputs.contract-collection-id }}'
       );
+      expect(bootstrapStep?.with?.['collection-sync-mode']).toBe(
+        '${{ inputs.collection-sync-mode }}'
+      );
+      expect(bootstrapStep?.with?.['spec-sync-mode']).toBe(
+        '${{ inputs.spec-sync-mode }}'
+      );
+      expect(bootstrapStep?.with?.['release-label']).toBe(
+        '${{ inputs.release-label }}'
+      );
+      expect(bootstrapStep?.with?.['set-as-current']).toBe(
+        '${{ inputs.set-as-current }}'
+      );
       expect(repoSyncStep?.with?.['workspace-id']).toBe(
         '${{ steps.bootstrap.outputs.workspace-id }}'
       );
@@ -260,6 +283,18 @@ describe('postman-api-onboarding-action composite contract', () => {
       );
       expect(repoSyncStep?.with?.['contract-collection-id']).toBe(
         '${{ steps.bootstrap.outputs.contract-collection-id }}'
+      );
+      expect(repoSyncStep?.with?.['collection-sync-mode']).toBe(
+        '${{ inputs.collection-sync-mode }}'
+      );
+      expect(repoSyncStep?.with?.['spec-sync-mode']).toBe(
+        '${{ inputs.spec-sync-mode }}'
+      );
+      expect(repoSyncStep?.with?.['release-label']).toBe(
+        '${{ inputs.release-label }}'
+      );
+      expect(repoSyncStep?.with?.['set-as-current']).toBe(
+        '${{ inputs.set-as-current }}'
       );
       expect(repoSyncStep?.with?.['generate-ci-workflow']).toBe(
         '${{ inputs.generate-ci-workflow }}'
