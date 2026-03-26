@@ -144,6 +144,7 @@ describe('postman-api-onboarding-action composite contract', () => {
         'requester-email',
         'workspace-admin-user-ids',
         'spec-url',
+        'spec-path',
         'environments-json',
         'system-env-map-json',
         'governance-mapping-json',
@@ -275,6 +276,9 @@ describe('postman-api-onboarding-action composite contract', () => {
       );
       expect(repoSyncStep?.with?.['spec-id']).toBe(
         '${{ steps.bootstrap.outputs.spec-id }}'
+      );
+      expect(repoSyncStep?.with?.['spec-path']).toBe(
+        '${{ inputs.spec-path }}'
       );
       expect(repoSyncStep?.with?.['releases-json']).toBeUndefined();
       expect(repoSyncStep?.with?.['generate-ci-workflow']).toBe(

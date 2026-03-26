@@ -142,6 +142,7 @@ Even when reusing an existing `spec-id`, the composite action still requires `sp
 | `workspace-admin-user-ids` | | Optional comma-separated workspace admin IDs. |
 | `workspace-team-id` | | Numeric sub-team ID for org-mode workspace creation. |
 | `spec-url` | | Required registry-backed OpenAPI document URL. |
+| `spec-path` | | Optional repo-root-relative path to the local spec file used for repo metadata generation. |
 | `environments-json` | `["prod"]` | Environment slugs to materialize downstream. |
 | `system-env-map-json` | `{}` | Map of environment slug to system environment ID. |
 | `governance-mapping-json` | `{}` | Map of domain to governance group name. |
@@ -232,7 +233,7 @@ The composite action wires:
 - `workspace-id`, `workspace-url`, `spec-id`, and `collections-json` from `bootstrap`.
 - `environment-uids-json`, `mock-url`, `monitor-id`, `repo-sync-summary-json`, and `commit-sha` from `repo_sync`.
 - Existing-service passthrough inputs to `bootstrap`: `workspace-id`, `spec-id`, `baseline-collection-id`, `smoke-collection-id`, and `contract-collection-id`.
-- Existing-repo passthrough inputs to `repo_sync`: `generate-ci-workflow` and `ci-workflow-path`.
+- Existing-repo passthrough inputs to `repo_sync`: `generate-ci-workflow`, `ci-workflow-path`, and `spec-path`.
 - When `enable-insights: true`, the Insights onboarding step runs after repo sync using the workspace ID from bootstrap plus the first environment from `environments-json` for `environment-id` and `system-env-map-json` lookup.
 - Insights outputs (`insights-status`, `insights-verification-token`, `insights-application-id`, `insights-discovered-service-id`, `insights-discovered-service-name`, `insights-collection-id`) are surfaced when `enable-insights: true`.
 
