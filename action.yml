@@ -28,10 +28,6 @@ inputs:
   release-label:
     description: Optional release label for versioned specs and collections. When omitted during versioned sync, derived from GitHub tag or branch metadata.
     required: false
-  set-as-current:
-    description: Whether resolved assets should become the current/default repo variable pointers. Set false to publish a side-by-side version.
-    required: false
-    default: 'true'
   monitor-id:
     description: Existing smoke monitor ID. When set, the action validates and reuses this monitor instead of creating a new one.
     required: false
@@ -99,10 +95,6 @@ inputs:
   gh-fallback-token:
     description: Fallback GitHub token for variable and workflow-file APIs.
     required: false
-  github-auth-mode:
-    description: GitHub auth mode for repository APIs.
-    required: false
-    default: github_token_first
   repo-write-mode:
     description: Repo mutation mode for generated assets and workflow files.
     required: false
@@ -212,20 +204,14 @@ runs:
         collection-sync-mode: ${{ inputs.collection-sync-mode }}
         spec-sync-mode: ${{ inputs.spec-sync-mode }}
         release-label: ${{ inputs.release-label }}
-        set-as-current: ${{ inputs.set-as-current }}
         domain: ${{ inputs.domain }}
         domain-code: ${{ inputs.domain-code }}
         requester-email: ${{ inputs.requester-email }}
         workspace-admin-user-ids: ${{ inputs.workspace-admin-user-ids }}
         spec-url: ${{ inputs.spec-url }}
-        environments-json: ${{ inputs.environments-json }}
-        system-env-map-json: ${{ inputs.system-env-map-json }}
         governance-mapping-json: ${{ inputs.governance-mapping-json }}
         postman-api-key: ${{ inputs.postman-api-key }}
         postman-access-token: ${{ inputs.postman-access-token }}
-        github-token: ${{ inputs.github-token }}
-        gh-fallback-token: ${{ inputs.gh-fallback-token }}
-        github-auth-mode: ${{ inputs.github-auth-mode }}
         integration-backend: ${{ inputs.integration-backend }}
     - id: repo_sync
       name: Sync Repository and Workspace
@@ -241,7 +227,6 @@ runs:
         collection-sync-mode: ${{ inputs.collection-sync-mode }}
         spec-sync-mode: ${{ inputs.spec-sync-mode }}
         release-label: ${{ inputs.release-label }}
-        set-as-current: ${{ inputs.set-as-current }}
         generate-ci-workflow: ${{ inputs.generate-ci-workflow }}
         ci-workflow-path: ${{ inputs.ci-workflow-path }}
         environments-json: ${{ inputs.environments-json }}
@@ -256,7 +241,6 @@ runs:
         postman-access-token: ${{ inputs.postman-access-token }}
         github-token: ${{ inputs.github-token }}
         gh-fallback-token: ${{ inputs.gh-fallback-token }}
-        github-auth-mode: ${{ inputs.github-auth-mode }}
         org-mode: ${{ inputs.org-mode }}
         integration-backend: ${{ inputs.integration-backend }}
         monitor-id: ${{ inputs.monitor-id }}
@@ -267,7 +251,6 @@ runs:
         ssl-client-passphrase: ${{ inputs.ssl-client-passphrase }}
         ssl-extra-ca-certs: ${{ inputs.ssl-extra-ca-certs }}
         spec-id: ${{ steps.bootstrap.outputs.spec-id }}
-        releases-json: ${{ steps.bootstrap.outputs.releases-json }}
     - id: insights_onboarding
       if: inputs.enable-insights == 'true'
       name: Onboard Postman Insights

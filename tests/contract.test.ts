@@ -133,7 +133,6 @@ describe('postman-api-onboarding-action composite contract', () => {
         'collection-sync-mode',
         'spec-sync-mode',
         'release-label',
-        'set-as-current',
         'monitor-id',
         'mock-url',
         'monitor-cron',
@@ -154,7 +153,6 @@ describe('postman-api-onboarding-action composite contract', () => {
         'postman-team-id',
         'github-token',
         'gh-fallback-token',
-        'github-auth-mode',
         'repo-write-mode',
         'current-ref',
         'committer-name',
@@ -278,9 +276,7 @@ describe('postman-api-onboarding-action composite contract', () => {
       expect(repoSyncStep?.with?.['spec-id']).toBe(
         '${{ steps.bootstrap.outputs.spec-id }}'
       );
-      expect(repoSyncStep?.with?.['releases-json']).toBe(
-        '${{ steps.bootstrap.outputs.releases-json }}'
-      );
+      expect(repoSyncStep?.with?.['releases-json']).toBeUndefined();
       expect(repoSyncStep?.with?.['generate-ci-workflow']).toBe(
         '${{ inputs.generate-ci-workflow }}'
       );
@@ -379,11 +375,6 @@ describe('postman-api-onboarding-action composite contract', () => {
     it('repo-write-mode defaults to commit-and-push', () => {
       const manifest = loadManifest();
       expect(manifest.inputs['repo-write-mode']?.default).toBe('commit-and-push');
-    });
-
-    it('github-auth-mode defaults to github_token_first', () => {
-      const manifest = loadManifest();
-      expect(manifest.inputs['github-auth-mode']?.default).toBe('github_token_first');
     });
 
     it('committer-name defaults to Postman CSE', () => {

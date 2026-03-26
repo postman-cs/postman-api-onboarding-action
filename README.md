@@ -130,7 +130,6 @@ Even when reusing an existing `spec-id`, the composite action still requires `sp
 | `collection-sync-mode` | `refresh` | Collection lifecycle policy. `refresh` regenerates from latest spec (default), `reuse` keeps existing, `version` creates release-scoped collections. |
 | `spec-sync-mode` | `update` | Spec lifecycle policy. `update` keeps canonical spec current, `version` creates release-scoped spec. |
 | `release-label` | | Optional release label for versioned specs and collections. Derived from git tag/branch when omitted. |
-| `set-as-current` | `true` | Whether resolved assets become the current/default repo variable pointers. Set `false` for side-by-side releases. |
 | `monitor-id` | | Existing smoke monitor ID. When set, the action validates and reuses this monitor instead of creating a new one. |
 | `mock-url` | | Existing mock server URL. When set, the action validates and reuses this mock instead of creating a new one. |
 | `monitor-cron` | `""` | Cron expression for monitor scheduling (e.g. `0 */6 * * *`). When empty, the monitor is created in a disabled state. |
@@ -150,9 +149,8 @@ Even when reusing an existing `spec-id`, the composite action still requires `sp
 | `postman-api-key` | | Required Postman API key for the bootstrap and sync phases. The composite always runs `postman-bootstrap-action`, which still requires a PMAK. |
 | `postman-access-token` | | Enables governance assignment, Bifrost integration, and API key generation fallback. |
 | `postman-team-id` | | Explicit Postman team ID override for org-mode Bifrost calls. Passed to the downstream actions when provided. |
-| `github-token` | | Enables repository variable persistence and generated commits. |
-| `gh-fallback-token` | | Optional fallback token for workflow and variable APIs. |
-| `github-auth-mode` | `github_token_first` | GitHub auth mode for repository APIs. |
+| `github-token` | | Enables generated commits, workflow writes, and optional secret persistence in repo sync. |
+| `gh-fallback-token` | | Optional fallback token for workflow and commit APIs. |
 | `repo-write-mode` | `commit-and-push` | Repo mutation mode passed to repo sync. |
 | `current-ref` | | Optional explicit ref override for detached checkouts. |
 | `committer-name` | `Postman CSE` | Commit author name for generated sync commits. |
