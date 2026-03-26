@@ -118,6 +118,18 @@ inputs:
     description: Whether the Postman team uses org-mode. When true, x-entity-team-id header is included in Bifrost proxy calls. Non-org teams must omit this header.
     required: false
     default: 'false'
+  ssl-client-cert:
+    description: Base64-encoded PEM client certificate for mTLS. Passed through to repo-sync for CI workflow generation.
+    required: false
+  ssl-client-key:
+    description: Base64-encoded PEM client private key. Passed through to repo-sync.
+    required: false
+  ssl-client-passphrase:
+    description: Passphrase for encrypted private key. Passed through to repo-sync.
+    required: false
+  ssl-extra-ca-certs:
+    description: Base64-encoded PEM additional CA certificates. Passed through to repo-sync.
+    required: false
 outputs:
   integration-backend:
     description: Resolved integration backend for the onboarding run.
@@ -209,6 +221,10 @@ runs:
         monitor-id: ${{ inputs.monitor-id }}
         mock-url: ${{ inputs.mock-url }}
         monitor-cron: ${{ inputs.monitor-cron }}
+        ssl-client-cert: ${{ inputs.ssl-client-cert }}
+        ssl-client-key: ${{ inputs.ssl-client-key }}
+        ssl-client-passphrase: ${{ inputs.ssl-client-passphrase }}
+        ssl-extra-ca-certs: ${{ inputs.ssl-extra-ca-certs }}
     - id: insights_onboarding
       if: inputs.enable-insights == 'true'
       name: Onboard Postman Insights

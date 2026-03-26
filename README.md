@@ -110,6 +110,10 @@ Even when reusing an existing `spec-id`, the composite action still requires `sp
 | `cluster-name` | | Optional Insights cluster name passed to the downstream Insights onboarding step. |
 | `integration-backend` | `bifrost` | Current public open-alpha backend. |
 | `org-mode` | `false` | When `true`, includes `x-entity-team-id` header in Bifrost proxy calls. Non-org teams must omit this header. |
+| `ssl-client-cert` | | Base64-encoded PEM client certificate for mTLS. Passed through to repo-sync for CI workflow SSL support. |
+| `ssl-client-key` | | Base64-encoded PEM client private key. Passed through to repo-sync. |
+| `ssl-client-passphrase` | | Passphrase for encrypted private key. Passed through to repo-sync. |
+| `ssl-extra-ca-certs` | | Base64-encoded PEM additional CA certificates. Passed through to repo-sync. |
 
 ### Team ID derivation
 

@@ -158,7 +158,11 @@ describe('postman-api-onboarding-action composite contract', () => {
         'enable-insights',
         'cluster-name',
         'integration-backend',
-        'org-mode'
+        'org-mode',
+        'ssl-client-cert',
+        'ssl-client-key',
+        'ssl-client-passphrase',
+        'ssl-extra-ca-certs'
       ]);
     });
 
