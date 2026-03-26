@@ -127,6 +127,7 @@ Even when reusing an existing `spec-id`, the composite action still requires `sp
 | `baseline-collection-id` | | Reuse an existing baseline collection. |
 | `smoke-collection-id` | | Reuse an existing smoke collection. |
 | `contract-collection-id` | | Reuse an existing contract collection. |
+| `sync-examples` | `true` | Whether linked spec/collection relations should enable example syncing during cloud linkage. |
 | `collection-sync-mode` | `refresh` | Collection lifecycle policy. `refresh` regenerates from latest spec (default), `reuse` keeps existing, `version` creates release-scoped collections. |
 | `spec-sync-mode` | `update` | Spec lifecycle policy. `update` keeps canonical spec current, `version` creates release-scoped spec. |
 | `release-label` | | Optional release label for versioned specs and collections. Derived from git tag/branch when omitted. |

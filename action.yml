@@ -17,6 +17,10 @@ inputs:
   contract-collection-id:
     description: Existing contract collection ID.
     required: false
+  sync-examples:
+    description: Whether linked spec/collection relations should enable example syncing.
+    required: false
+    default: 'true'
   collection-sync-mode:
     description: Collection lifecycle policy (reuse, refresh, or version). Default refresh ensures collections stay in sync with the spec.
     required: false
@@ -204,6 +208,7 @@ runs:
         baseline-collection-id: ${{ inputs.baseline-collection-id }}
         smoke-collection-id: ${{ inputs.smoke-collection-id }}
         contract-collection-id: ${{ inputs.contract-collection-id }}
+        sync-examples: ${{ inputs.sync-examples }}
         collection-sync-mode: ${{ inputs.collection-sync-mode }}
         spec-sync-mode: ${{ inputs.spec-sync-mode }}
         release-label: ${{ inputs.release-label }}
