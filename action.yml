@@ -17,6 +17,21 @@ inputs:
   contract-collection-id:
     description: Existing contract collection ID.
     required: false
+  collection-sync-mode:
+    description: Collection lifecycle policy (reuse, refresh, or version). Default refresh ensures collections stay in sync with the spec.
+    required: false
+    default: refresh
+  spec-sync-mode:
+    description: Spec lifecycle policy (update or version).
+    required: false
+    default: update
+  release-label:
+    description: Optional release label for versioned specs and collections. When omitted during versioned sync, derived from GitHub tag or branch metadata.
+    required: false
+  set-as-current:
+    description: Whether resolved assets should become the current/default repo variable pointers. Set false to publish a side-by-side version.
+    required: false
+    default: 'true'
   monitor-id:
     description: Existing smoke monitor ID. When set, the action validates and reuses this monitor instead of creating a new one.
     required: false
@@ -194,6 +209,10 @@ runs:
         baseline-collection-id: ${{ inputs.baseline-collection-id }}
         smoke-collection-id: ${{ inputs.smoke-collection-id }}
         contract-collection-id: ${{ inputs.contract-collection-id }}
+        collection-sync-mode: ${{ inputs.collection-sync-mode }}
+        spec-sync-mode: ${{ inputs.spec-sync-mode }}
+        release-label: ${{ inputs.release-label }}
+        set-as-current: ${{ inputs.set-as-current }}
         domain: ${{ inputs.domain }}
         domain-code: ${{ inputs.domain-code }}
         requester-email: ${{ inputs.requester-email }}
@@ -219,6 +238,10 @@ runs:
         baseline-collection-id: ${{ steps.bootstrap.outputs.baseline-collection-id }}
         smoke-collection-id: ${{ steps.bootstrap.outputs.smoke-collection-id }}
         contract-collection-id: ${{ steps.bootstrap.outputs.contract-collection-id }}
+        collection-sync-mode: ${{ inputs.collection-sync-mode }}
+        spec-sync-mode: ${{ inputs.spec-sync-mode }}
+        release-label: ${{ inputs.release-label }}
+        set-as-current: ${{ inputs.set-as-current }}
         generate-ci-workflow: ${{ inputs.generate-ci-workflow }}
         ci-workflow-path: ${{ inputs.ci-workflow-path }}
         environments-json: ${{ inputs.environments-json }}
