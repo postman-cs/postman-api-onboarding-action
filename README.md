@@ -127,6 +127,10 @@ Even when reusing an existing `spec-id`, the composite action still requires `sp
 | `baseline-collection-id` | | Reuse an existing baseline collection. |
 | `smoke-collection-id` | | Reuse an existing smoke collection. |
 | `contract-collection-id` | | Reuse an existing contract collection. |
+| `collection-sync-mode` | `refresh` | Collection lifecycle policy. `refresh` regenerates from latest spec (default), `reuse` keeps existing, `version` creates release-scoped collections. |
+| `spec-sync-mode` | `update` | Spec lifecycle policy. `update` keeps canonical spec current, `version` creates release-scoped spec. |
+| `release-label` | | Optional release label for versioned specs and collections. Derived from git tag/branch when omitted. |
+| `set-as-current` | `true` | Whether resolved assets become the current/default repo variable pointers. Set `false` for side-by-side releases. |
 | `monitor-id` | | Existing smoke monitor ID. When set, the action validates and reuses this monitor instead of creating a new one. |
 | `mock-url` | | Existing mock server URL. When set, the action validates and reuses this mock instead of creating a new one. |
 | `monitor-cron` | `""` | Cron expression for monitor scheduling (e.g. `0 */6 * * *`). When empty, the monitor is created in a disabled state. |
@@ -137,6 +141,7 @@ Even when reusing an existing `spec-id`, the composite action still requires `sp
 | `domain-code` | | Short prefix used in workspace naming. |
 | `requester-email` | | Optional workspace invite target. |
 | `workspace-admin-user-ids` | | Optional comma-separated workspace admin IDs. |
+| `workspace-team-id` | | Numeric sub-team ID for org-mode workspace creation. |
 | `spec-url` | | Required registry-backed OpenAPI document URL. |
 | `environments-json` | `["prod"]` | Environment slugs to materialize downstream. |
 | `system-env-map-json` | `{}` | Map of environment slug to system environment ID. |
