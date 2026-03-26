@@ -275,6 +275,12 @@ describe('postman-api-onboarding-action composite contract', () => {
       expect(repoSyncStep?.with?.['contract-collection-id']).toBe(
         '${{ steps.bootstrap.outputs.contract-collection-id }}'
       );
+      expect(repoSyncStep?.with?.['spec-id']).toBe(
+        '${{ steps.bootstrap.outputs.spec-id }}'
+      );
+      expect(repoSyncStep?.with?.['releases-json']).toBe(
+        '${{ steps.bootstrap.outputs.releases-json }}'
+      );
       expect(repoSyncStep?.with?.['generate-ci-workflow']).toBe(
         '${{ inputs.generate-ci-workflow }}'
       );
