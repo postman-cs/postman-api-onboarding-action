@@ -206,7 +206,13 @@ describe('postman-api-onboarding-action composite contract', () => {
         'mock-url',
         'monitor-id',
         'repo-sync-summary-json',
-        'commit-sha'
+        'commit-sha',
+        'insights-status',
+        'insights-verification-token',
+        'insights-application-id',
+        'insights-discovered-service-id',
+        'insights-discovered-service-name',
+        'insights-collection-id'
       ]);
     });
   });

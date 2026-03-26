@@ -161,6 +161,24 @@ outputs:
   commit-sha:
     description: Commit SHA produced by repo-write-mode.
     value: ${{ steps.repo_sync.outputs.commit-sha }}
+  insights-status:
+    description: Insights onboarding status (success, not-found, error, or empty if insights disabled).
+    value: ${{ steps.insights_onboarding.outputs.status }}
+  insights-verification-token:
+    description: Team verification token for Insights DaemonSet configuration.
+    value: ${{ steps.insights_onboarding.outputs.verification-token }}
+  insights-application-id:
+    description: Insights application binding ID.
+    value: ${{ steps.insights_onboarding.outputs.application-id }}
+  insights-discovered-service-id:
+    description: Discovered service ID from Insights agent.
+    value: ${{ steps.insights_onboarding.outputs.discovered-service-id }}
+  insights-discovered-service-name:
+    description: Discovered service name from Insights agent.
+    value: ${{ steps.insights_onboarding.outputs.discovered-service-name }}
+  insights-collection-id:
+    description: Insights API Catalog collection ID.
+    value: ${{ steps.insights_onboarding.outputs.collection-id }}
 runs:
   using: composite
   steps:
