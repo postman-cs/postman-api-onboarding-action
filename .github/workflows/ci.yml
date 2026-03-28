@@ -16,6 +16,7 @@ jobs:
           node-version: '20'
           cache: npm
       - run: npm ci
+      - run: npm run lint
       - run: npm run typecheck
       - run: npm test
 
@@ -32,3 +33,12 @@ jobs:
         run: |
           ACTIONLINT_BIN="$(go env GOPATH)/bin/actionlint"
           "$ACTIONLINT_BIN"
+
+  commitlint:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: wagoid/commitlint-github-action@v6

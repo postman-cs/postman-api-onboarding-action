@@ -1,0 +1,28 @@
+name: Feature Request
+description: Suggest an enhancement
+labels: ["enhancement", "needs-triage"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: Describe the feature or enhancement.
+    validations:
+      required: true
+  - type: textarea
+    id: justification
+    attributes:
+      label: Use Case
+      description: Why is this needed? What problem does it solve?
+    validations:
+      required: true
+  - type: dropdown
+    id: willing-to-pr
+    attributes:
+      label: Are you willing to submit a PR?
+      options:
+        - "Yes"
+        - "No"
+        - "Maybe, with guidance"
+    validations:
+      required: true
