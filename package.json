@@ -12,7 +12,9 @@
   },
   "scripts": {
     "test": "vitest run",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix"
   },
   "keywords": [
     "github-action",
@@ -20,9 +22,14 @@
   ],
   "license": "MIT",
   "devDependencies": {
+    "@commitlint/cli": "^20.5.0",
+    "@commitlint/config-conventional": "^20.5.0",
+    "@eslint/js": "^10.0.1",
     "@types/node": "^25.3.5",
+    "eslint": "^10.1.0",
     "typescript": "^5.9.3",
-    "yaml": "^2.8.2",
-    "vitest": "^4.0.18"
+    "typescript-eslint": "^8.57.2",
+    "vitest": "^4.0.18",
+    "yaml": "^2.8.2"
   }
 }
