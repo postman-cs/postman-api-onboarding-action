@@ -22,7 +22,7 @@ inputs:
     required: false
     default: 'true'
   collection-sync-mode:
-    description: Collection lifecycle policy (reuse, refresh, or version). Default refresh ensures collections stay in sync with the spec.
+    description: Collection lifecycle policy (refresh or version). Default refresh ensures tracked collections stay in sync with the spec.
     required: false
     default: refresh
   spec-sync-mode:
@@ -211,7 +211,7 @@ runs:
   steps:
     - id: bootstrap
       name: Bootstrap Postman Assets
-      uses: postman-cs/postman-bootstrap-action@v0
+      uses: pavan-nelakuditi/postman-bootstrap-action@refresh_behavior_fix
       env:
         POSTMAN_TEAM_ID: ${{ inputs.postman-team-id }}
       with:
@@ -236,7 +236,7 @@ runs:
         integration-backend: ${{ inputs.integration-backend }}
     - id: repo_sync
       name: Sync Repository and Workspace
-      uses: postman-cs/postman-repo-sync-action@v0
+      uses: pavan-nelakuditi/postman-repo-sync-action@refresh_behavior_fix
       env:
         POSTMAN_TEAM_ID: ${{ inputs.postman-team-id }}
       with:
