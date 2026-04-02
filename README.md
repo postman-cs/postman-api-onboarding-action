@@ -10,6 +10,18 @@ This is the primary partner-facing entrypoint for the open-alpha suite.
 
 For existing services, the composite action can target an existing workspace/spec/collection set and can suppress or redirect generated CI workflow output for repos that already have their own pipeline layout.
 
+### Enterprise adoption: Protected-branch workflows
+
+If your repository enforces branch protection rules requiring all changes through pull requests, use `repo-write-mode: commit-only` with a workflow that creates PRs programmatically. This ensures Postman artifacts go through your normal code review process instead of pushing directly to `main`.
+
+**How it works:**
+1. Create a temporary sync branch (e.g., `postman-sync/YYYYMMDD-HHmmss`) — this branch is unprotected.
+2. Run the action with `repo-write-mode: commit-only` — artifacts are committed but not pushed.
+3. If artifacts changed, push the sync branch and open a PR targeting `main`.
+4. Your team reviews and merges the PR to apply the artifacts.
+
+This pattern separates **Postman provisioning** (independent success) from **git merge approval** (subject to your branch rules).
+
 ## Contract
 
 - Default `integration-backend` is `bifrost`.
@@ -241,6 +253,24 @@ The composite action wires:
 - `insights-status` remains the domain result from `steps.insights_onboarding.outputs.status`, while `insights-outcome` is the GitHub Actions step outcome for that phase.
 
 See [action.yml](action.yml) for exact step mappings.
+
+## Phase Outcome Tracking
+
+The composite action exposes runner-level outcome outputs for each phase so you can track partial success across bootstrap, repo sync, and optional Insights onboarding:
+
+- `bootstrap-outcome`: Bootstrap phase outcome (`success`, `failure`, `cancelled`, or `skipped`)
+- `repo-sync-outcome`: Repo sync phase outcome (`success`, `failure`, `cancelled`, or `skipped`)
+- `insights-outcome`: Insights onboarding phase outcome (`success`, `failure`, `cancelled`, or `skipped`; skipped if `enable-insights: false`)
+
+These are distinct from `insights-status`, which carries the domain result from the Insights action itself (e.g. `success`, `not-found`, `error`).
+
+**Why this matters:** Postman-side provisioning (workspace, spec, collections) completes independently of repository operations (git commit, branch protection, merge approval). Phase outcome outputs let you identify what succeeded and what requires attention:
+
+- **Bootstrap succeeds, repo-sync fails:** Postman workspace is ready; investigate repository permissions or branch protection issues.
+- **Both phases succeed, but repo merge pending:** Postman artifacts are staged in a PR awaiting your team's review.
+- **Insights fails after sync succeeds:** Postman and repository sync are complete; debug Insights cluster/agent issues separately.
+
+This enables idempotent reruns: reuse existing Postman assets (workspace ID, collection IDs) when retrying failed repository operations without re-provisioning.
 
 ## Local Development
 
