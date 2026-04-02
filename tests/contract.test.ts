@@ -148,6 +148,7 @@ describe('postman-api-onboarding-action composite contract', () => {
         'spec-path',
         'environments-json',
         'system-env-map-json',
+        'environment-uids-json',
         'governance-mapping-json',
         'env-runtime-urls-json',
         'postman-api-key',
@@ -397,6 +398,7 @@ describe('postman-api-onboarding-action composite contract', () => {
       expect(manifest.inputs['system-env-map-json']?.default).toBe('{}');
       expect(manifest.inputs['governance-mapping-json']?.default).toBe('{}');
       expect(manifest.inputs['env-runtime-urls-json']?.default).toBe('{}');
+      expect(manifest.inputs['environment-uids-json']?.default).toBe('{}');
     });
 
     it('every input has a description', () => {
