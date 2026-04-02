@@ -238,11 +238,11 @@ describe('postman-api-onboarding-action composite contract', () => {
 
       expect(steps[0]?.id).toBe('bootstrap');
       expect(steps[0]?.uses).toBe(
-        'pavan-nelakuditi/postman-bootstrap-action@refresh_behavior_fix'
+        'postman-cs/postman-bootstrap-action@main'
       );
       expect(steps[1]?.id).toBe('repo_sync');
       expect(steps[1]?.uses).toBe(
-        'pavan-nelakuditi/postman-repo-sync-action@refresh_behavior_fix'
+        'postman-cs/postman-repo-sync-action@main'
       );
       expect(steps[2]?.id).toBe('insights_onboarding');
       expect(steps[2]?.uses).toBe('postman-cs/postman-insights-onboarding-action@v0');
