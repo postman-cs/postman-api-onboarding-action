@@ -211,6 +211,9 @@ describe('postman-api-onboarding-action composite contract', () => {
         'monitor-id',
         'repo-sync-summary-json',
         'commit-sha',
+        'bootstrap-outcome',
+        'repo-sync-outcome',
+        'insights-outcome',
         'insights-status',
         'insights-verification-token',
         'insights-application-id',
@@ -290,7 +293,7 @@ describe('postman-api-onboarding-action composite contract', () => {
       );
     });
 
-    it('surfaces final outputs from bootstrap and repo-sync steps', () => {
+    it('surfaces final outputs from phase steps', () => {
       const manifest = loadManifest();
 
       expect(manifest.outputs['workspace-id']?.value).toBe(
@@ -307,6 +310,18 @@ describe('postman-api-onboarding-action composite contract', () => {
       );
       expect(manifest.outputs['commit-sha']?.value).toBe(
         '${{ steps.repo_sync.outputs.commit-sha }}'
+      );
+      expect(manifest.outputs['bootstrap-outcome']?.value).toBe(
+        '${{ steps.bootstrap.outcome }}'
+      );
+      expect(manifest.outputs['repo-sync-outcome']?.value).toBe(
+        '${{ steps.repo_sync.outcome }}'
+      );
+      expect(manifest.outputs['insights-outcome']?.value).toBe(
+        '${{ steps.insights_onboarding.outcome }}'
+      );
+      expect(manifest.outputs['insights-status']?.value).toBe(
+        '${{ steps.insights_onboarding.outputs.status }}'
       );
     });
 
