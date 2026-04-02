@@ -175,6 +175,15 @@ outputs:
   commit-sha:
     description: Commit SHA produced by repo-write-mode.
     value: ${{ steps.repo_sync.outputs.commit-sha }}
+  bootstrap-outcome:
+    description: GitHub Actions runner outcome for the bootstrap step.
+    value: ${{ steps.bootstrap.outcome }}
+  repo-sync-outcome:
+    description: GitHub Actions runner outcome for the repo sync step.
+    value: ${{ steps.repo_sync.outcome }}
+  insights-outcome:
+    description: GitHub Actions runner outcome for the Insights onboarding step.
+    value: ${{ steps.insights_onboarding.outcome }}
   insights-status:
     description: Insights onboarding status (success, not-found, error, or empty if insights disabled).
     value: ${{ steps.insights_onboarding.outputs.status }}

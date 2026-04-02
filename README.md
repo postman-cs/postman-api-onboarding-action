@@ -233,10 +233,12 @@ The composite action wires:
 
 - `workspace-id`, `workspace-url`, `spec-id`, and `collections-json` from `bootstrap`.
 - `environment-uids-json`, `mock-url`, `monitor-id`, `repo-sync-summary-json`, and `commit-sha` from `repo_sync`.
+- Runner-level phase outcomes are exposed as `bootstrap-outcome`, `repo-sync-outcome`, and `insights-outcome` from step outcomes (`success`, `failure`, `cancelled`, or `skipped`).
 - Existing-service passthrough inputs to `bootstrap`: `workspace-id`, `spec-id`, `baseline-collection-id`, `smoke-collection-id`, and `contract-collection-id`.
 - Existing-repo passthrough inputs to `repo_sync`: `generate-ci-workflow`, `ci-workflow-path`, and `spec-path`.
 - When `enable-insights: true`, the Insights onboarding step runs after repo sync using the workspace ID from bootstrap plus the first environment from `environments-json` for `environment-id` and `system-env-map-json` lookup.
-- Insights outputs (`insights-status`, `insights-verification-token`, `insights-application-id`, `insights-discovered-service-id`, `insights-discovered-service-name`, `insights-collection-id`) are surfaced when `enable-insights: true`.
+- Insights domain outputs (`insights-status`, `insights-verification-token`, `insights-application-id`, `insights-discovered-service-id`, `insights-discovered-service-name`, `insights-collection-id`) are surfaced when `enable-insights: true`.
+- `insights-status` remains the domain result from `steps.insights_onboarding.outputs.status`, while `insights-outcome` is the GitHub Actions step outcome for that phase.
 
 See [action.yml](action.yml) for exact step mappings.
 
