@@ -79,6 +79,10 @@ inputs:
     description: JSON map of environment slug to system environment id.
     required: false
     default: '{}'
+  environment-uids-json:                                                                                                                                                                                                                                                                             
+    description: JSON map of environment slug to existing Postman environment UID. When provided, repo-sync reuses these environments instead of creating new ones.                                                                                                                                  
+    required: false                                                                                                                                                                                                                                                                                  
+    default: '{}'      
   governance-mapping-json:
     description: JSON map of business domain to governance group name.
     required: false
@@ -239,7 +243,7 @@ runs:
         ci-workflow-path: ${{ inputs.ci-workflow-path }}
         environments-json: ${{ inputs.environments-json }}
         system-env-map-json: ${{ inputs.system-env-map-json }}
-        environment-uids-json: '{}'
+        environment-uids-json: ${{ inputs.environment-uids-json }}
         env-runtime-urls-json: ${{ inputs.env-runtime-urls-json }}
         repo-write-mode: ${{ inputs.repo-write-mode }}
         current-ref: ${{ inputs.current-ref }}
