@@ -40,6 +40,7 @@ jobs:
           spec-url: https://example.com/openapi.yaml
           environments-json: '["prod","stage"]'
           system-env-map-json: '{"prod":"uuid-prod","stage":"uuid-stage"}'
+          environment-uids-json: '{"dev":"uid-dev","staging":"uid-staging"}'
           governance-mapping-json: '{"core-banking":"Core Banking"}'
           env-runtime-urls-json: '{"prod":"https://api.example.com"}'
           postman-api-key: ${{ secrets.POSTMAN_API_KEY }}
@@ -146,6 +147,7 @@ Even when reusing an existing `spec-id`, the composite action still requires `sp
 | `spec-path` | | Optional repo-root-relative path to the local spec file used for repo metadata generation. |
 | `environments-json` | `["prod"]` | Environment slugs to materialize downstream. |
 | `system-env-map-json` | `{}` | Map of environment slug to system environment ID. |
+| `environment-uids-json` | `{}` | Map of environment slug to existing Postman environment UID. When provided, repo-sync reuses these environments instead of creating new ones. |
 | `governance-mapping-json` | `{}` | Map of domain to governance group name. |
 | `env-runtime-urls-json` | `{}` | Map of environment slug to runtime base URL. |
 | `postman-api-key` | | Required Postman API key for the bootstrap and sync phases. The composite always runs `postman-bootstrap-action`, which still requires a PMAK. |
