@@ -232,14 +232,18 @@ describe('postman-api-onboarding-action composite contract', () => {
       expect(manifest.runs.steps).toHaveLength(3);
     });
 
-    it('uses the postman-cs bootstrap, repo-sync, and insights actions', () => {
+    it('uses the configured bootstrap, repo-sync, and insights actions', () => {
       const manifest = loadManifest();
       const steps = manifest.runs.steps;
 
       expect(steps[0]?.id).toBe('bootstrap');
-      expect(steps[0]?.uses).toBe('postman-cs/postman-bootstrap-action@v0');
+      expect(steps[0]?.uses).toBe(
+        'postman-cs/postman-bootstrap-action@main'
+      );
       expect(steps[1]?.id).toBe('repo_sync');
-      expect(steps[1]?.uses).toBe('postman-cs/postman-repo-sync-action@v0');
+      expect(steps[1]?.uses).toBe(
+        'postman-cs/postman-repo-sync-action@main'
+      );
       expect(steps[2]?.id).toBe('insights_onboarding');
       expect(steps[2]?.uses).toBe('postman-cs/postman-insights-onboarding-action@v0');
     });
