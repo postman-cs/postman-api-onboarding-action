@@ -146,7 +146,7 @@ Even when reusing an existing `spec-id`, the composite action still requires `sp
 | `release-label` | | Optional release label for versioned specs and collections. Derived from git tag/branch when omitted. |
 | `monitor-id` | | Existing smoke monitor ID. When set, the action validates and reuses this monitor instead of creating a new one. |
 | `mock-url` | | Existing mock server URL. When set, the action validates and reuses this mock instead of creating a new one. |
-| `monitor-cron` | `""` | Cron expression for monitor scheduling (e.g. `0 */6 * * *`). When empty, the monitor is created in a disabled state. |
+| `monitor-cron` | `""` | Cron expression for monitor scheduling (e.g. `0 */6 * * *`). When empty, the monitor is created disabled and triggered to run once per workflow invocation (and once on every subsequent run). |
 | `generate-ci-workflow` | `true` | Pass through to repo sync; set `false` for repos that already manage CI. |
 | `ci-workflow-path` | `.github/workflows/ci.yml` | Pass through to repo sync to redirect generated workflow output. |
 | `project-name` | | Service name used across bootstrap and repo sync. |
