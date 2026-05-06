@@ -226,13 +226,13 @@ describe('postman-api-onboarding-action composite contract', () => {
   });
 
   describe('Phase 2: Step Wiring', () => {
-    it('is a composite action with three steps', () => {
+    it('is a composite action with the expected step count', () => {
       const manifest = loadManifest();
       expect(manifest.runs.using).toBe('composite');
-      expect(manifest.runs.steps).toHaveLength(3);
+      expect(manifest.runs.steps).toHaveLength(5);
     });
 
-    it('uses the configured bootstrap, repo-sync, and insights actions', () => {
+    it('uses the configured bootstrap, repo-sync, junit-runner, junit-uploader, and insights actions', () => {
       const manifest = loadManifest();
       const steps = manifest.runs.steps;
 
@@ -244,8 +244,12 @@ describe('postman-api-onboarding-action composite contract', () => {
       expect(steps[1]?.uses).toBe(
         'postman-cs/postman-repo-sync-action@main'
       );
-      expect(steps[2]?.id).toBe('insights_onboarding');
-      expect(steps[2]?.uses).toBe('postman-cs/postman-insights-onboarding-action@v0');
+      expect(steps[2]?.id).toBe('run_tests_junit');
+      expect(steps[2]?.shell).toBe('bash');
+      expect(steps[3]?.id).toBe('upload_junit_artifact');
+      expect(steps[3]?.uses).toBe('actions/upload-artifact@v4');
+      expect(steps[4]?.id).toBe('insights_onboarding');
+      expect(steps[4]?.uses).toBe('postman-cs/postman-insights-onboarding-action@v0');
     });
 
     it('insights step is conditional on enable-insights', () => {

@@ -273,6 +273,57 @@ runs:
         ssl-extra-ca-certs: ${{ inputs.ssl-extra-ca-certs }}
         spec-id: ${{ steps.bootstrap.outputs.spec-id }}
         spec-path: ${{ inputs.spec-path }}
+    - id: run_tests_junit
+      name: Run smoke and contract collections with JUnit output
+      if: ${{ steps.bootstrap.outputs.collections-json != '' }}
+      shell: bash
+      continue-on-error: true
+      env:
+        POSTMAN_TEAM_ID: ${{ inputs.postman-team-id }}
+        POSTMAN_API_KEY: ${{ inputs.postman-api-key }}
+        COLLECTIONS_JSON: ${{ steps.bootstrap.outputs.collections-json }}
+        ENVIRONMENT_UIDS_JSON: ${{ steps.repo_sync.outputs.environment-uids-json }}
+      run: |
+        set +e
+        mkdir -p "$RUNNER_TEMP/postman-junit"
+
+        if ! command -v postman >/dev/null 2>&1; then
+          curl -fsSL "https://dl-cli.pstmn.io/install/unix.sh" | sh
+          export PATH="$HOME/.postman/cli:$PATH"
+        fi
+
+        postman login --with-api-key "$POSTMAN_API_KEY" >/dev/null 2>&1 || true
+
+        SMOKE=$(printf '%s' "$COLLECTIONS_JSON"    | jq -r '.smoke // empty')
+        CONTRACT=$(printf '%s' "$COLLECTIONS_JSON" | jq -r '.contract // empty')
+        ENV_UID=$(printf '%s' "$ENVIRONMENT_UIDS_JSON" | jq -r 'to_entries | (.[0].value // empty)')
+
+        ENV_FLAG=()
+        if [ -n "$ENV_UID" ]; then
+          ENV_FLAG=(-e "$ENV_UID")
+        fi
+
+        if [ -n "$SMOKE" ]; then
+          postman collection run "$SMOKE" "${ENV_FLAG[@]}" \
+            --reporters cli,junit \
+            --reporter-junit-export "$RUNNER_TEMP/postman-junit/smoke.xml" || true
+        fi
+
+        if [ -n "$CONTRACT" ]; then
+          postman collection run "$CONTRACT" "${ENV_FLAG[@]}" \
+            --reporters cli,junit \
+            --reporter-junit-export "$RUNNER_TEMP/postman-junit/contract.xml" || true
+        fi
+    - id: upload_junit_artifact
+      name: Upload Postman JUnit results
+      if: always()
+      env:
+        POSTMAN_TEAM_ID: ${{ inputs.postman-team-id }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: postman-test-results
+        path: ${{ runner.temp }}/postman-junit/*.xml
+        if-no-files-found: ignore
     - id: insights_onboarding
       if: inputs.enable-insights == 'true'
       name: Onboard Postman Insights
