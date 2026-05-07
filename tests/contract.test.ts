@@ -427,8 +427,29 @@ describe('postman-api-onboarding-action composite contract', () => {
       const manifest = loadManifest();
       const junitStep = manifest.runs.steps.find((s) => s.id === 'run_tests_junit');
 
-      expect(junitStep?.run).toContain('"${{ inputs.postman-cli-install-url }}"');
+      expect(junitStep?.run).toContain('$POSTMAN_CLI_INSTALL_URL');
       expect(junitStep?.run).not.toContain('https://dl-cli.pstmn.io/install/unix.sh');
+    });
+
+    it('run_tests_junit routes install URL via env var, not shell interpolation', () => {
+      const manifest = loadManifest();
+      const junitStep = manifest.runs.steps.find((s) => s.id === 'run_tests_junit');
+
+      expect(junitStep?.env?.POSTMAN_CLI_INSTALL_URL).toBe(
+        '${{ inputs.postman-cli-install-url }}'
+      );
+      expect(junitStep?.run).toContain('$POSTMAN_CLI_INSTALL_URL');
+      expect(junitStep?.run).not.toContain('"${{ inputs.postman-cli-install-url }}"');
+    });
+
+    it('run_tests_junit validates install URL before use', () => {
+      const manifest = loadManifest();
+      const junitStep = manifest.runs.steps.find((s) => s.id === 'run_tests_junit');
+
+      expect(junitStep?.run).toContain('if ! [[ "$POSTMAN_CLI_INSTALL_URL"');
+      expect(junitStep?.run).toContain('https://[A-Za-z0-9.-]+/[A-Za-z0-9._~/?=&%-]+');
+      expect(junitStep?.run).toContain('::error::postman-cli-install-url must be an https URL');
+      expect(junitStep?.run).toContain('exit 1');
     });
 
     it('insights step receives workspace-id from bootstrap output', () => {

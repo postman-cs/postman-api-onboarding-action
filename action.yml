@@ -310,12 +310,17 @@ runs:
         POSTMAN_API_KEY: ${{ inputs.postman-api-key }}
         COLLECTIONS_JSON: ${{ steps.bootstrap.outputs.collections-json }}
         ENVIRONMENT_UIDS_JSON: ${{ steps.repo_sync.outputs.environment-uids-json }}
+        POSTMAN_CLI_INSTALL_URL: ${{ inputs.postman-cli-install-url }}
       run: |
         set +e
         mkdir -p "$RUNNER_TEMP/postman-junit"
 
         if ! command -v postman >/dev/null 2>&1; then
-          curl -fsSL "${{ inputs.postman-cli-install-url }}" | sh
+          if ! [[ "$POSTMAN_CLI_INSTALL_URL" =~ ^https://[A-Za-z0-9.-]+/[A-Za-z0-9._~/?=&%-]+$ ]]; then
+            echo "::error::postman-cli-install-url must be an https URL with safe characters; got: $POSTMAN_CLI_INSTALL_URL"
+            exit 1
+          fi
+          curl -fsSL "$POSTMAN_CLI_INSTALL_URL" | sh
           export PATH="$HOME/.postman/cli:$PATH"
         fi
 
