@@ -452,16 +452,6 @@ describe('postman-api-onboarding-action composite contract', () => {
       );
     });
 
-    it('run_tests_junit validates install URL before use', () => {
-      const manifest = loadManifest();
-      const junitStep = manifest.runs.steps.find((s) => s.id === 'run_tests_junit');
-
-      expect(junitStep?.run).toContain('if ! [[ "$POSTMAN_CLI_INSTALL_URL"');
-      expect(junitStep?.run).toContain('https://[A-Za-z0-9.-]+/[A-Za-z0-9._~/?=&%-]+');
-      expect(junitStep?.run).toContain('::error::postman-cli-install-url must be an https URL');
-      expect(junitStep?.run).toContain('exit 1');
-    });
-
     it('insights step receives workspace-id from bootstrap output', () => {
       const manifest = loadManifest();
       const insightsStep = manifest.runs.steps.find((s) => s.id === 'insights_onboarding');

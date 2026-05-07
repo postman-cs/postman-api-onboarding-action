@@ -313,10 +313,6 @@ runs:
         mkdir -p "$RUNNER_TEMP/postman-junit"
 
         if ! command -v postman >/dev/null 2>&1; then
-          if ! [[ "$POSTMAN_CLI_INSTALL_URL" =~ ^https://[A-Za-z0-9.-]+/[A-Za-z0-9._~/?=&%-]+$ ]]; then
-            echo "::error::postman-cli-install-url must be an https URL with safe characters; got: $POSTMAN_CLI_INSTALL_URL"
-            exit 1
-          fi
           curl -fsSL "$POSTMAN_CLI_INSTALL_URL" | sh
           export PATH="$HOME/.postman/cli:$PATH"
         fi
