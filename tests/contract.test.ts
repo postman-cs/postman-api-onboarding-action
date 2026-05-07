@@ -28,6 +28,8 @@ type ActionManifest = {
   outputs: Record<string, { description?: string; value: string }>;
 };
 
+const HIDDEN_INPUTS = new Set(['postman-stack']);
+
 function loadManifest(): ActionManifest {
   return parse(
     readFileSync(path.join(repoRoot, 'action.yml'), 'utf8')
@@ -96,6 +98,7 @@ describe('postman-api-onboarding-action composite contract', () => {
       const manifest = loadManifest();
       const readme = loadReadme();
       for (const inputName of Object.keys(manifest.inputs)) {
+        if (HIDDEN_INPUTS.has(inputName)) continue;
         expect(readme).toContain(`\`${inputName}\``);
       }
     });
@@ -157,11 +160,7 @@ describe('postman-api-onboarding-action composite contract', () => {
         'postman-api-key',
         'postman-access-token',
         'postman-team-id',
-        'postman-api-base',
-        'postman-bifrost-base',
-        'postman-gateway-base',
-        'postman-observability-base',
-        'postman-cli-install-url',
+        'postman-stack',
         'github-token',
         'gh-fallback-token',
         'repo-write-mode',
@@ -237,27 +236,38 @@ describe('postman-api-onboarding-action composite contract', () => {
     it('is a composite action with the expected step count', () => {
       const manifest = loadManifest();
       expect(manifest.runs.using).toBe('composite');
-      expect(manifest.runs.steps).toHaveLength(5);
+      expect(manifest.runs.steps).toHaveLength(6);
     });
 
-    it('uses the configured bootstrap, repo-sync, junit-runner, junit-uploader, and insights actions', () => {
+    it('uses pinned bootstrap, repo-sync, junit-runner, junit-uploader, and insights actions', () => {
       const manifest = loadManifest();
       const steps = manifest.runs.steps;
+      const validateStep = steps.find((step) => step.id === 'validate_postman_stack');
+      const bootstrapStep = steps.find((step) => step.id === 'bootstrap');
+      const repoSyncStep = steps.find((step) => step.id === 'repo_sync');
+      const junitStep = steps.find((step) => step.id === 'run_tests_junit');
+      const uploadStep = steps.find((step) => step.id === 'upload_junit_artifact');
+      const insightsStep = steps.find((step) => step.id === 'insights_onboarding');
 
-      expect(steps[0]?.id).toBe('bootstrap');
-      expect(steps[0]?.uses).toBe(
-        'postman-cs/postman-bootstrap-action@main'
-      );
-      expect(steps[1]?.id).toBe('repo_sync');
-      expect(steps[1]?.uses).toBe(
-        'postman-cs/postman-repo-sync-action@main'
-      );
-      expect(steps[2]?.id).toBe('run_tests_junit');
-      expect(steps[2]?.shell).toBe('bash');
-      expect(steps[3]?.id).toBe('upload_junit_artifact');
-      expect(steps[3]?.uses).toBe('actions/upload-artifact@v4');
-      expect(steps[4]?.id).toBe('insights_onboarding');
-      expect(steps[4]?.uses).toBe('postman-cs/postman-insights-onboarding-action@v0');
+      expect(validateStep?.shell).toBe('bash');
+      expect(bootstrapStep?.uses).toBe('postman-cs/postman-bootstrap-action@v0.12.0');
+      expect(repoSyncStep?.uses).toBe('postman-cs/postman-repo-sync-action@v0.12.0');
+      expect(junitStep?.shell).toBe('bash');
+      expect(uploadStep?.uses).toBe('actions/upload-artifact@v4');
+      expect(insightsStep?.uses).toBe('postman-cs/postman-insights-onboarding-action@v0.8.0');
+      for (const step of [bootstrapStep, repoSyncStep, insightsStep]) {
+        expect(step?.uses).not.toMatch(/@(main|v0)$/);
+      }
+    });
+
+    it('validates the hidden postman-stack input before downstream actions run', () => {
+      const manifest = loadManifest();
+      const validateStep = manifest.runs.steps.find((step) => step.id === 'validate_postman_stack');
+
+      expect(manifest.inputs['postman-stack']?.default).toBe('prod');
+      expect(validateStep?.env?.POSTMAN_STACK).toBe('${{ inputs.postman-stack }}');
+      expect(validateStep?.run).toContain('prod|beta');
+      expect(validateStep?.run).toContain('postman-stack must be one of: prod, beta');
     });
 
     it('insights step is conditional on enable-insights', () => {
@@ -390,37 +400,25 @@ describe('postman-api-onboarding-action composite contract', () => {
       expect(manifest.inputs['workspace-team-id']?.description).toContain('org-mode');
     });
 
-    it('passes base URL overrides and CLI install URL through to bootstrap', () => {
+    it('passes hidden postman-stack through to bootstrap', () => {
       const manifest = loadManifest();
       const bootstrapStep = manifest.runs.steps.find((s) => s.id === 'bootstrap');
 
-      expect(bootstrapStep?.with?.['postman-api-base']).toBe(
-        '${{ inputs.postman-api-base }}'
-      );
-      expect(bootstrapStep?.with?.['postman-bifrost-base']).toBe(
-        '${{ inputs.postman-bifrost-base }}'
-      );
-      expect(bootstrapStep?.with?.['postman-gateway-base']).toBe(
-        '${{ inputs.postman-gateway-base }}'
-      );
-      expect(bootstrapStep?.with?.['postman-cli-install-url']).toBe(
-        '${{ inputs.postman-cli-install-url }}'
-      );
+      expect(bootstrapStep?.with?.['postman-stack']).toBe('${{ inputs.postman-stack }}');
+      expect(bootstrapStep?.with?.['postman-api-base']).toBeUndefined();
+      expect(bootstrapStep?.with?.['postman-bifrost-base']).toBeUndefined();
+      expect(bootstrapStep?.with?.['postman-gateway-base']).toBeUndefined();
+      expect(bootstrapStep?.with?.['postman-cli-install-url']).toBeUndefined();
     });
 
-    it('passes postman-api-base, postman-bifrost-base, and postman-cli-install-url to repo-sync but not postman-gateway-base', () => {
+    it('passes hidden postman-stack through to repo-sync without explicit URL knobs', () => {
       const manifest = loadManifest();
       const repoSyncStep = manifest.runs.steps.find((s) => s.id === 'repo_sync');
 
-      expect(repoSyncStep?.with?.['postman-api-base']).toBe(
-        '${{ inputs.postman-api-base }}'
-      );
-      expect(repoSyncStep?.with?.['postman-bifrost-base']).toBe(
-        '${{ inputs.postman-bifrost-base }}'
-      );
-      expect(repoSyncStep?.with?.['postman-cli-install-url']).toBe(
-        '${{ inputs.postman-cli-install-url }}'
-      );
+      expect(repoSyncStep?.with?.['postman-stack']).toBe('${{ inputs.postman-stack }}');
+      expect(repoSyncStep?.with?.['postman-api-base']).toBeUndefined();
+      expect(repoSyncStep?.with?.['postman-bifrost-base']).toBeUndefined();
+      expect(repoSyncStep?.with?.['postman-cli-install-url']).toBeUndefined();
       expect(repoSyncStep?.with?.['postman-gateway-base']).toBeUndefined();
     });
 
@@ -437,10 +435,21 @@ describe('postman-api-onboarding-action composite contract', () => {
       const junitStep = manifest.runs.steps.find((s) => s.id === 'run_tests_junit');
 
       expect(junitStep?.env?.POSTMAN_CLI_INSTALL_URL).toBe(
-        '${{ inputs.postman-cli-install-url }}'
+        "${{ inputs.postman-stack == 'beta' && 'https://dl-cli.pstmn-beta.io/install/unix.sh' || 'https://dl-cli.pstmn.io/install/unix.sh' }}"
       );
       expect(junitStep?.run).toContain('$POSTMAN_CLI_INSTALL_URL');
       expect(junitStep?.run).not.toContain('"${{ inputs.postman-cli-install-url }}"');
+    });
+
+    it('run_tests_junit checks jq before parsing JSON payloads', () => {
+      const manifest = loadManifest();
+      const junitStep = manifest.runs.steps.find((s) => s.id === 'run_tests_junit');
+
+      expect(junitStep?.run).toContain('command -v jq');
+      expect(junitStep?.run).toContain('jq is required');
+      expect((junitStep?.run ?? '').indexOf('command -v jq')).toBeLessThan(
+        (junitStep?.run ?? '').indexOf('SMOKE=')
+      );
     });
 
     it('run_tests_junit validates install URL before use', () => {
@@ -474,21 +483,17 @@ describe('postman-api-onboarding-action composite contract', () => {
       );
       expect(insightsStep?.with?.['cluster-name']).toBe('${{ inputs.cluster-name }}');
       expect(insightsStep?.with?.['postman-team-id']).toBe('${{ inputs.postman-team-id }}');
+      expect(insightsStep?.with?.['postman-stack']).toBe('${{ inputs.postman-stack }}');
     });
 
-    it('insights step receives base URL overrides for beta/alpha stack routing', () => {
+    it('insights step receives postman-stack without explicit URL knobs', () => {
       const manifest = loadManifest();
       const insightsStep = manifest.runs.steps.find((s) => s.id === 'insights_onboarding');
 
-      expect(insightsStep?.with?.['postman-api-base']).toBe(
-        '${{ inputs.postman-api-base }}'
-      );
-      expect(insightsStep?.with?.['postman-bifrost-base']).toBe(
-        '${{ inputs.postman-bifrost-base }}'
-      );
-      expect(insightsStep?.with?.['postman-observability-base']).toBe(
-        '${{ inputs.postman-observability-base }}'
-      );
+      expect(insightsStep?.with?.['postman-stack']).toBe('${{ inputs.postman-stack }}');
+      expect(insightsStep?.with?.['postman-api-base']).toBeUndefined();
+      expect(insightsStep?.with?.['postman-bifrost-base']).toBeUndefined();
+      expect(insightsStep?.with?.['postman-observability-base']).toBeUndefined();
     });
   });
 
@@ -531,28 +536,14 @@ describe('postman-api-onboarding-action composite contract', () => {
       expect(manifest.inputs['environment-uids-json']?.default).toBe('{}');
     });
 
-    it('base URL and CLI install URL inputs default to prod endpoints', () => {
+    it('postman-stack defaults to prod and explicit base URL inputs are hidden from the composite', () => {
       const manifest = loadManifest();
-      expect(manifest.inputs['postman-api-base']?.default).toBe(
-        'https://api.getpostman.com'
-      );
-      expect(manifest.inputs['postman-api-base']?.required).toBe(false);
-      expect(manifest.inputs['postman-bifrost-base']?.default).toBe(
-        'https://bifrost-premium-https-v4.gw.postman.com'
-      );
-      expect(manifest.inputs['postman-bifrost-base']?.required).toBe(false);
-      expect(manifest.inputs['postman-gateway-base']?.default).toBe(
-        'https://gateway.postman.com'
-      );
-      expect(manifest.inputs['postman-gateway-base']?.required).toBe(false);
-      expect(manifest.inputs['postman-observability-base']?.default).toBe(
-        'https://api.observability.postman.com'
-      );
-      expect(manifest.inputs['postman-observability-base']?.required).toBe(false);
-      expect(manifest.inputs['postman-cli-install-url']?.default).toBe(
-        'https://dl-cli.pstmn.io/install/unix.sh'
-      );
-      expect(manifest.inputs['postman-cli-install-url']?.required).toBe(false);
+      expect(manifest.inputs['postman-stack']?.default).toBe('prod');
+      expect(manifest.inputs['postman-stack']?.required).toBe(false);
+      expect(manifest.inputs['postman-api-base']).toBeUndefined();
+      expect(manifest.inputs['postman-bifrost-base']).toBeUndefined();
+      expect(manifest.inputs['postman-gateway-base']).toBeUndefined();
+      expect(manifest.inputs['postman-cli-install-url']).toBeUndefined();
     });
 
     it('every input has a description', () => {

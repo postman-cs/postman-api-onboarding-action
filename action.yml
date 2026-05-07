@@ -103,26 +103,10 @@ inputs:
   postman-team-id:
     description: Explicit Postman team ID override for org-mode Bifrost calls.
     required: false
-  postman-api-base:
-    description: Postman API base URL; override for beta/alpha stacks.
+  postman-stack:
+    description: Postman stack profile.
     required: false
-    default: "https://api.getpostman.com"
-  postman-bifrost-base:
-    description: Bifrost proxy base URL; override for beta.
-    required: false
-    default: "https://bifrost-premium-https-v4.gw.postman.com"
-  postman-gateway-base:
-    description: Postman gateway base URL; override for beta.
-    required: false
-    default: "https://gateway.postman.com"
-  postman-observability-base:
-    description: Postman observability API base URL; override for beta/alpha stacks. Forwarded to postman-insights-onboarding-action.
-    required: false
-    default: "https://api.observability.postman.com"
-  postman-cli-install-url:
-    description: URL of the install script for the Postman CLI.
-    required: false
-    default: "https://dl-cli.pstmn.io/install/unix.sh"
+    default: prod
   github-token:
     description: GitHub token used for repo variables and generated commits.
     required: false
@@ -232,9 +216,23 @@ outputs:
 runs:
   using: composite
   steps:
+    - id: validate_postman_stack
+      name: Validate Postman stack
+      shell: bash
+      env:
+        POSTMAN_TEAM_ID: ${{ inputs.postman-team-id }}
+        POSTMAN_STACK: ${{ inputs.postman-stack }}
+      run: |
+        case "$POSTMAN_STACK" in
+          prod|beta) ;;
+          *)
+            echo "::error::postman-stack must be one of: prod, beta; got: $POSTMAN_STACK"
+            exit 1
+            ;;
+        esac
     - id: bootstrap
       name: Bootstrap Postman Assets
-      uses: postman-cs/postman-bootstrap-action@main
+      uses: postman-cs/postman-bootstrap-action@v0.12.0
       env:
         POSTMAN_TEAM_ID: ${{ inputs.postman-team-id }}
       with:
@@ -258,13 +256,10 @@ runs:
         postman-api-key: ${{ inputs.postman-api-key }}
         postman-access-token: ${{ inputs.postman-access-token }}
         integration-backend: ${{ inputs.integration-backend }}
-        postman-api-base: ${{ inputs.postman-api-base }}
-        postman-bifrost-base: ${{ inputs.postman-bifrost-base }}
-        postman-gateway-base: ${{ inputs.postman-gateway-base }}
-        postman-cli-install-url: ${{ inputs.postman-cli-install-url }}
+        postman-stack: ${{ inputs.postman-stack }}
     - id: repo_sync
       name: Sync Repository and Workspace
-      uses: postman-cs/postman-repo-sync-action@main
+      uses: postman-cs/postman-repo-sync-action@v0.12.0
       env:
         POSTMAN_TEAM_ID: ${{ inputs.postman-team-id }}
       with:
@@ -301,9 +296,7 @@ runs:
         ssl-extra-ca-certs: ${{ inputs.ssl-extra-ca-certs }}
         spec-id: ${{ steps.bootstrap.outputs.spec-id }}
         spec-path: ${{ inputs.spec-path }}
-        postman-api-base: ${{ inputs.postman-api-base }}
-        postman-bifrost-base: ${{ inputs.postman-bifrost-base }}
-        postman-cli-install-url: ${{ inputs.postman-cli-install-url }}
+        postman-stack: ${{ inputs.postman-stack }}
     - id: run_tests_junit
       name: Run smoke and contract collections with JUnit output
       if: ${{ steps.bootstrap.outputs.collections-json != '' }}
@@ -314,7 +307,7 @@ runs:
         POSTMAN_API_KEY: ${{ inputs.postman-api-key }}
         COLLECTIONS_JSON: ${{ steps.bootstrap.outputs.collections-json }}
         ENVIRONMENT_UIDS_JSON: ${{ steps.repo_sync.outputs.environment-uids-json }}
-        POSTMAN_CLI_INSTALL_URL: ${{ inputs.postman-cli-install-url }}
+        POSTMAN_CLI_INSTALL_URL: ${{ inputs.postman-stack == 'beta' && 'https://dl-cli.pstmn-beta.io/install/unix.sh' || 'https://dl-cli.pstmn.io/install/unix.sh' }}
       run: |
         set +e
         mkdir -p "$RUNNER_TEMP/postman-junit"
@@ -326,6 +319,11 @@ runs:
           fi
           curl -fsSL "$POSTMAN_CLI_INSTALL_URL" | sh
           export PATH="$HOME/.postman/cli:$PATH"
+        fi
+
+        if ! command -v jq >/dev/null 2>&1; then
+          echo "::error::jq is required to parse Postman collection and environment IDs"
+          exit 1
         fi
 
         postman login --with-api-key "$POSTMAN_API_KEY" >/dev/null 2>&1 || true
@@ -363,7 +361,7 @@ runs:
     - id: insights_onboarding
       if: inputs.enable-insights == 'true'
       name: Onboard Postman Insights
-      uses: postman-cs/postman-insights-onboarding-action@v0
+      uses: postman-cs/postman-insights-onboarding-action@v0.8.0
       env:
         POSTMAN_TEAM_ID: ${{ inputs.postman-team-id }}
       with:
@@ -376,6 +374,4 @@ runs:
         postman-access-token: ${{ inputs.postman-access-token }}
         postman-team-id: ${{ inputs.postman-team-id }}
         github-token: ${{ inputs.github-token }}
-        postman-api-base: ${{ inputs.postman-api-base }}
-        postman-bifrost-base: ${{ inputs.postman-bifrost-base }}
-        postman-observability-base: ${{ inputs.postman-observability-base }}
+        postman-stack: ${{ inputs.postman-stack }}

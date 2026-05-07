@@ -19,8 +19,8 @@ It applies to these repositories:
 ## Current state
 
 - Each repository owns its own CI workflow and its own `v*` tag-triggered GitHub release workflow.
-- The composite action currently references sibling actions through floating `@v0` aliases in `action.yml`.
-- Released composite tags such as `v0.4`, `v0.4.1`, and `v0.5` also resolve sibling actions through `@v0` aliases.
+- The composite action references sibling actions through immutable release tags in `action.yml`.
+- Older released composite tags such as `v0.4`, `v0.4.1`, and `v0.5` resolved sibling actions through `@v0` aliases.
 - During the current open-alpha period, the public release contract is the git tag and GitHub release. Do not treat `package.json` version fields as the authoritative public release identifier.
 
 ## Source of truth
@@ -54,17 +54,15 @@ Do not duplicate full input and output tables across repositories. Link to the a
 
 The composite action currently depends on:
 
-- `postman-cs/postman-bootstrap-action@v0`
-- `postman-cs/postman-repo-sync-action@v0`
-- `postman-cs/postman-insights-onboarding-action@v0` when Insights is enabled
+- `postman-cs/postman-bootstrap-action@v0.12.0`
+- `postman-cs/postman-repo-sync-action@v0.12.0`
+- `postman-cs/postman-insights-onboarding-action@v0.8.0` when Insights is enabled
 
-Because these are floating aliases, a consumer who pins `postman-api-onboarding-action@v0.5` still gets the latest sibling `v0` targets at runtime.
-
-Until the composite action moves to immutable internal pins, maintainers must treat composite releases as coordinated suite releases.
+Because these are immutable sibling pins, a consumer who pins `postman-api-onboarding-action` to an immutable tag gets a reproducible lower-level action set at runtime.
 
 ### Target policy before GA
 
-Before GA, change the composite action to reference immutable sibling tags inside `action.yml`. After that change:
+The composite action references immutable sibling tags inside `action.yml`. Therefore:
 
 - Every composite release must record the exact sibling tags it uses.
 - Any change to a pinned sibling version requires a new composite release.
@@ -79,8 +77,7 @@ Release from the bottom up:
 3. Release `postman-insights-onboarding-action` if it changed.
 4. Verify the published tags, CI status, and GitHub releases for every changed lower-level action.
 5. Review `postman-api-onboarding-action`:
-   - If the composite still uses floating `@v0` aliases, verify that the latest lower-level `v0` targets are the intended ones.
-   - If the composite has moved to immutable sibling pins, update `action.yml` to the exact release tags you want to bundle.
+   - Update `action.yml` to the exact lower-level release tags you want to bundle.
 6. Update `README.md`, this file, and any compatibility notes affected by the release.
 7. Release `postman-api-onboarding-action` last.
 
@@ -90,9 +87,8 @@ This matrix describes the current open-alpha release model.
 
 | Composite reference used by consumers | Composite repository content | Lower-level dependency references | Result |
 | --- | --- | --- | --- |
-| `postman-api-onboarding-action@v0` | Rolling | Rolling `@v0` aliases | Fully rolling suite channel |
-| `postman-api-onboarding-action@v0.5` | Immutable composite repo tag | Rolling `@v0` aliases | Partially reproducible |
-| Future immutable composite release | Immutable composite repo tag | Immutable sibling tags | Fully reproducible |
+| `postman-api-onboarding-action@v0` | Rolling composite alias | Immutable sibling tags in the current composite content | Rolling composite channel with pinned siblings per composite revision |
+| Immutable composite release | Immutable composite repo tag | Immutable sibling tags | Fully reproducible |
 
 ## Maintainer release checklist
 
