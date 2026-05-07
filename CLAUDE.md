@@ -4,7 +4,7 @@ Composite GitHub Action -- the primary partner-facing entrypoint. Chains bootstr
 
 ## How It Works
 
-`action.yml` uses `runs: composite` to call sibling actions at `postman-cs/<action>@v0`:
+`action.yml` uses `runs: composite` to call sibling actions at immutable release tags:
 1. `postman-bootstrap-action` -- creates workspace, uploads spec, generates collections
 2. `postman-repo-sync-action` -- exports artifacts to repo, creates envs/mocks/monitors
 3. `postman-insights-onboarding-action` -- (when `enable-insights: true`) links discovered services
@@ -39,7 +39,7 @@ npm run typecheck
 
 ## Gotchas
 
-- Floating `@v0` sibling refs mean composite releases are effectively suite releases
+- Sibling action refs are pinned; update them deliberately during coordinated releases
 - `spec-url` is always required, even when reusing an existing `spec-id` (bootstrap updates from source)
 - `POSTMAN_TEAM_ID` env var is passed via `env:` block, not as an input
 - `package.json` version is NOT the release identifier -- git tags are
