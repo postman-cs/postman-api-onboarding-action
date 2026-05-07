@@ -146,6 +146,7 @@ describe('postman-api-onboarding-action composite contract', () => {
         'domain-code',
         'requester-email',
         'workspace-admin-user-ids',
+        'workspace-team-id',
         'spec-url',
         'spec-path',
         'environments-json',
@@ -365,6 +366,27 @@ describe('postman-api-onboarding-action composite contract', () => {
 
       expect(bootstrapStep?.with?.['integration-backend']).toBe('${{ inputs.integration-backend }}');
       expect(repoSyncStep?.with?.['integration-backend']).toBe('${{ inputs.integration-backend }}');
+    });
+
+    it('passes workspace-team-id to bootstrap but not to repo-sync or insights', () => {
+      const manifest = loadManifest();
+      const bootstrapStep = manifest.runs.steps.find((s) => s.id === 'bootstrap');
+      const repoSyncStep = manifest.runs.steps.find((s) => s.id === 'repo_sync');
+      const insightsStep = manifest.runs.steps.find((s) => s.id === 'insights_onboarding');
+
+      expect(bootstrapStep?.with?.['workspace-team-id']).toBe(
+        '${{ inputs.workspace-team-id }}'
+      );
+      expect(repoSyncStep?.with?.['workspace-team-id']).toBeUndefined();
+      expect(insightsStep?.with?.['workspace-team-id']).toBeUndefined();
+    });
+
+    it('workspace-team-id input is optional with no default', () => {
+      const manifest = loadManifest();
+      expect(manifest.inputs['workspace-team-id']).toBeDefined();
+      expect(manifest.inputs['workspace-team-id']?.required).toBe(false);
+      expect(manifest.inputs['workspace-team-id']?.default).toBeUndefined();
+      expect(manifest.inputs['workspace-team-id']?.description).toContain('org-mode');
     });
 
     it('passes base URL overrides and CLI install URL through to bootstrap', () => {

@@ -154,7 +154,7 @@ Even when reusing an existing `spec-id`, the composite action still requires `sp
 | `domain-code` | | Short prefix used in workspace naming. |
 | `requester-email` | | Optional workspace invite target. |
 | `workspace-admin-user-ids` | | Optional comma-separated workspace admin IDs. |
-| `workspace-team-id` | | Numeric sub-team ID for org-mode workspace creation. |
+| `workspace-team-id` | | Optional. Numeric sub-team ID for org-mode workspace creation. Required only when the target team is scoped under an organization (org-mode); the Postman API cannot create workspaces at the org level without it. Passed through to `postman-bootstrap-action`. |
 | `spec-url` | | Required registry-backed OpenAPI document URL. |
 | `spec-path` | | Optional repo-root-relative path to the local spec file used for repo metadata generation. |
 | `environments-json` | `["prod"]` | Environment slugs to materialize downstream. |

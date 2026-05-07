@@ -65,6 +65,9 @@ inputs:
   workspace-admin-user-ids:
     description: Comma-separated workspace admin user ids.
     required: false
+  workspace-team-id:
+    description: Numeric sub-team ID for org-mode workspace creation. Required by the Postman API when the PMAK's team is scoped under an organization.
+    required: false
   spec-url:
     description: URL to the OpenAPI document to bootstrap.
     required: true
@@ -245,6 +248,7 @@ runs:
         domain-code: ${{ inputs.domain-code }}
         requester-email: ${{ inputs.requester-email }}
         workspace-admin-user-ids: ${{ inputs.workspace-admin-user-ids }}
+        workspace-team-id: ${{ inputs.workspace-team-id }}
         spec-url: ${{ inputs.spec-url }}
         governance-mapping-json: ${{ inputs.governance-mapping-json }}
         postman-api-key: ${{ inputs.postman-api-key }}
