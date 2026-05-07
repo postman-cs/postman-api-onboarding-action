@@ -165,6 +165,10 @@ Even when reusing an existing `spec-id`, the composite action still requires `sp
 | `postman-api-key` | | Required Postman API key for the bootstrap and sync phases. The composite always runs `postman-bootstrap-action`, which still requires a PMAK. |
 | `postman-access-token` | | Enables governance assignment, Bifrost integration, and API key generation fallback. |
 | `postman-team-id` | | Explicit Postman team ID override for org-mode Bifrost calls. Passed to the downstream actions when provided. |
+| `postman-api-base` | `https://api.getpostman.com` | Optional Postman API base URL override. Defaults to prod. Pass through for beta/alpha stacks; propagated to bootstrap and repo-sync. |
+| `postman-bifrost-base` | `https://bifrost-premium-https-v4.gw.postman.com` | Optional Bifrost proxy base URL override. Defaults to prod. Propagated to bootstrap and repo-sync. |
+| `postman-gateway-base` | `https://gateway.postman.com` | Optional Postman gateway base URL override. Defaults to prod. Propagated to bootstrap only (repo-sync does not consume it). |
+| `postman-cli-install-url` | `https://dl-cli.pstmn.io/install/unix.sh` | Optional Postman CLI install script URL. Defaults to prod. Used for the in-line CLI install in the JUnit runner step, and propagated to bootstrap and repo-sync. |
 | `github-token` | | Enables generated commits, workflow writes, and optional secret persistence in repo sync. |
 | `gh-fallback-token` | | Optional fallback token for workflow and commit APIs. |
 | `repo-write-mode` | `commit-and-push` | Repo mutation mode passed to repo sync. |

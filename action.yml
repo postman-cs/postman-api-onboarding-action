@@ -100,6 +100,22 @@ inputs:
   postman-team-id:
     description: Explicit Postman team ID override for org-mode Bifrost calls.
     required: false
+  postman-api-base:
+    description: Postman API base URL; override for beta/alpha stacks.
+    required: false
+    default: "https://api.getpostman.com"
+  postman-bifrost-base:
+    description: Bifrost proxy base URL; override for beta.
+    required: false
+    default: "https://bifrost-premium-https-v4.gw.postman.com"
+  postman-gateway-base:
+    description: Postman gateway base URL; override for beta.
+    required: false
+    default: "https://gateway.postman.com"
+  postman-cli-install-url:
+    description: URL of the install script for the Postman CLI.
+    required: false
+    default: "https://dl-cli.pstmn.io/install/unix.sh"
   github-token:
     description: GitHub token used for repo variables and generated commits.
     required: false
@@ -234,6 +250,10 @@ runs:
         postman-api-key: ${{ inputs.postman-api-key }}
         postman-access-token: ${{ inputs.postman-access-token }}
         integration-backend: ${{ inputs.integration-backend }}
+        postman-api-base: ${{ inputs.postman-api-base }}
+        postman-bifrost-base: ${{ inputs.postman-bifrost-base }}
+        postman-gateway-base: ${{ inputs.postman-gateway-base }}
+        postman-cli-install-url: ${{ inputs.postman-cli-install-url }}
     - id: repo_sync
       name: Sync Repository and Workspace
       uses: postman-cs/postman-repo-sync-action@main
@@ -273,6 +293,9 @@ runs:
         ssl-extra-ca-certs: ${{ inputs.ssl-extra-ca-certs }}
         spec-id: ${{ steps.bootstrap.outputs.spec-id }}
         spec-path: ${{ inputs.spec-path }}
+        postman-api-base: ${{ inputs.postman-api-base }}
+        postman-bifrost-base: ${{ inputs.postman-bifrost-base }}
+        postman-cli-install-url: ${{ inputs.postman-cli-install-url }}
     - id: run_tests_junit
       name: Run smoke and contract collections with JUnit output
       if: ${{ steps.bootstrap.outputs.collections-json != '' }}
@@ -288,7 +311,7 @@ runs:
         mkdir -p "$RUNNER_TEMP/postman-junit"
 
         if ! command -v postman >/dev/null 2>&1; then
-          curl -fsSL "https://dl-cli.pstmn.io/install/unix.sh" | sh
+          curl -fsSL "${{ inputs.postman-cli-install-url }}" | sh
           export PATH="$HOME/.postman/cli:$PATH"
         fi
 

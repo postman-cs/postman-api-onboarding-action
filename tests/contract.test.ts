@@ -11,6 +11,8 @@ type Step = {
   name?: string;
   uses?: string;
   if?: string;
+  shell?: string;
+  run?: string;
   env?: Record<string, string>;
   with?: Record<string, string>;
 };
@@ -154,6 +156,10 @@ describe('postman-api-onboarding-action composite contract', () => {
         'postman-api-key',
         'postman-access-token',
         'postman-team-id',
+        'postman-api-base',
+        'postman-bifrost-base',
+        'postman-gateway-base',
+        'postman-cli-install-url',
         'github-token',
         'gh-fallback-token',
         'repo-write-mode',
@@ -361,6 +367,48 @@ describe('postman-api-onboarding-action composite contract', () => {
       expect(repoSyncStep?.with?.['integration-backend']).toBe('${{ inputs.integration-backend }}');
     });
 
+    it('passes base URL overrides and CLI install URL through to bootstrap', () => {
+      const manifest = loadManifest();
+      const bootstrapStep = manifest.runs.steps.find((s) => s.id === 'bootstrap');
+
+      expect(bootstrapStep?.with?.['postman-api-base']).toBe(
+        '${{ inputs.postman-api-base }}'
+      );
+      expect(bootstrapStep?.with?.['postman-bifrost-base']).toBe(
+        '${{ inputs.postman-bifrost-base }}'
+      );
+      expect(bootstrapStep?.with?.['postman-gateway-base']).toBe(
+        '${{ inputs.postman-gateway-base }}'
+      );
+      expect(bootstrapStep?.with?.['postman-cli-install-url']).toBe(
+        '${{ inputs.postman-cli-install-url }}'
+      );
+    });
+
+    it('passes postman-api-base, postman-bifrost-base, and postman-cli-install-url to repo-sync but not postman-gateway-base', () => {
+      const manifest = loadManifest();
+      const repoSyncStep = manifest.runs.steps.find((s) => s.id === 'repo_sync');
+
+      expect(repoSyncStep?.with?.['postman-api-base']).toBe(
+        '${{ inputs.postman-api-base }}'
+      );
+      expect(repoSyncStep?.with?.['postman-bifrost-base']).toBe(
+        '${{ inputs.postman-bifrost-base }}'
+      );
+      expect(repoSyncStep?.with?.['postman-cli-install-url']).toBe(
+        '${{ inputs.postman-cli-install-url }}'
+      );
+      expect(repoSyncStep?.with?.['postman-gateway-base']).toBeUndefined();
+    });
+
+    it('run_tests_junit installs the Postman CLI from postman-cli-install-url', () => {
+      const manifest = loadManifest();
+      const junitStep = manifest.runs.steps.find((s) => s.id === 'run_tests_junit');
+
+      expect(junitStep?.run).toContain('"${{ inputs.postman-cli-install-url }}"');
+      expect(junitStep?.run).not.toContain('https://dl-cli.pstmn.io/install/unix.sh');
+    });
+
     it('insights step receives workspace-id from bootstrap output', () => {
       const manifest = loadManifest();
       const insightsStep = manifest.runs.steps.find((s) => s.id === 'insights_onboarding');
@@ -422,6 +470,26 @@ describe('postman-api-onboarding-action composite contract', () => {
       expect(manifest.inputs['governance-mapping-json']?.default).toBe('{}');
       expect(manifest.inputs['env-runtime-urls-json']?.default).toBe('{}');
       expect(manifest.inputs['environment-uids-json']?.default).toBe('{}');
+    });
+
+    it('base URL and CLI install URL inputs default to prod endpoints', () => {
+      const manifest = loadManifest();
+      expect(manifest.inputs['postman-api-base']?.default).toBe(
+        'https://api.getpostman.com'
+      );
+      expect(manifest.inputs['postman-api-base']?.required).toBe(false);
+      expect(manifest.inputs['postman-bifrost-base']?.default).toBe(
+        'https://bifrost-premium-https-v4.gw.postman.com'
+      );
+      expect(manifest.inputs['postman-bifrost-base']?.required).toBe(false);
+      expect(manifest.inputs['postman-gateway-base']?.default).toBe(
+        'https://gateway.postman.com'
+      );
+      expect(manifest.inputs['postman-gateway-base']?.required).toBe(false);
+      expect(manifest.inputs['postman-cli-install-url']?.default).toBe(
+        'https://dl-cli.pstmn.io/install/unix.sh'
+      );
+      expect(manifest.inputs['postman-cli-install-url']?.required).toBe(false);
     });
 
     it('every input has a description', () => {
