@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
@@ -439,6 +440,23 @@ describe('postman-api-onboarding-action composite contract', () => {
       );
       expect(junitStep?.run).toContain('$POSTMAN_CLI_INSTALL_URL');
       expect(junitStep?.run).not.toContain('"${{ inputs.postman-cli-install-url }}"');
+    });
+
+    it('run_tests_junit script remains valid Bash', () => {
+      const manifest = loadManifest();
+      const junitStep = manifest.runs.steps.find((s) => s.id === 'run_tests_junit');
+
+      expect(junitStep?.shell).toBe('bash');
+      expect(junitStep?.run).toBeTruthy();
+      expect(() => execFileSync('bash', ['-n'], { input: junitStep?.run })).not.toThrow();
+    });
+
+    it('run_tests_junit does not validate the install URL with an inline Bash regex', () => {
+      const manifest = loadManifest();
+      const junitStep = manifest.runs.steps.find((s) => s.id === 'run_tests_junit');
+
+      expect(junitStep?.run).not.toContain('=~');
+      expect(junitStep?.run).not.toContain('postman-cli-install-url must be an https URL');
     });
 
     it('run_tests_junit checks jq before parsing JSON payloads', () => {
