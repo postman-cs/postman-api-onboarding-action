@@ -160,6 +160,7 @@ describe('postman-api-onboarding-action composite contract', () => {
         'postman-api-base',
         'postman-bifrost-base',
         'postman-gateway-base',
+        'postman-observability-base',
         'postman-cli-install-url',
         'github-token',
         'gh-fallback-token',
@@ -453,6 +454,21 @@ describe('postman-api-onboarding-action composite contract', () => {
       expect(insightsStep?.with?.['cluster-name']).toBe('${{ inputs.cluster-name }}');
       expect(insightsStep?.with?.['postman-team-id']).toBe('${{ inputs.postman-team-id }}');
     });
+
+    it('insights step receives base URL overrides for beta/alpha stack routing', () => {
+      const manifest = loadManifest();
+      const insightsStep = manifest.runs.steps.find((s) => s.id === 'insights_onboarding');
+
+      expect(insightsStep?.with?.['postman-api-base']).toBe(
+        '${{ inputs.postman-api-base }}'
+      );
+      expect(insightsStep?.with?.['postman-bifrost-base']).toBe(
+        '${{ inputs.postman-bifrost-base }}'
+      );
+      expect(insightsStep?.with?.['postman-observability-base']).toBe(
+        '${{ inputs.postman-observability-base }}'
+      );
+    });
   });
 
   describe('Phase 3: Safe Defaults', () => {
@@ -508,6 +524,10 @@ describe('postman-api-onboarding-action composite contract', () => {
         'https://gateway.postman.com'
       );
       expect(manifest.inputs['postman-gateway-base']?.required).toBe(false);
+      expect(manifest.inputs['postman-observability-base']?.default).toBe(
+        'https://api.observability.postman.com'
+      );
+      expect(manifest.inputs['postman-observability-base']?.required).toBe(false);
       expect(manifest.inputs['postman-cli-install-url']?.default).toBe(
         'https://dl-cli.pstmn.io/install/unix.sh'
       );

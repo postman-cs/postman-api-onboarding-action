@@ -168,6 +168,7 @@ Even when reusing an existing `spec-id`, the composite action still requires `sp
 | `postman-api-base` | `https://api.getpostman.com` | Optional Postman API base URL override. Defaults to prod. Pass through for beta/alpha stacks; propagated to bootstrap and repo-sync. |
 | `postman-bifrost-base` | `https://bifrost-premium-https-v4.gw.postman.com` | Optional Bifrost proxy base URL override. Defaults to prod. Propagated to bootstrap and repo-sync. |
 | `postman-gateway-base` | `https://gateway.postman.com` | Optional Postman gateway base URL override. Defaults to prod. Propagated to bootstrap only (repo-sync does not consume it). |
+| `postman-observability-base` | `https://api.observability.postman.com` | Optional Postman observability API base URL override for beta/alpha stacks. Defaults to prod. Forwarded to postman-insights-onboarding-action. |
 | `postman-cli-install-url` | `https://dl-cli.pstmn.io/install/unix.sh` | Optional Postman CLI install script URL. Defaults to prod. Used for the in-line CLI install in the JUnit runner step, and propagated to bootstrap and repo-sync. |
 | `github-token` | | Enables generated commits, workflow writes, and optional secret persistence in repo sync. |
 | `gh-fallback-token` | | Optional fallback token for workflow and commit APIs. |

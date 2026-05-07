@@ -115,6 +115,10 @@ inputs:
     description: Postman gateway base URL; override for beta.
     required: false
     default: "https://gateway.postman.com"
+  postman-observability-base:
+    description: Postman observability API base URL; override for beta/alpha stacks. Forwarded to postman-insights-onboarding-action.
+    required: false
+    default: "https://api.observability.postman.com"
   postman-cli-install-url:
     description: URL of the install script for the Postman CLI.
     required: false
@@ -367,3 +371,6 @@ runs:
         postman-access-token: ${{ inputs.postman-access-token }}
         postman-team-id: ${{ inputs.postman-team-id }}
         github-token: ${{ inputs.github-token }}
+        postman-api-base: ${{ inputs.postman-api-base }}
+        postman-bifrost-base: ${{ inputs.postman-bifrost-base }}
+        postman-observability-base: ${{ inputs.postman-observability-base }}
