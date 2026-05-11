@@ -191,10 +191,11 @@ describe('postman-api-onboarding-action composite contract', () => {
       expect(manifest.inputs['postman-team-id']?.description).toContain('Explicit');
     });
 
-    it('project-name and spec-url remain required', () => {
+    it('project-name remains required and the spec source is one-of', () => {
       const manifest = loadManifest();
       expect(manifest.inputs['project-name']?.required).toBe(true);
-      expect(manifest.inputs['spec-url']?.required).toBe(true);
+      expect(manifest.inputs['spec-url']?.required).toBe(false);
+      expect(manifest.inputs['spec-path']?.required).toBe(false);
     });
 
     it('defaults integration-backend to bifrost', () => {

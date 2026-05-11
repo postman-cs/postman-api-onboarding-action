@@ -129,7 +129,7 @@ Both CLIs support `--dotenv-path` for shell-friendly KEY=VALUE output that can b
 
 The Insights onboarding CLI is not yet available for non-GitHub CI. See the `postman-insights-onboarding-action` repo for updates.
 
-Even when reusing an existing `spec-id`, the composite action still requires `spec-url` because the bootstrap step updates the existing Spec Hub asset from that source of truth.
+Provide exactly one of `spec-url` (HTTPS URL) or `spec-path` (repo-relative path to a checked-out file). When reusing an existing `spec-id`, the bootstrap step still updates the Spec Hub asset from whichever source you pass.
 
 ## Inputs
 
@@ -155,8 +155,8 @@ Even when reusing an existing `spec-id`, the composite action still requires `sp
 | `requester-email` | | Optional workspace invite target. |
 | `workspace-admin-user-ids` | | Optional comma-separated workspace admin IDs. |
 | `workspace-team-id` | | Optional. Numeric sub-team ID for org-mode workspace creation. Required only when the target team is scoped under an organization (org-mode); the Postman API cannot create workspaces at the org level without it. Passed through to `postman-bootstrap-action`. |
-| `spec-url` | | Required registry-backed OpenAPI document URL. |
-| `spec-path` | | Optional repo-root-relative path to the local spec file used for repo metadata generation. |
+| `spec-url` | | HTTPS URL to the OpenAPI document. Provide either `spec-url` or `spec-path`. |
+| `spec-path` | | Repo-root-relative path to the local spec file (e.g. `apis/<service>/openapi.yaml`). Used for repo metadata generation and, when `spec-url` is not set, also as the spec source for the bootstrap step (read directly from the checked-out workspace). Provide either `spec-url` or `spec-path`. |
 | `environments-json` | `["prod"]` | Environment slugs to materialize downstream. |
 | `system-env-map-json` | `{}` | Map of environment slug to system environment ID. |
 | `environment-uids-json` | `{}` | Map of environment slug to existing Postman environment UID. When provided, repo-sync reuses these environments instead of creating new ones. |

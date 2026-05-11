@@ -69,10 +69,10 @@ inputs:
     description: Numeric sub-team ID for org-mode workspace creation. Required by the Postman API when the PMAK's team is scoped under an organization.
     required: false
   spec-url:
-    description: URL to the OpenAPI document to bootstrap.
-    required: true
+    description: HTTPS URL to the OpenAPI document to bootstrap. Provide either spec-url or spec-path.
+    required: false
   spec-path:
-    description: Optional repo-root-relative path to the local spec file for repo metadata generation.
+    description: Repo-root-relative path to the local spec file. Used for repo metadata generation and, when spec-url is not provided, as the spec source for bootstrap (read directly from the checked-out workspace).
     required: false
   environments-json:
     description: JSON array of environment slugs to materialize.
@@ -252,6 +252,7 @@ runs:
         workspace-admin-user-ids: ${{ inputs.workspace-admin-user-ids }}
         workspace-team-id: ${{ inputs.workspace-team-id }}
         spec-url: ${{ inputs.spec-url }}
+        spec-path: ${{ inputs.spec-path }}
         governance-mapping-json: ${{ inputs.governance-mapping-json }}
         postman-api-key: ${{ inputs.postman-api-key }}
         postman-access-token: ${{ inputs.postman-access-token }}
