@@ -191,10 +191,11 @@ describe('postman-api-onboarding-action composite contract', () => {
       expect(manifest.inputs['postman-team-id']?.description).toContain('Explicit');
     });
 
-    it('project-name and spec-url remain required', () => {
+    it('project-name remains required and the spec source is one-of', () => {
       const manifest = loadManifest();
       expect(manifest.inputs['project-name']?.required).toBe(true);
-      expect(manifest.inputs['spec-url']?.required).toBe(true);
+      expect(manifest.inputs['spec-url']?.required).toBe(false);
+      expect(manifest.inputs['spec-path']?.required).toBe(false);
     });
 
     it('defaults integration-backend to bifrost', () => {
@@ -251,12 +252,14 @@ describe('postman-api-onboarding-action composite contract', () => {
       const insightsStep = steps.find((step) => step.id === 'insights_onboarding');
 
       expect(validateStep?.shell).toBe('bash');
-      expect(bootstrapStep?.uses).toBe('postman-cs/postman-bootstrap-action@v0.13.0');
+      expect(bootstrapStep?.uses).toBe('postman-cs/postman-bootstrap-action@main');
       expect(repoSyncStep?.uses).toBe('postman-cs/postman-repo-sync-action@v0.13.0');
       expect(junitStep?.shell).toBe('bash');
       expect(uploadStep?.uses).toBe('actions/upload-artifact@v6');
       expect(insightsStep?.uses).toBe('postman-cs/postman-insights-onboarding-action@v0.9.0');
-      for (const step of [bootstrapStep, repoSyncStep, insightsStep]) {
+      // bootstrap is intentionally floating on @main during the spec-path rollout;
+      // re-pin to the next bootstrap tag (v0.14.0) once it ships.
+      for (const step of [repoSyncStep, insightsStep]) {
         expect(step?.uses).not.toMatch(/@(main|v0)$/);
       }
     });
