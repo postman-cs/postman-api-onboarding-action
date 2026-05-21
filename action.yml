@@ -260,7 +260,7 @@ runs:
         esac
     - id: bootstrap
       name: Bootstrap Postman Assets
-      uses: postman-cs/postman-bootstrap-action@feat/bootstrap-breaking-change-check
+      uses: postman-cs/postman-bootstrap-action@main
       env:
         POSTMAN_TEAM_ID: ${{ inputs.postman-team-id }}
       with:
