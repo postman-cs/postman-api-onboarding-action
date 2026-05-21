@@ -50,6 +50,7 @@ jobs:
           requester-email: owner@example.com
           workspace-admin-user-ids: 101,102
           spec-url: https://example.com/openapi.yaml
+          # breaking-change-mode: previous-spec
           environments-json: '["prod","stage"]'
           system-env-map-json: '{"prod":"uuid-prod","stage":"uuid-stage"}'
           environment-uids-json: '{"dev":"uid-dev","staging":"uid-staging"}'
@@ -157,6 +158,12 @@ Provide exactly one of `spec-url` (HTTPS URL) or `spec-path` (repo-relative path
 | `workspace-team-id` | | Optional. Numeric sub-team ID for org-mode workspace creation. Required only when the target team is scoped under an organization (org-mode); the Postman API cannot create workspaces at the org level without it. Passed through to `postman-bootstrap-action`. |
 | `spec-url` | | HTTPS URL to the OpenAPI document. Provide either `spec-url` or `spec-path`. |
 | `spec-path` | | Repo-root-relative path to the local spec file (e.g. `apis/<service>/openapi.yaml`). Used for repo metadata generation and, when `spec-url` is not set, also as the spec source for the bootstrap step (read directly from the checked-out workspace). Provide either `spec-url` or `spec-path`. |
+| `breaking-change-mode` | `off` | OpenAPI breaking-change comparison mode passed through to bootstrap: `off`, `pr-native`, `baseline-only`, or `previous-spec`. Existing workflows skip the check unless this is enabled. |
+| `breaking-baseline-spec-path` | | Repo-root-relative baseline OpenAPI spec path used by `baseline-only` and as `pr-native` fallback. |
+| `breaking-rules-path` | `changes-rules.yaml` | Repo-root-relative `openapi-changes` rules file passed through to bootstrap. Missing files are ignored. |
+| `breaking-target-ref` | | Optional target branch or git ref override for bootstrap `pr-native` comparisons. |
+| `breaking-summary-path` | | Optional markdown breaking-change report path. Defaults to a bootstrap runner-temp file and the GitHub job summary. |
+| `breaking-log-path` | | Optional raw breaking-change log path. Defaults to a bootstrap runner-temp file. |
 | `environments-json` | `["prod"]` | Environment slugs to materialize downstream. |
 | `system-env-map-json` | `{}` | Map of environment slug to system environment ID. |
 | `environment-uids-json` | `{}` | Map of environment slug to existing Postman environment UID. When provided, repo-sync reuses these environments instead of creating new ones. |
@@ -245,10 +252,10 @@ The `postman-access-token` is a Postman session token (`x-access-token`) require
 
 The composite action wires:
 
-- `workspace-id`, `workspace-url`, `spec-id`, and `collections-json` from `bootstrap`.
+- `workspace-id`, `workspace-url`, `spec-id`, `collections-json`, `breaking-change-status`, and `breaking-change-summary-json` from `bootstrap`.
 - `environment-uids-json`, `mock-url`, `monitor-id`, `repo-sync-summary-json`, and `commit-sha` from `repo_sync`.
 - Runner-level phase outcomes are exposed as `bootstrap-outcome`, `repo-sync-outcome`, and `insights-outcome` from step outcomes (`success`, `failure`, `cancelled`, or `skipped`).
-- Existing-service passthrough inputs to `bootstrap`: `workspace-id`, `spec-id`, `baseline-collection-id`, `smoke-collection-id`, and `contract-collection-id`.
+- Existing-service passthrough inputs to `bootstrap`: `workspace-id`, `spec-id`, `baseline-collection-id`, `smoke-collection-id`, `contract-collection-id`, and breaking-change controls.
 - Existing-repo passthrough inputs to `repo_sync`: `generate-ci-workflow`, `ci-workflow-path`, and `spec-path`.
 - When `enable-insights: true`, the Insights onboarding step runs after repo sync using the workspace ID from bootstrap plus the first environment from `environments-json` for `environment-id` and `system-env-map-json` lookup.
 - Insights domain outputs (`insights-status`, `insights-verification-token`, `insights-application-id`, `insights-discovered-service-id`, `insights-discovered-service-name`, `insights-collection-id`) are surfaced when `enable-insights: true`.

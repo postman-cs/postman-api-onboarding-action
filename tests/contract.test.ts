@@ -153,6 +153,12 @@ describe('postman-api-onboarding-action composite contract', () => {
         'workspace-team-id',
         'spec-url',
         'spec-path',
+        'breaking-change-mode',
+        'breaking-baseline-spec-path',
+        'breaking-rules-path',
+        'breaking-target-ref',
+        'breaking-summary-path',
+        'breaking-log-path',
         'environments-json',
         'system-env-map-json',
         'environment-uids-json',
@@ -216,6 +222,8 @@ describe('postman-api-onboarding-action composite contract', () => {
         'workspace-url',
         'spec-id',
         'collections-json',
+        'breaking-change-status',
+        'breaking-change-summary-json',
         'environment-uids-json',
         'mock-url',
         'monitor-id',
@@ -252,7 +260,7 @@ describe('postman-api-onboarding-action composite contract', () => {
       const insightsStep = steps.find((step) => step.id === 'insights_onboarding');
 
       expect(validateStep?.shell).toBe('bash');
-      expect(bootstrapStep?.uses).toBe('postman-cs/postman-bootstrap-action@main');
+      expect(bootstrapStep?.uses).toBe('postman-cs/postman-bootstrap-action@feat/bootstrap-breaking-change-check');
       expect(repoSyncStep?.uses).toBe('postman-cs/postman-repo-sync-action@v0.13.0');
       expect(junitStep?.shell).toBe('bash');
       expect(uploadStep?.uses).toBe('actions/upload-artifact@v6');
@@ -297,6 +305,24 @@ describe('postman-api-onboarding-action composite contract', () => {
       expect(bootstrapStep?.with?.['contract-collection-id']).toBe(
         '${{ inputs.contract-collection-id }}'
       );
+      expect(bootstrapStep?.with?.['breaking-change-mode']).toBe(
+        '${{ inputs.breaking-change-mode }}'
+      );
+      expect(bootstrapStep?.with?.['breaking-baseline-spec-path']).toBe(
+        '${{ inputs.breaking-baseline-spec-path }}'
+      );
+      expect(bootstrapStep?.with?.['breaking-rules-path']).toBe(
+        '${{ inputs.breaking-rules-path }}'
+      );
+      expect(bootstrapStep?.with?.['breaking-target-ref']).toBe(
+        '${{ inputs.breaking-target-ref }}'
+      );
+      expect(bootstrapStep?.with?.['breaking-summary-path']).toBe(
+        '${{ inputs.breaking-summary-path }}'
+      );
+      expect(bootstrapStep?.with?.['breaking-log-path']).toBe(
+        '${{ inputs.breaking-log-path }}'
+      );
       expect(repoSyncStep?.with?.['workspace-id']).toBe(
         '${{ steps.bootstrap.outputs.workspace-id }}'
       );
@@ -332,6 +358,12 @@ describe('postman-api-onboarding-action composite contract', () => {
       );
       expect(manifest.outputs['collections-json']?.value).toBe(
         '${{ steps.bootstrap.outputs.collections-json }}'
+      );
+      expect(manifest.outputs['breaking-change-status']?.value).toBe(
+        '${{ steps.bootstrap.outputs.breaking-change-status }}'
+      );
+      expect(manifest.outputs['breaking-change-summary-json']?.value).toBe(
+        '${{ steps.bootstrap.outputs.breaking-change-summary-json }}'
       );
       expect(manifest.outputs['environment-uids-json']?.value).toBe(
         '${{ steps.repo_sync.outputs.environment-uids-json }}'
@@ -522,6 +554,14 @@ describe('postman-api-onboarding-action composite contract', () => {
     it('environments-json defaults to ["prod"]', () => {
       const manifest = loadManifest();
       expect(manifest.inputs['environments-json']?.default).toBe('["prod"]');
+    });
+
+    it('breaking-change controls default to off with runner-temp reports', () => {
+      const manifest = loadManifest();
+      expect(manifest.inputs['breaking-change-mode']?.default).toBe('off');
+      expect(manifest.inputs['breaking-rules-path']?.default).toBe('changes-rules.yaml');
+      expect(manifest.inputs['breaking-summary-path']?.default).toBe('');
+      expect(manifest.inputs['breaking-log-path']?.default).toBe('');
     });
 
     it('repo-write-mode defaults to commit-and-push', () => {
