@@ -169,6 +169,7 @@ describe('postman-api-onboarding-action composite contract', () => {
         'committer-name',
         'committer-email',
         'enable-insights',
+        'skip-built-in-tests',
         'cluster-name',
         'integration-backend',
         'org-mode',
@@ -206,6 +207,13 @@ describe('postman-api-onboarding-action composite contract', () => {
     it('defaults enable-insights to false', () => {
       const manifest = loadManifest();
       expect(manifest.inputs['enable-insights']?.default).toBe('false');
+    });
+
+    it('defaults skip-built-in-tests to false so existing callers see no behavior change', () => {
+      const manifest = loadManifest();
+      expect(manifest.inputs['skip-built-in-tests']).toBeDefined();
+      expect(manifest.inputs['skip-built-in-tests']?.required).toBe(false);
+      expect(manifest.inputs['skip-built-in-tests']?.default).toBe('false');
     });
 
     it('has the complete expected output set', () => {
@@ -257,8 +265,9 @@ describe('postman-api-onboarding-action composite contract', () => {
       expect(junitStep?.shell).toBe('bash');
       expect(uploadStep?.uses).toBe('actions/upload-artifact@v6');
       expect(insightsStep?.uses).toBe('postman-cs/postman-insights-onboarding-action@v0.9.0');
-      // bootstrap is intentionally floating on @main during the spec-path rollout;
-      // re-pin to the next bootstrap tag (v0.14.0) once it ships.
+      // bootstrap is floating on the fix/score-static-over-server-prefix branch
+      // for the Fox-spec end-to-end test (fulfillment-svc rides this onboarding
+      // branch). Re-pin to the next bootstrap tag once that PR merges.
       for (const step of [repoSyncStep, insightsStep]) {
         expect(step?.uses).not.toMatch(/@(main|v0)$/);
       }
@@ -279,6 +288,16 @@ describe('postman-api-onboarding-action composite contract', () => {
       const insightsStep = manifest.runs.steps.find((s) => s.id === 'insights_onboarding');
       expect(insightsStep?.if).toContain('enable-insights');
       expect(insightsStep?.if).toContain("'true'");
+    });
+
+    it('run_tests_junit and upload_junit_artifact are gated on skip-built-in-tests', () => {
+      const manifest = loadManifest();
+      const junitStep = manifest.runs.steps.find((s) => s.id === 'run_tests_junit');
+      const uploadStep = manifest.runs.steps.find((s) => s.id === 'upload_junit_artifact');
+      expect(junitStep?.if).toContain('skip-built-in-tests');
+      expect(junitStep?.if).toContain("'true'");
+      expect(uploadStep?.if).toContain('skip-built-in-tests');
+      expect(uploadStep?.if).toContain("'true'");
     });
 
     it('maps bootstrap outputs explicitly into repo-sync inputs', () => {
