@@ -244,7 +244,7 @@ runs:
         esac
     - id: bootstrap
       name: Bootstrap Postman Assets
-      uses: postman-cs/postman-bootstrap-action@fix/score-static-over-server-prefix
+      uses: postman-cs/postman-bootstrap-action@main
       env:
         POSTMAN_TEAM_ID: ${{ inputs.postman-team-id }}
       with:
