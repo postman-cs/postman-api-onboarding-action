@@ -40,50 +40,47 @@ jobs:
           TAG_VERSION="${GITHUB_REF_NAME#v}"
           PKG_VERSION=$(node -p "require('./package.json').version")
           IFS='.' read -r MAJOR MINOR PATCH _ <<< "$PKG_VERSION"
-          PUBLISH_TAGS=("$PKG_VERSION")
+          ALIAS_TAGS=("$MAJOR")
           if [ "${PATCH:-}" = "0" ] && [ -n "${MINOR:-}" ]; then
-            PUBLISH_TAGS+=("$MAJOR.$MINOR")
+            ALIAS_TAGS+=("$MAJOR.$MINOR")
           fi
-          for PUBLISH_TAG in "${PUBLISH_TAGS[@]}"; do
-            if [ "$TAG_VERSION" = "$PUBLISH_TAG" ]; then
-              echo "publish_tag=true" >> "$GITHUB_OUTPUT"
+          if [ "$TAG_VERSION" = "$PKG_VERSION" ]; then
+            echo "npm_publish=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          for ALIAS_TAG in "${ALIAS_TAGS[@]}"; do
+            if [ "$TAG_VERSION" = "$ALIAS_TAG" ]; then
+              echo "npm_publish=false" >> "$GITHUB_OUTPUT"
+              echo "::notice::Tag v$TAG_VERSION is a rolling customer preview alias for package version $PKG_VERSION; skipping npm publish."
               exit 0
             fi
           done
-          if [ "$TAG_VERSION" = "$MAJOR" ]; then
-            echo "publish_tag=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::Tag v$TAG_VERSION is the rolling customer preview channel for package version $PKG_VERSION; skipping publish steps."
-            exit 0
-          fi
-          if [ "${#PUBLISH_TAGS[@]}" -eq 2 ]; then
-            EXPECTED="v${PUBLISH_TAGS[0]}, v${PUBLISH_TAGS[1]}, or v$MAJOR"
+          if [ "${#ALIAS_TAGS[@]}" -eq 2 ]; then
+            EXPECTED="v$PKG_VERSION, v${ALIAS_TAGS[0]}, or v${ALIAS_TAGS[1]}"
           else
-            EXPECTED="v${PUBLISH_TAGS[0]} or v$MAJOR"
+            EXPECTED="v$PKG_VERSION or v${ALIAS_TAGS[0]}"
           fi
           echo "::error::Tag v$TAG_VERSION does not match package.json version $PKG_VERSION; expected $EXPECTED"
           exit 1
       - name: Publish GitHub release
-        if: steps.release_tag.outputs.publish_tag == 'true'
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
       - uses: actions/setup-node@v5
-        if: steps.release_tag.outputs.publish_tag == 'true'
+        if: steps.release_tag.outputs.npm_publish == 'true'
         with:
           node-version: '24'
           registry-url: 'https://registry.npmjs.org'
       - name: Publish to npm
-        if: steps.release_tag.outputs.publish_tag == 'true'
+        if: steps.release_tag.outputs.npm_publish == 'true'
         run: npm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       - name: Attach npm tarball to release
-        if: steps.release_tag.outputs.publish_tag == 'true'
         run: |
           npm pack
           mv ./*.tgz release.tgz
       - name: Upload tarball
-        if: steps.release_tag.outputs.publish_tag == 'true'
         uses: softprops/action-gh-release@v2
         with:
           files: release.tgz
