@@ -63,12 +63,12 @@ describe('postman-api-onboarding-action composite contract', () => {
       expect(pkg.name).toBe('@postman-cse/onboarding-api');
     });
 
-    it('description references open-alpha, not beta', () => {
+    it('description references customer preview, not beta', () => {
       const manifest = loadManifest();
       const pkg = loadPackageJson();
-      expect(manifest.description).toContain('open-alpha');
+      expect(manifest.description).toContain('customer preview');
       expect(manifest.description).not.toContain('beta');
-      expect(String(pkg.description)).toContain('open-alpha');
+      expect(String(pkg.description)).toContain('customer preview');
       expect(String(pkg.description)).not.toContain('beta');
     });
 
@@ -83,9 +83,9 @@ describe('postman-api-onboarding-action composite contract', () => {
       }
     });
 
-    it('REST_MIGRATION_SEAM.md references open-alpha, not beta', () => {
+    it('REST_MIGRATION_SEAM.md references customer preview, not beta', () => {
       const seam = loadRestMigrationSeam();
-      expect(seam).toContain('open-alpha');
+      expect(seam).toContain('customer preview');
       expect(seam).not.toMatch(/\bbeta\b/i);
     });
 

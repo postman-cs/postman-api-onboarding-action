@@ -1,6 +1,6 @@
 # Release Policy
 
-This document governs how the Postman GitHub Actions open-alpha suite is released and documented.
+This document governs how the Postman GitHub Actions customer preview suite is released and documented.
 
 It applies to these repositories:
 
@@ -14,14 +14,14 @@ It applies to these repositories:
 - Keep each action independently releasable.
 - Keep suite-level guidance in one place without duplicating per-action API details.
 - Prevent composite releases from drifting away from the lower-level actions they depend on.
-- Make consumer version guidance explicit during open alpha.
+- Make consumer version guidance explicit during customer preview.
 
 ## Current state
 
 - Each repository owns its own CI workflow and its own `v*` tag-triggered GitHub release workflow.
 - The composite action references sibling actions through immutable release tags in `action.yml`.
 - Older released composite tags such as `v0.4`, `v0.4.1`, and `v0.5` resolved sibling actions through `@v0` aliases.
-- During the current open-alpha period, the public release contract is the git tag and GitHub release. Do not treat `package.json` version fields as the authoritative public release identifier.
+- During the current customer preview period, the public release contract is the git tag and GitHub release. Do not treat `package.json` version fields as the authoritative public release identifier.
 
 ## Source of truth
 
@@ -38,7 +38,7 @@ Do not duplicate full input and output tables across repositories. Link to the a
 ## Tag policy
 
 - Immutable release tags use the public `v0.x` or `v0.x.y` pattern.
-- The moving `v0` tag is the rolling open-alpha channel.
+- The moving `v0` tag is the rolling customer preview channel.
 - Never rewrite or force-push an existing release tag.
 - Every public tag should have a corresponding GitHub release with generated notes.
 
@@ -50,7 +50,7 @@ Do not duplicate full input and output tables across repositories. Link to the a
 
 ## Composite dependency policy
 
-### Current open-alpha rule
+### Current customer preview rule
 
 The composite action currently depends on:
 
@@ -83,7 +83,7 @@ Release from the bottom up:
 
 ## Compatibility matrix
 
-This matrix describes the current open-alpha release model.
+This matrix describes the current customer preview release model.
 
 | Composite reference used by consumers | Composite repository content | Lower-level dependency references | Result |
 | --- | --- | --- | --- |

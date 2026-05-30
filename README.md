@@ -1,12 +1,12 @@
 # postman-api-onboarding-action
 
-Public open-alpha composite GitHub Action that orchestrates Postman onboarding by chaining:
+Public customer preview composite GitHub Action that orchestrates Postman onboarding by chaining:
 
 - `postman-cs/postman-bootstrap-action@v0`
 - `postman-cs/postman-repo-sync-action@v0`
 - `postman-cs/postman-insights-onboarding-action@v0` (optional, when `enable-insights: true`)
 
-This is the primary partner-facing entrypoint for the open-alpha suite.
+This is the primary partner-facing entrypoint for the customer preview suite.
 
 For existing services, the composite action can target an existing workspace/spec/collection set and can suppress or redirect generated CI workflow output for repos that already have their own pipeline layout.
 
@@ -175,7 +175,7 @@ Provide exactly one of `spec-url` (HTTPS URL) or `spec-path` (repo-relative path
 | `enable-insights` | `false` | When `true`, chains `postman-cs/postman-insights-onboarding-action@v0` after bootstrap and repo sync. |
 | `skip-built-in-tests` | `false` | When `true`, skips the built-in smoke/contract Postman CLI run and JUnit artifact upload. Use this when the caller workflow must perform additional post-onboarding setup (e.g. bearer-token injection, mTLS bootstrap, vault-hydrated secrets, dynamic env enrichment) before tests can authenticate, and will run the tests itself afterward. See [Deferring the test run](#deferring-the-test-run) below. |
 | `cluster-name` | | Optional Insights cluster name passed to the downstream Insights onboarding step. |
-| `integration-backend` | `bifrost` | Current public open-alpha backend. |
+| `integration-backend` | `bifrost` | Current public customer preview backend. |
 | `org-mode` | `false` | When `true`, includes `x-entity-team-id` header in Bifrost proxy calls. Non-org teams must omit this header. |
 | `ssl-client-cert` | | Base64-encoded PEM client certificate for mTLS. Passed through to repo-sync for CI workflow SSL support. |
 | `ssl-client-key` | | Base64-encoded PEM client private key. Passed through to repo-sync. |
@@ -257,9 +257,9 @@ The `postman-api-key` is a Postman API key (PMAK) used for all standard Postman 
 
 > **Note:** The PMAK is a long-lived key tied to your Postman account. It does not require periodic renewal like the `postman-access-token`.
 
-### Obtaining `postman-access-token` (Open Alpha)
+### Obtaining `postman-access-token` (Customer Preview)
 
-> **Open-alpha limitation:** The `postman-access-token` input requires a manually-extracted session token. There is currently no public API to exchange a Postman API key (PMAK) for an access token programmatically. This manual step will be eliminated before GA.
+> **Customer Preview limitation:** The `postman-access-token` input requires a manually-extracted session token. There is currently no public API to exchange a Postman API key (PMAK) for an access token programmatically. This manual step will be eliminated before GA.
 
 The `postman-access-token` is a Postman session token (`x-access-token`) required for internal API operations that the standard PMAK API key cannot perform -- specifically workspace-to-repo git sync (Bifrost), governance group assignment, and system environment associations. Without it, those steps are silently skipped during the onboarding pipeline.
 
@@ -330,11 +330,11 @@ npm install
 npm test
 ```
 
-## Open-Alpha Release Strategy
+## Customer Preview Release Strategy
 
-- Open-alpha channel tags use `v0.x.y`.
+- Customer Preview channel tags use `v0.x.y`.
 - Consumers can pin immutable tags such as `v0.2.0` for reproducibility.
-- Moving tag `v0` is used only as the rolling open-alpha channel.
+- Moving tag `v0` is used only as the rolling customer preview channel.
 
 ## REST Migration Seam
 

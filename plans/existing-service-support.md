@@ -1,7 +1,7 @@
 # Implementation Plan - Existing Service Support (Idempotency & Safe Sync)
 
 ## 1. 🔍 Analysis & Context
-*   **Objective:** Modify the beta action suite to be idempotent and non-destructive so it can be installed on existing repositories and/or existing Postman workspaces without clobbering existing CI pipelines or creating duplicate Postman assets.
+*   **Objective:** Modify the customer preview action suite to be idempotent and non-destructive so it can be installed on existing repositories and/or existing Postman workspaces without clobbering existing CI pipelines or creating duplicate Postman assets.
 *   **Affected Files:**
     *   `../../postman-bootstrap-action/action.yml`
     *   `../../postman-bootstrap-action/src/index.ts`
