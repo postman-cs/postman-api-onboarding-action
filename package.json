@@ -1,6 +1,6 @@
 {
   "name": "@postman-cse/onboarding-api",
-  "version": "0.13.2",
+  "version": "0.13.3",
   "description": "Public customer preview composite Postman API onboarding GitHub Action.",
   "files": [
     "action.yml",
@@ -12,6 +12,10 @@
   },
   "publishConfig": {
     "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/postman-cs/postman-api-onboarding-action"
   },
   "scripts": {
     "test": "vitest run",
