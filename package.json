@@ -25,14 +25,14 @@
   ],
   "license": "MIT",
   "devDependencies": {
-    "@commitlint/cli": "^20.5.0",
-    "@commitlint/config-conventional": "^20.5.0",
+    "@commitlint/cli": "^20.5.3",
+    "@commitlint/config-conventional": "^20.5.3",
     "@eslint/js": "^10.0.1",
-    "@types/node": "^25.3.5",
-    "eslint": "^10.1.0",
-    "typescript": "^5.9.3",
-    "typescript-eslint": "^8.57.2",
-    "vitest": "^4.0.18",
-    "yaml": "^2.8.2"
+    "@types/node": "^24.12.4",
+    "eslint": "^10.4.1",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.60.0",
+    "vitest": "^4.1.7",
+    "yaml": "^2.9.0"
   }
 }

@@ -59,6 +59,9 @@ inputs:
   domain-code:
     description: Short domain code used in workspace naming.
     required: false
+  governance-group:
+    description: Postman governance workspace group name. Overrides the postman-governance-group repository custom property and domain mapping.
+    required: false
   requester-email:
     description: Requester email used for workspace membership.
     required: false
@@ -260,6 +263,7 @@ runs:
         release-label: ${{ inputs.release-label }}
         domain: ${{ inputs.domain }}
         domain-code: ${{ inputs.domain-code }}
+        governance-group: ${{ inputs.governance-group }}
         requester-email: ${{ inputs.requester-email }}
         workspace-admin-user-ids: ${{ inputs.workspace-admin-user-ids }}
         workspace-team-id: ${{ inputs.workspace-team-id }}
@@ -270,6 +274,8 @@ runs:
         # contract.
         spec-path: ${{ inputs.spec-url == '' && inputs.spec-path || '' }}
         governance-mapping-json: ${{ inputs.governance-mapping-json }}
+        github-token: ${{ inputs.github-token }}
+        gh-fallback-token: ${{ inputs.gh-fallback-token }}
         postman-api-key: ${{ inputs.postman-api-key }}
         postman-access-token: ${{ inputs.postman-access-token }}
         integration-backend: ${{ inputs.integration-backend }}
@@ -366,7 +372,7 @@ runs:
       if: always() && inputs.skip-built-in-tests != 'true'
       env:
         POSTMAN_TEAM_ID: ${{ inputs.postman-team-id }}
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@v7.0.1
       with:
         name: postman-test-results
         path: ${{ runner.temp }}/postman-junit/*.xml
