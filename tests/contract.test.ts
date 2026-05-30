@@ -148,6 +148,7 @@ describe('postman-api-onboarding-action composite contract', () => {
         'project-name',
         'domain',
         'domain-code',
+        'governance-group',
         'requester-email',
         'workspace-admin-user-ids',
         'workspace-team-id',
@@ -254,7 +255,7 @@ describe('postman-api-onboarding-action composite contract', () => {
       expect(bootstrapStep?.uses).toBe('postman-cs/postman-bootstrap-action@v0.13.0');
       expect(repoSyncStep?.uses).toBe('postman-cs/postman-repo-sync-action@v0.13.0');
       expect(junitStep?.shell).toBe('bash');
-      expect(uploadStep?.uses).toBe('actions/upload-artifact@v6');
+      expect(uploadStep?.uses).toBe('actions/upload-artifact@v7.0.1');
       expect(insightsStep?.uses).toBe('postman-cs/postman-insights-onboarding-action@v0.9.0');
       for (const step of [bootstrapStep, repoSyncStep, insightsStep]) {
         expect(step?.uses).not.toMatch(/@(main|v0)$/);
@@ -369,6 +370,15 @@ describe('postman-api-onboarding-action composite contract', () => {
       expect(bootstrapStep?.with?.['postman-access-token']).toBe('${{ inputs.postman-access-token }}');
       expect(repoSyncStep?.with?.['postman-api-key']).toBe('${{ inputs.postman-api-key }}');
       expect(repoSyncStep?.with?.['postman-access-token']).toBe('${{ inputs.postman-access-token }}');
+    });
+
+    it('passes governance group and GitHub tokens to bootstrap', () => {
+      const manifest = loadManifest();
+      const bootstrapStep = manifest.runs.steps.find((s) => s.id === 'bootstrap');
+
+      expect(bootstrapStep?.with?.['governance-group']).toBe('${{ inputs.governance-group }}');
+      expect(bootstrapStep?.with?.['github-token']).toBe('${{ inputs.github-token }}');
+      expect(bootstrapStep?.with?.['gh-fallback-token']).toBe('${{ inputs.gh-fallback-token }}');
     });
 
     it('passes integration-backend to bootstrap and repo-sync', () => {

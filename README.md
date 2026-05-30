@@ -152,6 +152,7 @@ Even when reusing an existing `spec-id`, the composite action still requires `sp
 | `project-name` | | Service name used across bootstrap and repo sync. |
 | `domain` | | Business domain used for governance assignment. |
 | `domain-code` | | Short prefix used in workspace naming. |
+| `governance-group` | | Explicit Postman governance workspace group name. Overrides the `postman-governance-group` repository custom property and domain mapping. |
 | `requester-email` | | Optional workspace invite target. |
 | `workspace-admin-user-ids` | | Optional comma-separated workspace admin IDs. |
 | `workspace-team-id` | | Optional. Numeric sub-team ID for org-mode workspace creation. Required only when the target team is scoped under an organization (org-mode); the Postman API cannot create workspaces at the org level without it. Passed through to `postman-bootstrap-action`. |
