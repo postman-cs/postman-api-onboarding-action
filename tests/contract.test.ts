@@ -109,26 +109,31 @@ describe('postman-api-onboarding-action composite contract', () => {
       expect(String(pkg.version)).not.toMatch(/beta/);
     });
 
-    it('skips npm publishing for rolling alias release tags', () => {
+    it('publishes immutable release tags while skipping npm for the rolling alias', () => {
       const workflow = loadReleaseWorkflow();
       const steps = workflow.jobs.release.steps;
       const verifyStep = steps.find((step) => step.name === 'Verify release tag matches package version');
       const releaseStep = steps.find((step) => step.name === 'Publish GitHub release');
       const npmSetupStep = steps.find((step) => step.uses === 'actions/setup-node@v5' && step.with?.['registry-url']);
+      const npmPackageStep = steps.find((step) => step.name === 'Check npm package version');
       const publishStep = steps.find((step) => step.name === 'Publish to npm');
       const attachStep = steps.find((step) => step.name === 'Attach npm tarball to release');
       const uploadStep = steps.find((step) => step.name === 'Upload tarball');
 
       expect(verifyStep?.id).toBe('release_tag');
-      expect(verifyStep?.run).toContain('ALIAS_TAGS=("$MAJOR")');
-      expect(verifyStep?.run).toContain('ALIAS_TAGS+=("$MAJOR.$MINOR")');
+      expect(verifyStep?.run).toContain('PUBLISH_TAGS=("$PKG_VERSION")');
+      expect(verifyStep?.run).toContain('PUBLISH_TAGS+=("$MAJOR.$MINOR")');
+      expect(verifyStep?.run).toContain('if [ "$TAG_VERSION" = "$MAJOR" ]; then');
       expect(verifyStep?.run).toContain('npm_publish=true');
       expect(verifyStep?.run).toContain('npm_publish=false');
       expect(verifyStep?.run).toContain('skipping npm publish');
+      expect(verifyStep?.run).not.toContain('ALIAS_TAGS');
       expect(verifyStep?.run).not.toContain('publish_tag');
       expect(releaseStep?.if).toBeUndefined();
       expect(npmSetupStep?.if).toBe("steps.release_tag.outputs.npm_publish == 'true'");
-      expect(publishStep?.if).toBe("steps.release_tag.outputs.npm_publish == 'true'");
+      expect(npmPackageStep?.id).toBe('npm_package');
+      expect(npmPackageStep?.run).toContain('npm view "$PKG_NAME@$PKG_VERSION" version');
+      expect(publishStep?.if).toBe("steps.release_tag.outputs.npm_publish == 'true' && steps.npm_package.outputs.already_published != 'true'");
       expect(attachStep?.if).toBeUndefined();
       expect(uploadStep?.if).toBeUndefined();
     });

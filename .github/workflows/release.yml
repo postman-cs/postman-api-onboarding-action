@@ -40,25 +40,25 @@ jobs:
           TAG_VERSION="${GITHUB_REF_NAME#v}"
           PKG_VERSION=$(node -p "require('./package.json').version")
           IFS='.' read -r MAJOR MINOR PATCH _ <<< "$PKG_VERSION"
-          ALIAS_TAGS=("$MAJOR")
+          PUBLISH_TAGS=("$PKG_VERSION")
           if [ "${PATCH:-}" = "0" ] && [ -n "${MINOR:-}" ]; then
-            ALIAS_TAGS+=("$MAJOR.$MINOR")
+            PUBLISH_TAGS+=("$MAJOR.$MINOR")
           fi
-          if [ "$TAG_VERSION" = "$PKG_VERSION" ]; then
-            echo "npm_publish=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          for ALIAS_TAG in "${ALIAS_TAGS[@]}"; do
-            if [ "$TAG_VERSION" = "$ALIAS_TAG" ]; then
-              echo "npm_publish=false" >> "$GITHUB_OUTPUT"
-              echo "::notice::Tag v$TAG_VERSION is a rolling customer preview alias for package version $PKG_VERSION; skipping npm publish."
+          for PUBLISH_TAG in "${PUBLISH_TAGS[@]}"; do
+            if [ "$TAG_VERSION" = "$PUBLISH_TAG" ]; then
+              echo "npm_publish=true" >> "$GITHUB_OUTPUT"
               exit 0
             fi
           done
-          if [ "${#ALIAS_TAGS[@]}" -eq 2 ]; then
-            EXPECTED="v$PKG_VERSION, v${ALIAS_TAGS[0]}, or v${ALIAS_TAGS[1]}"
+          if [ "$TAG_VERSION" = "$MAJOR" ]; then
+            echo "npm_publish=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Tag v$TAG_VERSION is the rolling customer preview alias for package version $PKG_VERSION; skipping npm publish."
+            exit 0
+          fi
+          if [ "${#PUBLISH_TAGS[@]}" -eq 2 ]; then
+            EXPECTED="v${PUBLISH_TAGS[0]}, v${PUBLISH_TAGS[1]}, or v$MAJOR"
           else
-            EXPECTED="v$PKG_VERSION or v${ALIAS_TAGS[0]}"
+            EXPECTED="v${PUBLISH_TAGS[0]} or v$MAJOR"
           fi
           echo "::error::Tag v$TAG_VERSION does not match package.json version $PKG_VERSION; expected $EXPECTED"
           exit 1
@@ -71,8 +71,20 @@ jobs:
         with:
           node-version: '24'
           registry-url: 'https://registry.npmjs.org'
-      - name: Publish to npm
+      - name: Check npm package version
+        id: npm_package
         if: steps.release_tag.outputs.npm_publish == 'true'
+        run: |
+          PKG_NAME=$(node -p "require('./package.json').name")
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          if npm view "$PKG_NAME@$PKG_VERSION" version >/dev/null 2>&1; then
+            echo "already_published=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::$PKG_NAME@$PKG_VERSION is already published; skipping npm publish."
+          else
+            echo "already_published=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Publish to npm
+        if: steps.release_tag.outputs.npm_publish == 'true' && steps.npm_package.outputs.already_published != 'true'
         run: npm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
