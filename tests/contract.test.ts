@@ -116,16 +116,21 @@ describe('postman-api-onboarding-action composite contract', () => {
       const releaseStep = steps.find((step) => step.name === 'Publish GitHub release');
       const npmSetupStep = steps.find((step) => step.uses === 'actions/setup-node@v5' && step.with?.['registry-url']);
       const publishStep = steps.find((step) => step.name === 'Publish to npm');
+      const attachStep = steps.find((step) => step.name === 'Attach npm tarball to release');
       const uploadStep = steps.find((step) => step.name === 'Upload tarball');
 
       expect(verifyStep?.id).toBe('release_tag');
-      expect(verifyStep?.run).toContain('publish_tag=true');
-      expect(verifyStep?.run).toContain('publish_tag=false');
-      expect(verifyStep?.run).toContain('rolling customer preview channel');
-      expect(releaseStep?.if).toBe("steps.release_tag.outputs.publish_tag == 'true'");
-      expect(npmSetupStep?.if).toBe("steps.release_tag.outputs.publish_tag == 'true'");
-      expect(publishStep?.if).toBe("steps.release_tag.outputs.publish_tag == 'true'");
-      expect(uploadStep?.if).toBe("steps.release_tag.outputs.publish_tag == 'true'");
+      expect(verifyStep?.run).toContain('ALIAS_TAGS=("$MAJOR")');
+      expect(verifyStep?.run).toContain('ALIAS_TAGS+=("$MAJOR.$MINOR")');
+      expect(verifyStep?.run).toContain('npm_publish=true');
+      expect(verifyStep?.run).toContain('npm_publish=false');
+      expect(verifyStep?.run).toContain('skipping npm publish');
+      expect(verifyStep?.run).not.toContain('publish_tag');
+      expect(releaseStep?.if).toBeUndefined();
+      expect(npmSetupStep?.if).toBe("steps.release_tag.outputs.npm_publish == 'true'");
+      expect(publishStep?.if).toBe("steps.release_tag.outputs.npm_publish == 'true'");
+      expect(attachStep?.if).toBeUndefined();
+      expect(uploadStep?.if).toBeUndefined();
     });
 
     it('README documents all inputs from action.yml', () => {
