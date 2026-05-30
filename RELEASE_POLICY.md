@@ -54,9 +54,9 @@ Do not duplicate full input and output tables across repositories. Link to the a
 
 The composite action currently depends on:
 
-- `postman-cs/postman-bootstrap-action@v0.13.0`
-- `postman-cs/postman-repo-sync-action@v0.13.0`
-- `postman-cs/postman-insights-onboarding-action@v0.9.0` when Insights is enabled
+- `postman-cs/postman-bootstrap-action@main`
+- `postman-cs/postman-repo-sync-action@v0.13.1`
+- `postman-cs/postman-insights-onboarding-action@v0.9.1` when Insights is enabled
 
 Because these are immutable sibling pins, a consumer who pins `postman-api-onboarding-action` to an immutable tag gets a reproducible lower-level action set at runtime.
 

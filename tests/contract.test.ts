@@ -262,10 +262,10 @@ describe('postman-api-onboarding-action composite contract', () => {
 
       expect(validateStep?.shell).toBe('bash');
       expect(bootstrapStep?.uses).toBe('postman-cs/postman-bootstrap-action@main');
-      expect(repoSyncStep?.uses).toBe('postman-cs/postman-repo-sync-action@v0.13.0');
+      expect(repoSyncStep?.uses).toBe('postman-cs/postman-repo-sync-action@v0.13.1');
       expect(junitStep?.shell).toBe('bash');
       expect(uploadStep?.uses).toBe('actions/upload-artifact@v7.0.1');
-      expect(insightsStep?.uses).toBe('postman-cs/postman-insights-onboarding-action@v0.9.0');
+      expect(insightsStep?.uses).toBe('postman-cs/postman-insights-onboarding-action@v0.9.1');
       // bootstrap is floating on the fix/score-static-over-server-prefix branch
       // for the Fox-spec end-to-end test (fulfillment-svc rides this onboarding
       // branch). Re-pin to the next bootstrap tag once that PR merges.
