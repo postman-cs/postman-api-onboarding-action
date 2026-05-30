@@ -31,6 +31,7 @@ jobs:
           ACTIONLINT_BIN="$(go env GOPATH)/bin/actionlint"
           "$ACTIONLINT_BIN"
       - name: Verify release tag matches package version
+        id: release_tag
         run: |
           if [[ "$GITHUB_REF" != refs/tags/v* ]]; then
             echo "::error::Release workflow must run from a v* tag; got $GITHUB_REF"
@@ -39,39 +40,50 @@ jobs:
           TAG_VERSION="${GITHUB_REF_NAME#v}"
           PKG_VERSION=$(node -p "require('./package.json').version")
           IFS='.' read -r MAJOR MINOR PATCH _ <<< "$PKG_VERSION"
-          ALLOWED_TAGS=("$PKG_VERSION" "$MAJOR")
+          PUBLISH_TAGS=("$PKG_VERSION")
           if [ "${PATCH:-}" = "0" ] && [ -n "${MINOR:-}" ]; then
-            ALLOWED_TAGS+=("$MAJOR.$MINOR")
+            PUBLISH_TAGS+=("$MAJOR.$MINOR")
           fi
-          for ALLOWED_TAG in "${ALLOWED_TAGS[@]}"; do
-            if [ "$TAG_VERSION" = "$ALLOWED_TAG" ]; then
+          for PUBLISH_TAG in "${PUBLISH_TAGS[@]}"; do
+            if [ "$TAG_VERSION" = "$PUBLISH_TAG" ]; then
+              echo "publish_tag=true" >> "$GITHUB_OUTPUT"
               exit 0
             fi
           done
-          if [ "${#ALLOWED_TAGS[@]}" -eq 3 ]; then
-            EXPECTED="v${ALLOWED_TAGS[0]}, v${ALLOWED_TAGS[1]}, or v${ALLOWED_TAGS[2]}"
+          if [ "$TAG_VERSION" = "$MAJOR" ]; then
+            echo "publish_tag=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Tag v$TAG_VERSION is the rolling customer preview channel for package version $PKG_VERSION; skipping publish steps."
+            exit 0
+          fi
+          if [ "${#PUBLISH_TAGS[@]}" -eq 2 ]; then
+            EXPECTED="v${PUBLISH_TAGS[0]}, v${PUBLISH_TAGS[1]}, or v$MAJOR"
           else
-            EXPECTED="v${ALLOWED_TAGS[0]} or v${ALLOWED_TAGS[1]}"
+            EXPECTED="v${PUBLISH_TAGS[0]} or v$MAJOR"
           fi
           echo "::error::Tag v$TAG_VERSION does not match package.json version $PKG_VERSION; expected $EXPECTED"
           exit 1
       - name: Publish GitHub release
+        if: steps.release_tag.outputs.publish_tag == 'true'
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
       - uses: actions/setup-node@v5
+        if: steps.release_tag.outputs.publish_tag == 'true'
         with:
           node-version: '24'
           registry-url: 'https://registry.npmjs.org'
       - name: Publish to npm
+        if: steps.release_tag.outputs.publish_tag == 'true'
         run: npm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       - name: Attach npm tarball to release
+        if: steps.release_tag.outputs.publish_tag == 'true'
         run: |
           npm pack
           mv ./*.tgz release.tgz
       - name: Upload tarball
+        if: steps.release_tag.outputs.publish_tag == 'true'
         uses: softprops/action-gh-release@v2
         with:
           files: release.tgz

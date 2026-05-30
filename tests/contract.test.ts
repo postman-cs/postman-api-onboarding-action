@@ -29,6 +29,14 @@ type ActionManifest = {
   outputs: Record<string, { description?: string; value: string }>;
 };
 
+type WorkflowManifest = {
+  jobs: {
+    release: {
+      steps: Step[];
+    };
+  };
+};
+
 const HIDDEN_INPUTS = new Set(['postman-stack']);
 
 function loadManifest(): ActionManifest {
@@ -49,6 +57,12 @@ function loadReadme(): string {
 
 function loadRestMigrationSeam(): string {
   return readFileSync(path.join(repoRoot, 'REST_MIGRATION_SEAM.md'), 'utf8');
+}
+
+function loadReleaseWorkflow(): WorkflowManifest {
+  return parse(
+    readFileSync(path.join(repoRoot, '.github/workflows/release.yml'), 'utf8')
+  ) as WorkflowManifest;
 }
 
 describe('postman-api-onboarding-action composite contract', () => {
@@ -93,6 +107,25 @@ describe('postman-api-onboarding-action composite contract', () => {
       const pkg = loadPackageJson();
       expect(String(pkg.version)).toMatch(/^0\.\d+\.\d+$/);
       expect(String(pkg.version)).not.toMatch(/beta/);
+    });
+
+    it('skips npm publishing for rolling alias release tags', () => {
+      const workflow = loadReleaseWorkflow();
+      const steps = workflow.jobs.release.steps;
+      const verifyStep = steps.find((step) => step.name === 'Verify release tag matches package version');
+      const releaseStep = steps.find((step) => step.name === 'Publish GitHub release');
+      const npmSetupStep = steps.find((step) => step.uses === 'actions/setup-node@v5' && step.with?.['registry-url']);
+      const publishStep = steps.find((step) => step.name === 'Publish to npm');
+      const uploadStep = steps.find((step) => step.name === 'Upload tarball');
+
+      expect(verifyStep?.id).toBe('release_tag');
+      expect(verifyStep?.run).toContain('publish_tag=true');
+      expect(verifyStep?.run).toContain('publish_tag=false');
+      expect(verifyStep?.run).toContain('rolling customer preview channel');
+      expect(releaseStep?.if).toBe("steps.release_tag.outputs.publish_tag == 'true'");
+      expect(npmSetupStep?.if).toBe("steps.release_tag.outputs.publish_tag == 'true'");
+      expect(publishStep?.if).toBe("steps.release_tag.outputs.publish_tag == 'true'");
+      expect(uploadStep?.if).toBe("steps.release_tag.outputs.publish_tag == 'true'");
     });
 
     it('README documents all inputs from action.yml', () => {
