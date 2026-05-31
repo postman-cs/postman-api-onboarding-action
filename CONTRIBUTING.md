@@ -25,6 +25,18 @@ npm run lint        # ESLint
 - [ ] Changes are focused and address a single concern
 - [ ] New functionality includes tests
 
+## Release E2E Status
+
+This repo is not directly blocked by the central live release e2e gate in Phase
+1. The current `postman-actions-e2e` pipeline exercises the lower-level
+`resolve-service-token`, `bootstrap`, `repo-sync`, and `smoke-flow` CLI actions;
+it does not yet run the composite action as the released artifact.
+
+Do not describe a composite release as live-e2e-gated until the harness includes
+real composite coverage and this repo's release workflow waits on that gate.
+Follow `RELEASE_POLICY.md` for the current bottom-up release order and record
+the lower-level gated release evidence when updating composite pins.
+
 ## Commit Messages
 
 This project uses [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/). All commits must follow this format:
