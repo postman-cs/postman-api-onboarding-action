@@ -165,6 +165,7 @@ Provide exactly one of `spec-url` (HTTPS URL) or `spec-path` (repo-relative path
 | `env-runtime-urls-json` | `{}` | Map of environment slug to runtime base URL. |
 | `postman-api-key` | | Required Postman API key for the bootstrap and sync phases. The composite always runs `postman-bootstrap-action`, which still requires a PMAK. |
 | `postman-access-token` | | Enables governance assignment, Bifrost integration, and API key generation fallback. |
+| `credential-preflight` | `warn` | Credential identity preflight policy forwarded to bootstrap, repo sync, and insights. warn logs a note and continues when the api key and access token resolve to different parent orgs; enforce fails the run before any workspace is created; off skips the identity probes (reactive error guidance still applies). |
 | `postman-team-id` | | Explicit Postman team ID override for org-mode Bifrost calls. Passed to the downstream actions when provided. |
 | `github-token` | | Enables generated commits, workflow writes, and optional secret persistence in repo sync. |
 | `gh-fallback-token` | | Optional fallback token for workflow and commit APIs. |

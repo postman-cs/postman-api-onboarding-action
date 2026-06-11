@@ -206,6 +206,7 @@ describe('postman-api-onboarding-action composite contract', () => {
         'env-runtime-urls-json',
         'postman-api-key',
         'postman-access-token',
+        'credential-preflight',
         'postman-team-id',
         'postman-stack',
         'github-token',
@@ -306,15 +307,12 @@ describe('postman-api-onboarding-action composite contract', () => {
       const insightsStep = steps.find((step) => step.id === 'insights_onboarding');
 
       expect(validateStep?.shell).toBe('bash');
-      expect(bootstrapStep?.uses).toBe('postman-cs/postman-bootstrap-action@main');
-      expect(repoSyncStep?.uses).toBe('postman-cs/postman-repo-sync-action@v0.13.3');
+      expect(bootstrapStep?.uses).toBe('postman-cs/postman-bootstrap-action@v0.15.0');
+      expect(repoSyncStep?.uses).toBe('postman-cs/postman-repo-sync-action@v0.14.0');
       expect(junitStep?.shell).toBe('bash');
       expect(uploadStep?.uses).toBe('actions/upload-artifact@v7.0.1');
-      expect(insightsStep?.uses).toBe('postman-cs/postman-insights-onboarding-action@v0.9.1');
-      // bootstrap is floating on the fix/score-static-over-server-prefix branch
-      // for the Fox-spec end-to-end test (fulfillment-svc rides this onboarding
-      // branch). Re-pin to the next bootstrap tag once that PR merges.
-      for (const step of [repoSyncStep, insightsStep]) {
+      expect(insightsStep?.uses).toBe('postman-cs/postman-insights-onboarding-action@v0.10.0');
+      for (const step of [bootstrapStep, repoSyncStep, insightsStep]) {
         expect(step?.uses).not.toMatch(/@(main|v0)$/);
       }
     });
@@ -437,6 +435,31 @@ describe('postman-api-onboarding-action composite contract', () => {
       expect(bootstrapStep?.with?.['postman-access-token']).toBe('${{ inputs.postman-access-token }}');
       expect(repoSyncStep?.with?.['postman-api-key']).toBe('${{ inputs.postman-api-key }}');
       expect(repoSyncStep?.with?.['postman-access-token']).toBe('${{ inputs.postman-access-token }}');
+    });
+
+    it('credential-preflight defaults to warn and is optional', () => {
+      const manifest = loadManifest();
+      expect(manifest.inputs['credential-preflight']?.required).toBe(false);
+      expect(manifest.inputs['credential-preflight']?.default).toBe('warn');
+    });
+
+    it('passes credential-preflight to bootstrap, repo-sync, and insights', () => {
+      const manifest = loadManifest();
+      const bootstrapStep = manifest.runs.steps.find((s) => s.id === 'bootstrap');
+      const repoSyncStep = manifest.runs.steps.find((s) => s.id === 'repo_sync');
+      const insightsStep = manifest.runs.steps.find((s) => s.id === 'insights_onboarding');
+
+      expect(bootstrapStep?.with?.['credential-preflight']).toBe('${{ inputs.credential-preflight }}');
+      expect(repoSyncStep?.with?.['credential-preflight']).toBe('${{ inputs.credential-preflight }}');
+      expect(insightsStep?.with?.['credential-preflight']).toBe('${{ inputs.credential-preflight }}');
+    });
+
+    it('does not expose an iapub base URL knob on any child step', () => {
+      const manifest = loadManifest();
+      for (const stepId of ['bootstrap', 'repo_sync', 'insights_onboarding']) {
+        const step = manifest.runs.steps.find((s) => s.id === stepId);
+        expect(step?.with?.['iapub-base']).toBeUndefined();
+      }
     });
 
     it('passes governance group and GitHub tokens to bootstrap', () => {

@@ -103,6 +103,10 @@ inputs:
   postman-access-token:
     description: Postman access token used for Bifrost and governance integration.
     required: false
+  credential-preflight:
+    description: "Credential identity preflight policy forwarded to bootstrap, repo sync, and insights. warn (default) logs a note and continues when postman-api-key and postman-access-token resolve to different parent orgs; enforce fails the run on that condition before any workspace is created; off skips the identity probes entirely (the reactive error guidance still applies)."
+    required: false
+    default: warn
   postman-team-id:
     description: Explicit Postman team ID override for org-mode Bifrost calls.
     required: false
@@ -247,7 +251,7 @@ runs:
         esac
     - id: bootstrap
       name: Bootstrap Postman Assets
-      uses: postman-cs/postman-bootstrap-action@main
+      uses: postman-cs/postman-bootstrap-action@v0.15.0
       env:
         POSTMAN_TEAM_ID: ${{ inputs.postman-team-id }}
       with:
@@ -278,11 +282,12 @@ runs:
         gh-fallback-token: ${{ inputs.gh-fallback-token }}
         postman-api-key: ${{ inputs.postman-api-key }}
         postman-access-token: ${{ inputs.postman-access-token }}
+        credential-preflight: ${{ inputs.credential-preflight }}
         integration-backend: ${{ inputs.integration-backend }}
         postman-stack: ${{ inputs.postman-stack }}
     - id: repo_sync
       name: Sync Repository and Workspace
-      uses: postman-cs/postman-repo-sync-action@v0.13.3
+      uses: postman-cs/postman-repo-sync-action@v0.14.0
       env:
         POSTMAN_TEAM_ID: ${{ inputs.postman-team-id }}
       with:
@@ -306,6 +311,7 @@ runs:
         committer-email: ${{ inputs.committer-email }}
         postman-api-key: ${{ inputs.postman-api-key }}
         postman-access-token: ${{ inputs.postman-access-token }}
+        credential-preflight: ${{ inputs.credential-preflight }}
         github-token: ${{ inputs.github-token }}
         gh-fallback-token: ${{ inputs.gh-fallback-token }}
         org-mode: ${{ inputs.org-mode }}
@@ -380,7 +386,7 @@ runs:
     - id: insights_onboarding
       if: inputs.enable-insights == 'true'
       name: Onboard Postman Insights
-      uses: postman-cs/postman-insights-onboarding-action@v0.9.1
+      uses: postman-cs/postman-insights-onboarding-action@v0.10.0
       env:
         POSTMAN_TEAM_ID: ${{ inputs.postman-team-id }}
       with:
@@ -391,6 +397,7 @@ runs:
         cluster-name: ${{ inputs.cluster-name }}
         postman-api-key: ${{ inputs.postman-api-key }}
         postman-access-token: ${{ inputs.postman-access-token }}
+        credential-preflight: ${{ inputs.credential-preflight }}
         postman-team-id: ${{ inputs.postman-team-id }}
         github-token: ${{ inputs.github-token }}
         postman-stack: ${{ inputs.postman-stack }}
