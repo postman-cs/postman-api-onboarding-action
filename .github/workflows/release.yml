@@ -14,8 +14,8 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
         with:
           node-version: '24'
           cache: npm
@@ -63,10 +63,10 @@ jobs:
           echo "::error::Tag v$TAG_VERSION does not match package.json version $PKG_VERSION; expected $EXPECTED"
           exit 1
       - name: Publish GitHub release
-        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
+        uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3.0.0
         with:
           generate_release_notes: true
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v6
         if: steps.release_tag.outputs.npm_publish == 'true'
         with:
           node-version: '24'
@@ -93,6 +93,6 @@ jobs:
           npm pack
           mv ./*.tgz release.tgz
       - name: Upload tarball
-        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
+        uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3.0.0
         with:
           files: release.tgz
