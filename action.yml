@@ -1,5 +1,9 @@
 name: postman-api-onboarding-action
 description: Public customer preview composite action that orchestrates Postman bootstrap and repo sync.
+author: Postman
+branding:
+  icon: send
+  color: orange
 inputs:
 
   workspace-id:
@@ -251,7 +255,7 @@ runs:
         esac
     - id: bootstrap
       name: Bootstrap Postman Assets
-      uses: postman-cs/postman-bootstrap-action@v0.15.2
+      uses: postman-cs/postman-bootstrap-action@v0.15.3
       env:
         POSTMAN_TEAM_ID: ${{ inputs.postman-team-id }}
       with:
@@ -287,7 +291,7 @@ runs:
         postman-stack: ${{ inputs.postman-stack }}
     - id: repo_sync
       name: Sync Repository and Workspace
-      uses: postman-cs/postman-repo-sync-action@v0.14.2
+      uses: postman-cs/postman-repo-sync-action@v0.14.3
       env:
         POSTMAN_TEAM_ID: ${{ inputs.postman-team-id }}
       with:
@@ -386,7 +390,7 @@ runs:
     - id: insights_onboarding
       if: inputs.enable-insights == 'true'
       name: Onboard Postman Insights
-      uses: postman-cs/postman-insights-onboarding-action@v0.10.1
+      uses: postman-cs/postman-insights-onboarding-action@v0.10.2
       env:
         POSTMAN_TEAM_ID: ${{ inputs.postman-team-id }}
       with:

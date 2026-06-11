@@ -63,7 +63,7 @@ jobs:
           echo "::error::Tag v$TAG_VERSION does not match package.json version $PKG_VERSION; expected $EXPECTED"
           exit 1
       - name: Publish GitHub release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
         with:
           generate_release_notes: true
       - uses: actions/setup-node@v5
@@ -93,6 +93,6 @@ jobs:
           npm pack
           mv ./*.tgz release.tgz
       - name: Upload tarball
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
         with:
           files: release.tgz

@@ -1,5 +1,10 @@
 # postman-api-onboarding-action
 
+[![CI](https://github.com/postman-cs/postman-api-onboarding-action/actions/workflows/ci.yml/badge.svg)](https://github.com/postman-cs/postman-api-onboarding-action/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/postman-cs/postman-api-onboarding-action?sort=semver)](https://github.com/postman-cs/postman-api-onboarding-action/releases)
+[![npm](https://img.shields.io/npm/v/%40postman-cse%2Fonboarding-api)](https://www.npmjs.com/package/@postman-cse/onboarding-api)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 Public customer preview composite GitHub Action that orchestrates Postman onboarding by chaining:
 
 - `postman-cs/postman-bootstrap-action@v0`

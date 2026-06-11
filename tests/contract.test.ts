@@ -307,11 +307,11 @@ describe('postman-api-onboarding-action composite contract', () => {
       const insightsStep = steps.find((step) => step.id === 'insights_onboarding');
 
       expect(validateStep?.shell).toBe('bash');
-      expect(bootstrapStep?.uses).toBe('postman-cs/postman-bootstrap-action@v0.15.2');
-      expect(repoSyncStep?.uses).toBe('postman-cs/postman-repo-sync-action@v0.14.2');
+      expect(bootstrapStep?.uses).toBe('postman-cs/postman-bootstrap-action@v0.15.3');
+      expect(repoSyncStep?.uses).toBe('postman-cs/postman-repo-sync-action@v0.14.3');
       expect(junitStep?.shell).toBe('bash');
       expect(uploadStep?.uses).toBe('actions/upload-artifact@v7.0.1');
-      expect(insightsStep?.uses).toBe('postman-cs/postman-insights-onboarding-action@v0.10.1');
+      expect(insightsStep?.uses).toBe('postman-cs/postman-insights-onboarding-action@v0.10.2');
       for (const step of [bootstrapStep, repoSyncStep, insightsStep]) {
         expect(step?.uses).not.toMatch(/@(main|v0)$/);
       }
@@ -703,7 +703,7 @@ describe('postman-api-onboarding-action composite contract', () => {
         for (const match of matches) {
           expect(
             inputNames.has(match[1]),
-            `Step "${step.id}" references non-existent input "${"$"}{match[1]}"`
+            `Step "${step.id}" references non-existent input "${match[1]}"`
           ).toBe(true);
         }
       }
@@ -719,7 +719,7 @@ describe('postman-api-onboarding-action composite contract', () => {
         for (const match of matches) {
           expect(
             stepIds.has(match[1]),
-            `Output "${outputName}" references non-existent step "${"$"}{match[1]}"`
+            `Output "${outputName}" references non-existent step "${match[1]}"`
           ).toBe(true);
         }
       }
