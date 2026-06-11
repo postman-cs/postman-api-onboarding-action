@@ -40,15 +40,15 @@ Do not duplicate full input and output tables across repositories. Link to the a
 
 ## Tag policy
 
-- Immutable release tags use the public `v0.x` or `v0.x.y` pattern.
-- The moving `v0` tag is the rolling customer preview channel.
+- Immutable release tags use the public `v1.x` or `v1.x.y` pattern. Older `v0.x.y` tags remain published and immutable.
+- The moving `v1` tag is the rolling customer preview channel. The retired `v0` alias is frozen at the last v0 release and no longer moves.
 - Never rewrite or force-push an existing release tag.
 - Every public tag should have a corresponding GitHub release with generated notes.
 
 ## Consumer guidance
 
-- Recommend immutable tags such as `@v0.5` in examples and onboarding docs.
-- Treat `@v0` as a convenience channel, not as a reproducible reference.
+- Recommend immutable tags such as `@v1.0.0` in examples and onboarding docs.
+- Treat `@v1` as a convenience channel, never as a reproducible reference.
 - For security-sensitive environments, document that SHA pinning is the strongest option.
 
 ## Composite dependency policy
@@ -57,9 +57,9 @@ Do not duplicate full input and output tables across repositories. Link to the a
 
 The composite action currently depends on:
 
-- `postman-cs/postman-bootstrap-action@main`
-- `postman-cs/postman-repo-sync-action@v0.13.1`
-- `postman-cs/postman-insights-onboarding-action@v0.9.1` when Insights is enabled
+- `postman-cs/postman-bootstrap-action@v1.0.0`
+- `postman-cs/postman-repo-sync-action@v1.0.0`
+- `postman-cs/postman-insights-onboarding-action@v1.0.0` when Insights is enabled
 
 Because these are immutable sibling pins, a consumer who pins `postman-api-onboarding-action` to an immutable tag gets a reproducible lower-level action set at runtime.
 
@@ -108,7 +108,7 @@ exact action tag pinned, waits for the correlated workflow run to conclude
 successfully, and only then publishes. The release log must include the e2e run
 URL, correlation id, and conclusion.
 
-The rolling `v0` customer-preview alias validates locally but skips npm publish
+The rolling `v1` customer-preview alias validates locally but skips npm publish
 and the live e2e gate.
 
 The composite action, Insights onboarding, and AWS spec discovery are not
@@ -122,7 +122,7 @@ This matrix describes the current customer preview release model.
 
 | Composite reference used by consumers | Composite repository content | Lower-level dependency references | Result |
 | --- | --- | --- | --- |
-| `postman-api-onboarding-action@v0` | Rolling composite alias | Immutable sibling tags in the current composite content | Rolling composite channel with pinned siblings per composite revision |
+| `postman-api-onboarding-action@v1` | Rolling composite alias | Immutable sibling tags in the current composite content | Rolling composite channel with pinned siblings per composite revision |
 | Immutable composite release | Immutable composite repo tag | Immutable sibling tags | Fully reproducible |
 
 ## Maintainer release checklist

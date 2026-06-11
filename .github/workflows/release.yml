@@ -50,15 +50,15 @@ jobs:
               exit 0
             fi
           done
-          if [ "$TAG_VERSION" = "0" ]; then
+          if [ "$TAG_VERSION" = "$MAJOR" ]; then
             echo "npm_publish=false" >> "$GITHUB_OUTPUT"
             echo "::notice::Tag v$TAG_VERSION is the rolling customer preview alias for package version $PKG_VERSION; skipping npm publish."
             exit 0
           fi
           if [ "${#PUBLISH_TAGS[@]}" -eq 2 ]; then
-            EXPECTED="v${PUBLISH_TAGS[0]}, v${PUBLISH_TAGS[1]}, or v0"
+            EXPECTED="v${PUBLISH_TAGS[0]}, v${PUBLISH_TAGS[1]}, or v$MAJOR"
           else
-            EXPECTED="v${PUBLISH_TAGS[0]} or v0"
+            EXPECTED="v${PUBLISH_TAGS[0]} or v$MAJOR"
           fi
           echo "::error::Tag v$TAG_VERSION does not match package.json version $PKG_VERSION; expected $EXPECTED"
           exit 1

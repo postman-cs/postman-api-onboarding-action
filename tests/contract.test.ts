@@ -105,7 +105,7 @@ describe('postman-api-onboarding-action composite contract', () => {
 
     it('package.json version is a publishable semver release', () => {
       const pkg = loadPackageJson();
-      expect(String(pkg.version)).toMatch(/^0\.\d+\.\d+$/);
+      expect(String(pkg.version)).toMatch(/^1\.\d+\.\d+$/);
       expect(String(pkg.version)).not.toMatch(/beta/);
     });
 
@@ -123,9 +123,9 @@ describe('postman-api-onboarding-action composite contract', () => {
       expect(verifyStep?.id).toBe('release_tag');
       expect(verifyStep?.run).toContain('PUBLISH_TAGS=("$PKG_VERSION")');
       expect(verifyStep?.run).toContain('PUBLISH_TAGS+=("$MAJOR.$MINOR")');
-      expect(verifyStep?.run).toContain('if [ "$TAG_VERSION" = "0" ]; then');
-      expect(verifyStep?.run).not.toContain('if [ "$TAG_VERSION" = "$MAJOR" ]; then');
-      expect(verifyStep?.run).not.toContain('or v$MAJOR');
+      expect(verifyStep?.run).toContain('if [ "$TAG_VERSION" = "$MAJOR" ]; then');
+      expect(verifyStep?.run).not.toContain('if [ "$TAG_VERSION" = "0" ]; then');
+      expect(verifyStep?.run).toContain('or v$MAJOR');
       expect(verifyStep?.run).toContain('npm_publish=true');
       expect(verifyStep?.run).toContain('npm_publish=false');
       expect(verifyStep?.run).toContain('skipping npm publish');
@@ -307,11 +307,11 @@ describe('postman-api-onboarding-action composite contract', () => {
       const insightsStep = steps.find((step) => step.id === 'insights_onboarding');
 
       expect(validateStep?.shell).toBe('bash');
-      expect(bootstrapStep?.uses).toBe('postman-cs/postman-bootstrap-action@v0.15.3');
-      expect(repoSyncStep?.uses).toBe('postman-cs/postman-repo-sync-action@v0.14.3');
+      expect(bootstrapStep?.uses).toBe('postman-cs/postman-bootstrap-action@v1.0.0');
+      expect(repoSyncStep?.uses).toBe('postman-cs/postman-repo-sync-action@v1.0.0');
       expect(junitStep?.shell).toBe('bash');
       expect(uploadStep?.uses).toBe('actions/upload-artifact@v7.0.1');
-      expect(insightsStep?.uses).toBe('postman-cs/postman-insights-onboarding-action@v0.10.2');
+      expect(insightsStep?.uses).toBe('postman-cs/postman-insights-onboarding-action@v1.0.0');
       for (const step of [bootstrapStep, repoSyncStep, insightsStep]) {
         expect(step?.uses).not.toMatch(/@(main|v0)$/);
       }

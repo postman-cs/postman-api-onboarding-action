@@ -17,12 +17,12 @@ function npmRegistrySetupStep(): string {
 }
 
 describe('release workflow publishing contract', () => {
-  it('keeps v0 as the only rolling alias and v0.x as a zero-patch publish tag', () => {
+  it('keeps v1 as the only rolling alias and v1.x as a zero-patch publish tag', () => {
     expect(releaseWorkflow).toContain('PUBLISH_TAGS=("$PKG_VERSION")');
     expect(releaseWorkflow).toContain('PUBLISH_TAGS+=("$MAJOR.$MINOR")');
-    expect(releaseWorkflow).toContain('if [ "$TAG_VERSION" = "0" ]; then');
-    expect(releaseWorkflow).not.toContain('if [ "$TAG_VERSION" = "$MAJOR" ]; then');
-    expect(releaseWorkflow).not.toContain('or v$MAJOR');
+    expect(releaseWorkflow).toContain('if [ "$TAG_VERSION" = "$MAJOR" ]; then');
+    expect(releaseWorkflow).not.toContain('if [ "$TAG_VERSION" = "0" ]; then');
+    expect(releaseWorkflow).toContain('or v$MAJOR');
     expect(releaseWorkflow).toContain('echo "npm_publish=true" >> "$GITHUB_OUTPUT"');
     expect(releaseWorkflow).toContain('echo "npm_publish=false" >> "$GITHUB_OUTPUT"');
     expect(releaseWorkflow).toContain('skipping npm publish');

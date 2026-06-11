@@ -7,9 +7,9 @@
 
 Public customer preview composite GitHub Action that orchestrates Postman onboarding by chaining:
 
-- `postman-cs/postman-bootstrap-action@v0`
-- `postman-cs/postman-repo-sync-action@v0`
-- `postman-cs/postman-insights-onboarding-action@v0` (optional, when `enable-insights: true`)
+- `postman-cs/postman-bootstrap-action@v1`
+- `postman-cs/postman-repo-sync-action@v1`
+- `postman-cs/postman-insights-onboarding-action@v1` (optional, when `enable-insights: true`)
 
 This is the primary partner-facing entrypoint for the customer preview suite.
 
@@ -47,7 +47,7 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v5
-      - uses: postman-cs/postman-api-onboarding-action@v0
+      - uses: postman-cs/postman-api-onboarding-action@v1
         with:
           project-name: core-payments
           domain: core-banking
@@ -75,7 +75,7 @@ jobs:
       variables: write
     steps:
       - uses: actions/checkout@v5
-      - uses: postman-cs/postman-api-onboarding-action@v0
+      - uses: postman-cs/postman-api-onboarding-action@v1
         with:
           project-name: core-payments
           workspace-id: ws-123
@@ -178,7 +178,7 @@ Provide exactly one of `spec-url` (HTTPS URL) or `spec-path` (repo-relative path
 | `current-ref` | | Optional explicit ref override for detached checkouts. |
 | `committer-name` | `Postman CSE` | Commit author name for generated sync commits. |
 | `committer-email` | `help@postman.com` | Commit author email for generated sync commits. |
-| `enable-insights` | `false` | When `true`, chains `postman-cs/postman-insights-onboarding-action@v0` after bootstrap and repo sync. |
+| `enable-insights` | `false` | When `true`, chains `postman-cs/postman-insights-onboarding-action@v1` after bootstrap and repo sync. |
 | `skip-built-in-tests` | `false` | When `true`, skips the built-in smoke/contract Postman CLI run and JUnit artifact upload. Use this when the caller workflow must perform additional post-onboarding setup (e.g. bearer-token injection, mTLS bootstrap, vault-hydrated secrets, dynamic env enrichment) before tests can authenticate, and will run the tests itself afterward. See [Deferring the test run](#deferring-the-test-run) below. |
 | `cluster-name` | | Optional Insights cluster name passed to the downstream Insights onboarding step. |
 | `integration-backend` | `bifrost` | Current public customer preview backend. |
@@ -338,9 +338,9 @@ npm test
 
 ## Customer Preview Release Strategy
 
-- Customer Preview channel tags use `v0.x.y`.
-- Consumers can pin immutable tags such as `v0.2.0` for reproducibility.
-- Moving tag `v0` is used only as the rolling customer preview channel.
+- Customer Preview channel tags use `v1.x.y`.
+- Consumers can pin immutable tags such as `v1.0.0` for reproducibility.
+- Moving tag `v1` is used only as the rolling customer preview channel.
 
 ## REST Migration Seam
 
