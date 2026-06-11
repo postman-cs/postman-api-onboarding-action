@@ -1,40 +1,11 @@
-# postman-api-onboarding-action
+# Postman API Onboarding
 
 [![CI](https://github.com/postman-cs/postman-api-onboarding-action/actions/workflows/ci.yml/badge.svg)](https://github.com/postman-cs/postman-api-onboarding-action/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/postman-cs/postman-api-onboarding-action?sort=semver)](https://github.com/postman-cs/postman-api-onboarding-action/releases)
 [![npm](https://img.shields.io/npm/v/%40postman-cse%2Fonboarding-api)](https://www.npmjs.com/package/@postman-cse/onboarding-api)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-Public customer preview composite GitHub Action that orchestrates Postman onboarding by chaining:
-
-- `postman-cs/postman-bootstrap-action@v1`
-- `postman-cs/postman-repo-sync-action@v1`
-- `postman-cs/postman-insights-onboarding-action@v1` (optional, when `enable-insights: true`)
-
-This is the primary partner-facing entrypoint for the customer preview suite.
-
-For existing services, the composite action can target an existing workspace/spec/collection set and can suppress or redirect generated CI workflow output for repos that already have their own pipeline layout.
-
-### Enterprise adoption: Protected-branch workflows
-
-If your repository enforces branch protection rules requiring all changes through pull requests, use `repo-write-mode: commit-only` with a workflow that creates PRs programmatically. This ensures Postman artifacts go through your normal code review process instead of pushing directly to `main`.
-
-**How it works:**
-1. Create a temporary sync branch (e.g., `postman-sync/YYYYMMDD-HHmmss`) — this branch is unprotected.
-2. Run the action with `repo-write-mode: commit-only` — artifacts are committed but not pushed.
-3. If artifacts changed, push the sync branch and open a PR targeting `main`.
-4. Your team reviews and merges the PR to apply the artifacts.
-
-This pattern separates **Postman provisioning** (independent success) from **git merge approval** (subject to your branch rules).
-
-## Contract
-
-- Default `integration-backend` is `bifrost`.
-- Inputs are backend-neutral and kebab-case.
-- Bootstrap outputs are explicitly mapped into repo-sync inputs in `action.yml`.
-- Final outputs are surfaced from the two lower-level actions without exposing internal step mode controls.
-- Collection artifacts are exported in the Postman Collection v3 multi-file YAML directory structure (produced during the repo-sync step).
-- Workspace-to-repository linking supports both GitHub and GitLab (cloud and self-hosted) URLs via Bifrost.
+One-step Postman onboarding for an API repo: a single composite action that bootstraps a workspace from your OpenAPI spec, syncs generated artifacts back to the repository, and optionally links Postman Insights.
 
 ## Usage
 
@@ -50,294 +21,221 @@ jobs:
       - uses: postman-cs/postman-api-onboarding-action@v1
         with:
           project-name: core-payments
-          domain: core-banking
-          domain-code: AF
-          requester-email: owner@example.com
-          workspace-admin-user-ids: 101,102
           spec-url: https://example.com/openapi.yaml
-          environments-json: '["prod","stage"]'
-          system-env-map-json: '{"prod":"uuid-prod","stage":"uuid-stage"}'
-          environment-uids-json: '{"dev":"uid-dev","staging":"uid-staging"}'
-          governance-mapping-json: '{"core-banking":"Core Banking"}'
-          env-runtime-urls-json: '{"prod":"https://api.example.com"}'
-          postman-api-key: ${{ secrets.POSTMAN_API_KEY }}
-          postman-access-token: ${{ secrets.POSTMAN_ACCESS_TOKEN }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          gh-fallback-token: ${{ secrets.GH_FALLBACK_TOKEN }}
-          # enable-insights: true  # Chain Insights onboarding after bootstrap and repo sync
-          # cluster-name: my-cluster
-
-  onboarding-existing:
-    runs-on: ubuntu-latest
-    permissions:
-      actions: write
-      contents: write
-      variables: write
-    steps:
-      - uses: actions/checkout@v5
-      - uses: postman-cs/postman-api-onboarding-action@v1
-        with:
-          project-name: core-payments
-          workspace-id: ws-123
-          spec-id: spec-123
-          baseline-collection-id: col-baseline
-          smoke-collection-id: col-smoke
-          contract-collection-id: col-contract
-          spec-url: https://example.com/openapi.yaml
-          generate-ci-workflow: false
           postman-api-key: ${{ secrets.POSTMAN_API_KEY }}
 ```
 
-## Non-GitHub CI Usage
+That run creates (or reuses) a Postman workspace, uploads the spec, generates baseline/smoke/contract collections, materializes environments, registers a mock and monitor, commits exported artifacts to the repo, and runs the smoke and contract collections with JUnit output. See [docs/credentials.md](docs/credentials.md) for how to obtain `postman-api-key` and the optional `postman-access-token` that unlocks governance assignment and workspace-to-repo git linking.
 
-On GitHub Actions, continue using the composite action as documented above. The CLI entry points are for GitLab CI, Bitbucket Pipelines, Azure DevOps, and other CI systems.
+## Examples
 
-Install both CLIs globally:
+### Basic onboarding with governance and environments
 
-```bash
-npm install -g postman-bootstrap-action postman-repo-sync-action
+```yaml
+- uses: actions/checkout@v5
+- uses: postman-cs/postman-api-onboarding-action@v1
+  with:
+    project-name: core-payments
+    domain: core-banking
+    domain-code: AF
+    requester-email: owner@example.com
+    workspace-admin-user-ids: 101,102
+    spec-url: https://example.com/openapi.yaml
+    environments-json: '["prod","stage"]'
+    system-env-map-json: '{"prod":"uuid-prod","stage":"uuid-stage"}'
+    governance-mapping-json: '{"core-banking":"Core Banking"}'
+    env-runtime-urls-json: '{"prod":"https://api.example.com"}'
+    postman-api-key: ${{ secrets.POSTMAN_API_KEY }}
+    postman-access-token: ${{ secrets.POSTMAN_ACCESS_TOKEN }}
+    github-token: ${{ secrets.GITHUB_TOKEN }}
+    gh-fallback-token: ${{ secrets.GH_FALLBACK_TOKEN }}
 ```
 
-Run bootstrap first and save its JSON output:
+### Rerunning against an existing service
 
-```bash
-postman-bootstrap \
-  --project-name "my-api" \
-  --spec-url "https://registry.example.com/specs/my-api/openapi.yaml" \
-  --postman-api-key "$POSTMAN_API_KEY" \
-  --result-json ./bootstrap-result.json
+Target an existing workspace/spec/collection set and suppress generated CI workflow output for repos that already have their own pipeline layout. `spec-url` (or `spec-path`) is still required because the bootstrap step updates the Spec Hub asset from source on every run.
+
+```yaml
+- uses: actions/checkout@v5
+- uses: postman-cs/postman-api-onboarding-action@v1
+  with:
+    project-name: core-payments
+    workspace-id: ws-123
+    spec-id: spec-123
+    baseline-collection-id: col-baseline
+    smoke-collection-id: col-smoke
+    contract-collection-id: col-contract
+    spec-url: https://example.com/openapi.yaml
+    generate-ci-workflow: false
+    postman-api-key: ${{ secrets.POSTMAN_API_KEY }}
 ```
 
-Extract the outputs you need from the JSON:
+### Protected-branch repos: commit-only plus PR
 
-```bash
-WORKSPACE_ID=$(jq -r '.["workspace-id"]' bootstrap-result.json)
-SMOKE_COLLECTION_ID=$(jq -r '.["smoke-collection-id"]' bootstrap-result.json)
-CONTRACT_COLLECTION_ID=$(jq -r '.["contract-collection-id"]' bootstrap-result.json)
-BASELINE_COLLECTION_ID=$(jq -r '.["baseline-collection-id"]' bootstrap-result.json)
-```
-
-Run repo-sync with those values:
-
-```bash
-postman-repo-sync \
-  --project-name "my-api" \
-  --workspace-id "$WORKSPACE_ID" \
-  --baseline-collection-id "$BASELINE_COLLECTION_ID" \
-  --smoke-collection-id "$SMOKE_COLLECTION_ID" \
-  --contract-collection-id "$CONTRACT_COLLECTION_ID" \
-  --postman-api-key "$POSTMAN_API_KEY" \
-  --result-json ./sync-result.json
-```
-
-Both CLIs support `--dotenv-path` for shell-friendly KEY=VALUE output that can be sourced with `source ./bootstrap.env`.
-
-The Insights onboarding CLI is not yet available for non-GitHub CI. See the `postman-insights-onboarding-action` repo for updates.
-
-Provide exactly one of `spec-url` (HTTPS URL) or `spec-path` (repo-relative path to a checked-out file). When reusing an existing `spec-id`, the bootstrap step still updates the Spec Hub asset from whichever source you pass.
-
-## Inputs
-
-| Input | Default | Notes |
-| --- | --- | --- |
-| `workspace-id` | | Reuse an existing Postman workspace through the bootstrap step. |
-| `spec-id` | | Update an existing Postman spec instead of creating a new one. |
-| `baseline-collection-id` | | Reuse an existing baseline collection. |
-| `smoke-collection-id` | | Reuse an existing smoke collection. |
-| `contract-collection-id` | | Reuse an existing contract collection. |
-| `sync-examples` | `true` | Whether linked spec/collection relations should enable example syncing during cloud linkage. |
-| `collection-sync-mode` | `refresh` | Collection lifecycle policy. `refresh` keeps tracked collection IDs in sync with the latest spec, and `version` creates release-scoped collections. |
-| `spec-sync-mode` | `update` | Spec lifecycle policy. `update` keeps canonical spec current, `version` creates release-scoped spec. |
-| `release-label` | | Optional release label for versioned specs and collections. Derived from git tag/branch when omitted. |
-| `monitor-id` | | Existing smoke monitor ID. When set, the action validates and reuses this monitor instead of creating a new one. |
-| `mock-url` | | Existing mock server URL. When set, the action validates and reuses this mock instead of creating a new one. |
-| `monitor-cron` | `""` | Cron expression for monitor scheduling (e.g. `0 */6 * * *`). When empty, the monitor is created disabled and triggered to run once per workflow invocation (and once on every subsequent run). |
-| `generate-ci-workflow` | `true` | Pass through to repo sync; set `false` for repos that already manage CI. |
-| `ci-workflow-path` | `.github/workflows/ci.yml` | Pass through to repo sync to redirect generated workflow output. |
-| `project-name` | | Service name used across bootstrap and repo sync. |
-| `domain` | | Business domain used for governance assignment. |
-| `domain-code` | | Short prefix used in workspace naming. |
-| `governance-group` | | Explicit Postman governance workspace group name. Overrides the `postman-governance-group` repository custom property and domain mapping. |
-| `requester-email` | | Optional workspace invite target. |
-| `workspace-admin-user-ids` | | Optional comma-separated workspace admin IDs. |
-| `workspace-team-id` | | Optional. Numeric sub-team ID for org-mode workspace creation. Required only when the target team is scoped under an organization (org-mode); the Postman API cannot create workspaces at the org level without it. Passed through to `postman-bootstrap-action`. |
-| `spec-url` | | HTTPS URL to the OpenAPI document. Provide either `spec-url` or `spec-path`. |
-| `spec-path` | | Repo-root-relative path to the local spec file (e.g. `apis/<service>/openapi.yaml`). Used for repo metadata generation and, when `spec-url` is not set, also as the spec source for the bootstrap step (read directly from the checked-out workspace). Provide either `spec-url` or `spec-path`. |
-| `environments-json` | `["prod"]` | Environment slugs to materialize downstream. |
-| `system-env-map-json` | `{}` | Map of environment slug to system environment ID. |
-| `environment-uids-json` | `{}` | Map of environment slug to existing Postman environment UID. When provided, repo-sync reuses these environments instead of creating new ones. |
-| `governance-mapping-json` | `{}` | Map of domain to governance group name. |
-| `env-runtime-urls-json` | `{}` | Map of environment slug to runtime base URL. |
-| `postman-api-key` | | Required Postman API key for the bootstrap and sync phases. The composite always runs `postman-bootstrap-action`, which still requires a PMAK. |
-| `postman-access-token` | | Enables governance assignment, Bifrost integration, and API key generation fallback. |
-| `credential-preflight` | `warn` | Credential identity preflight policy forwarded to bootstrap, repo sync, and insights. warn logs a note and continues when the api key and access token resolve to different parent orgs; enforce fails the run before any workspace is created; off skips the identity probes (reactive error guidance still applies). |
-| `postman-team-id` | | Explicit Postman team ID override for org-mode Bifrost calls. Passed to the downstream actions when provided. |
-| `github-token` | | Enables generated commits, workflow writes, and optional secret persistence in repo sync. |
-| `gh-fallback-token` | | Optional fallback token for workflow and commit APIs. |
-| `repo-write-mode` | `commit-and-push` | Repo mutation mode passed to repo sync. |
-| `current-ref` | | Optional explicit ref override for detached checkouts. |
-| `committer-name` | `Postman CSE` | Commit author name for generated sync commits. |
-| `committer-email` | `help@postman.com` | Commit author email for generated sync commits. |
-| `enable-insights` | `false` | When `true`, chains `postman-cs/postman-insights-onboarding-action@v1` after bootstrap and repo sync. |
-| `skip-built-in-tests` | `false` | When `true`, skips the built-in smoke/contract Postman CLI run and JUnit artifact upload. Use this when the caller workflow must perform additional post-onboarding setup (e.g. bearer-token injection, mTLS bootstrap, vault-hydrated secrets, dynamic env enrichment) before tests can authenticate, and will run the tests itself afterward. See [Deferring the test run](#deferring-the-test-run) below. |
-| `cluster-name` | | Optional Insights cluster name passed to the downstream Insights onboarding step. |
-| `integration-backend` | `bifrost` | Current public customer preview backend. |
-| `org-mode` | `false` | When `true`, includes `x-entity-team-id` header in Bifrost proxy calls. Non-org teams must omit this header. |
-| `ssl-client-cert` | | Base64-encoded PEM client certificate for mTLS. Passed through to repo-sync for CI workflow SSL support. |
-| `ssl-client-key` | | Base64-encoded PEM client private key. Passed through to repo-sync. |
-| `ssl-client-passphrase` | | Passphrase for encrypted private key. Passed through to repo-sync. |
-| `ssl-extra-ca-certs` | | Base64-encoded PEM additional CA certificates. Passed through to repo-sync. |
-
-### Deferring the test run
-
-Set `skip-built-in-tests: true` when the caller workflow needs a hook between onboarding and the smoke/contract test run. The action will still bootstrap the workspace, sync the repo, materialize environments, register the mock and monitor, and (optionally) chain Insights — it just won't execute the smoke/contract collections or upload their JUnit artifact. The caller is then responsible for running the tests after whatever post-onboarding setup is required.
-
-Common patterns that need this:
-
-- **Bearer-token / OAuth / Auth0 / Okta / Cognito JWT** — tests require an env variable like `{{bearerToken}}` that has to be minted at run time (often per stage, often short-lived). The caller mints the token, injects it into the active environment, then runs tests.
-- **mTLS / custom-CA bootstrap** — tests require client certs or CA bundles that have to be materialized onto the runner before the Postman CLI can reach the service under test.
-- **Vault-hydrated secrets** — tests reference secrets that live in HashiCorp Vault, AWS Secrets Manager, Doppler, etc., and must be pulled into the env at run time.
-- **Dynamic environment enrichment** — tests require values that are only knowable post-deploy (deployed image tag, ephemeral hostname, feature-flag state, etc.).
-
-Caller pattern when `skip-built-in-tests: true`:
+For repositories whose branch protection requires all changes to land through pull requests, run the action with `repo-write-mode: commit-only` on a temporary sync branch, then push the branch and open a PR when `commit-sha` is non-empty. Postman provisioning succeeds independently of merge approval, and the phase outcome outputs (`bootstrap-outcome`, `repo-sync-outcome`, `insights-outcome`) tell you which half needs attention on partial failure.
 
 ```yaml
 - id: onboard
-  uses: postman-cs/postman-api-onboarding-action@main
+  uses: postman-cs/postman-api-onboarding-action@v1
   with:
-    # ...standard inputs...
-    skip-built-in-tests: 'true'
-
-- name: Inject post-onboarding setup
-  # ...mint token / hydrate secrets / fetch certs / etc.,
-  # then PUT updates to the relevant Postman environments
-  # via the API...
-
-- name: Run smoke and contract collections with JUnit output
-  shell: bash
-  env:
-    POSTMAN_API_KEY: ${{ secrets.POSTMAN_API_KEY }}
-    COLLECTIONS_JSON: ${{ steps.onboard.outputs.collections-json }}
-    ENVIRONMENT_UIDS_JSON: ${{ steps.onboard.outputs.environment-uids-json }}
-  run: |
-    # postman collection run "$SMOKE"    --reporters cli,junit ...
-    # postman collection run "$CONTRACT" --reporters cli,junit ...
-
-- uses: actions/upload-artifact@v6
-  if: always()
-  with:
-    name: postman-test-results
-    path: ${{ runner.temp }}/postman-junit/*.xml
-    if-no-files-found: ignore
+    project-name: core-payments
+    spec-url: https://example.com/openapi.yaml
+    repo-write-mode: commit-only
+    postman-api-key: ${{ secrets.POSTMAN_API_KEY }}
+    github-token: ${{ secrets.GITHUB_TOKEN }}
 ```
 
-The `collections-json`, `environment-uids-json`, and `workspace-id` outputs of the onboarding step expose everything a caller needs to reproduce the built-in test run on the caller's own terms.
+The full pattern, including sync-branch creation and programmatic PR opening, is in [docs/protected-branch-workflows.md](docs/protected-branch-workflows.md).
 
-`skip-built-in-tests` defaults to `false`, so existing callers continue to get the built-in smoke/contract run and JUnit artifact upload with no change.
+### Enabling Insights
 
-### Team ID derivation
+When `enable-insights: true`, the action chains `postman-cs/postman-insights-onboarding-action@v1` after bootstrap and repo sync, using the workspace from bootstrap plus the first environment from `environments-json`.
 
-Pass `postman-team-id` only when a downstream org-mode Bifrost call needs an explicit team header. When omitted, the lower-level actions can leave `x-entity-team-id` unset and let Bifrost resolve team context from the access token.
-
-### API key auto-creation
-
-`postman-repo-sync-action` and `postman-insights-onboarding-action` can create or rotate a PMAK from `postman-access-token` when they encounter a clear auth failure, but this composite still requires `postman-api-key` up front because `postman-bootstrap-action` cannot start without it.
-
-### Org-mode Bifrost headers
-
-The underlying actions include the `x-entity-team-id` header on Bifrost proxy calls only when an explicit team override is supplied. For non-org-mode tokens, omit `postman-team-id` so the header stays unset.
-
-### Obtaining `postman-api-key`
-
-The `postman-api-key` is a Postman API key (PMAK) used for all standard Postman API operations -- creating workspaces, uploading specs, generating collections, exporting artifacts, and managing environments.
-
-**To generate one:**
-
-1. Open the Postman desktop app or web UI.
-2. Go to **Settings** (gear icon) > **Account Settings** > **API Keys**.
-3. Click **Generate API Key**, give it a label, and copy the key (starts with `PMAK-`).
-4. Set it as a GitHub secret:
-   ```bash
-   gh secret set POSTMAN_API_KEY --repo <owner>/<repo>
-   ```
-
-> **Note:** The PMAK is a long-lived key tied to your Postman account. It does not require periodic renewal like the `postman-access-token`.
-
-### Obtaining `postman-access-token` (Customer Preview)
-
-> **Customer Preview limitation:** The `postman-access-token` input requires a manually-extracted session token. There is currently no public API to exchange a Postman API key (PMAK) for an access token programmatically. This manual step will be eliminated before GA.
-
-The `postman-access-token` is a Postman session token (`x-access-token`) required for internal API operations that the standard PMAK API key cannot perform -- specifically workspace-to-repo git sync (Bifrost), governance group assignment, and system environment associations. Without it, those steps are silently skipped during the onboarding pipeline.
-
-**To obtain and configure the token:**
-
-1. **Log in via the Postman CLI** (requires a browser):
-   ```bash
-   postman login
-   ```
-   This opens a browser window for Postman's PKCE OAuth flow. Complete the sign-in.
-
-2. **Extract the access token** from the CLI credential store:
-   ```bash
-   cat ~/.postman/postmanrc | jq -r '.login._profiles[].accessToken'
-   ```
-
-3. **Set it as a GitHub secret** on your repository or organization:
-   ```bash
-   # Repository-level secret
-   gh secret set POSTMAN_ACCESS_TOKEN --repo <owner>/<repo>
-
-   # Organization-level secret (recommended for multi-repo use)
-   gh secret set POSTMAN_ACCESS_TOKEN --org <org> --visibility selected --repos <repo1>,<repo2>
-   ```
-   Paste the token value when prompted.
-
-> **Important:** This token is session-scoped and will expire. When it does, operations that depend on it (workspace linking, governance, system environment associations) will silently degrade. You will need to repeat the login and secret update process. There is no automated refresh mechanism.
-
-> **Note:** `postman login --with-api-key` stores a PMAK -- **not** the session token these APIs require. You must use the interactive browser login.
-
-## Output Mapping
-
-The composite action wires:
-
-- `workspace-id`, `workspace-url`, `spec-id`, and `collections-json` from `bootstrap`.
-- `environment-uids-json`, `mock-url`, `monitor-id`, `repo-sync-summary-json`, and `commit-sha` from `repo_sync`.
-- Runner-level phase outcomes are exposed as `bootstrap-outcome`, `repo-sync-outcome`, and `insights-outcome` from step outcomes (`success`, `failure`, `cancelled`, or `skipped`).
-- Existing-service passthrough inputs to `bootstrap`: `workspace-id`, `spec-id`, `baseline-collection-id`, `smoke-collection-id`, and `contract-collection-id`.
-- Existing-repo passthrough inputs to `repo_sync`: `generate-ci-workflow`, `ci-workflow-path`, and `spec-path`.
-- When `enable-insights: true`, the Insights onboarding step runs after repo sync using the workspace ID from bootstrap plus the first environment from `environments-json` for `environment-id` and `system-env-map-json` lookup.
-- Insights domain outputs (`insights-status`, `insights-verification-token`, `insights-application-id`, `insights-discovered-service-id`, `insights-discovered-service-name`, `insights-collection-id`) are surfaced when `enable-insights: true`.
-- `insights-status` remains the domain result from `steps.insights_onboarding.outputs.status`, while `insights-outcome` is the GitHub Actions step outcome for that phase.
-
-See [action.yml](action.yml) for exact step mappings.
-
-## Phase Outcome Tracking
-
-The composite action exposes runner-level outcome outputs for each phase so you can track partial success across bootstrap, repo sync, and optional Insights onboarding:
-
-- `bootstrap-outcome`: Bootstrap phase outcome (`success`, `failure`, `cancelled`, or `skipped`)
-- `repo-sync-outcome`: Repo sync phase outcome (`success`, `failure`, `cancelled`, or `skipped`)
-- `insights-outcome`: Insights onboarding phase outcome (`success`, `failure`, `cancelled`, or `skipped`; skipped if `enable-insights: false`)
-
-These are distinct from `insights-status`, which carries the domain result from the Insights action itself (e.g. `success`, `not-found`, `error`).
-
-**Why this matters:** Postman-side provisioning (workspace, spec, collections) completes independently of repository operations (git commit, branch protection, merge approval). Phase outcome outputs let you identify what succeeded and what requires attention:
-
-- **Bootstrap succeeds, repo-sync fails:** Postman workspace is ready; investigate repository permissions or branch protection issues.
-- **Both phases succeed, but repo merge pending:** Postman artifacts are staged in a PR awaiting your team's review.
-- **Insights fails after sync succeeds:** Postman and repository sync are complete; debug Insights cluster/agent issues separately.
-
-This enables idempotent reruns: reuse existing Postman assets (workspace ID, collection IDs) when retrying failed repository operations without re-provisioning.
-
-## Local Development
-
-```bash
-npm install
-npm test
+```yaml
+- uses: actions/checkout@v5
+- uses: postman-cs/postman-api-onboarding-action@v1
+  with:
+    project-name: core-payments
+    spec-url: https://example.com/openapi.yaml
+    enable-insights: true
+    cluster-name: my-cluster
+    postman-api-key: ${{ secrets.POSTMAN_API_KEY }}
+    postman-access-token: ${{ secrets.POSTMAN_ACCESS_TOKEN }}
 ```
 
-## Customer Preview Release Strategy
+### Chaining with resolve-service-token
 
-- Customer Preview channel tags use `v1.x.y`.
-- Consumers can pin immutable tags such as `v1.0.0` for reproducibility.
-- Moving tag `v1` is used only as the rolling customer preview channel.
+Instead of manually extracting a session token, mint the access token and resolve the team ID with [postman-resolve-service-token-action](https://github.com/postman-cs/postman-resolve-service-token-action) and feed its outputs into onboarding:
+
+```yaml
+- uses: actions/checkout@v5
+- id: token
+  uses: postman-cs/postman-resolve-service-token-action@v1
+  with:
+    postman-api-key: ${{ secrets.POSTMAN_API_KEY }}
+- uses: postman-cs/postman-api-onboarding-action@v1
+  with:
+    project-name: core-payments
+    spec-url: https://example.com/openapi.yaml
+    postman-api-key: ${{ secrets.POSTMAN_API_KEY }}
+    postman-access-token: ${{ steps.token.outputs.token }}
+    postman-team-id: ${{ steps.token.outputs.team-id }}
+```
+
+### Deferring the built-in test run
+
+Set `skip-built-in-tests: 'true'` when the caller workflow must perform post-onboarding setup (bearer-token minting, mTLS bootstrap, vault-hydrated secrets, dynamic env enrichment) before the smoke and contract suites can authenticate, then run the collections itself using the `collections-json` and `environment-uids-json` outputs. The full caller pattern is in [docs/deferred-tests.md](docs/deferred-tests.md).
+
+## Inputs
+
+<!-- inputs-table:start -->
+| Name | Description | Required | Default |
+| --- | --- | --- | --- |
+| `workspace-id` | Existing Postman workspace ID. | no |  |
+| `spec-id` | Existing Postman spec ID. | no |  |
+| `baseline-collection-id` | Existing baseline collection ID. | no |  |
+| `smoke-collection-id` | Existing smoke collection ID. | no |  |
+| `contract-collection-id` | Existing contract collection ID. | no |  |
+| `sync-examples` | Whether linked spec/collection relations should enable example syncing. | no | `true` |
+| `collection-sync-mode` | Collection lifecycle policy (refresh or version). Default refresh ensures tracked collections stay in sync with the spec. | no | `refresh` |
+| `spec-sync-mode` | Spec lifecycle policy (update or version). | no | `update` |
+| `release-label` | Optional release label for versioned specs and collections. When omitted during versioned sync, derived from GitHub tag or branch metadata. | no |  |
+| `monitor-id` | Existing smoke monitor ID. When set, the action validates and reuses this monitor instead of creating a new one. | no |  |
+| `mock-url` | Existing mock server URL. When set, the action validates and reuses this mock instead of creating a new one. | no |  |
+| `monitor-cron` | Cron expression for monitor scheduling (e.g. '0 */6 * * *'). When empty, the monitor is created disabled and triggered to run once per workflow invocation (and once on every subsequent run). | no |  |
+| `generate-ci-workflow` | Whether to generate the CI workflow file. | no | `true` |
+| `ci-workflow-path` | Path to write the generated CI workflow file. | no | `.github/workflows/ci.yml` |
+| `project-name` | Service project name used across bootstrap and repo sync phases. | yes |  |
+| `domain` | Business domain used for governance assignment. | no |  |
+| `domain-code` | Short domain code used in workspace naming. | no |  |
+| `governance-group` | Postman governance workspace group name. Overrides the postman-governance-group repository custom property and domain mapping. | no |  |
+| `requester-email` | Requester email used for workspace membership. | no |  |
+| `workspace-admin-user-ids` | Comma-separated workspace admin user ids. | no |  |
+| `workspace-team-id` | Numeric sub-team ID for org-mode workspace creation. Required by the Postman API when the PMAK's team is scoped under an organization. | no |  |
+| `spec-url` | HTTPS URL to the OpenAPI document to bootstrap. Provide either spec-url or spec-path. | no |  |
+| `spec-path` | Repo-root-relative path to the local spec file. Used for repo metadata generation and, when spec-url is not provided, as the spec source for bootstrap (read directly from the checked-out workspace). | no |  |
+| `environments-json` | JSON array of environment slugs to materialize. | no | `["prod"]` |
+| `system-env-map-json` | JSON map of environment slug to system environment id. | no | `{}` |
+| `environment-uids-json` | JSON map of environment slug to existing Postman environment UID. When provided, repo-sync reuses these environments instead of creating new ones. | no | `{}` |
+| `governance-mapping-json` | JSON map of business domain to governance group name. | no | `{}` |
+| `env-runtime-urls-json` | JSON map of environment slug to runtime base URL. | no | `{}` |
+| `postman-api-key` | Postman API key used for bootstrap and sync operations. | yes |  |
+| `postman-access-token` | Postman access token used for Bifrost and governance integration. | no |  |
+| `credential-preflight` | Credential identity preflight policy forwarded to bootstrap, repo sync, and insights. warn (default) logs a note and continues when postman-api-key and postman-access-token resolve to different parent orgs; enforce fails the run on that condition before any workspace is created; off skips the identity probes entirely (the reactive error guidance still applies). | no | `warn` |
+| `postman-team-id` | Explicit Postman team ID override for org-mode Bifrost calls. | no |  |
+| `postman-stack` | Postman stack profile. | no | `prod` |
+| `github-token` | GitHub token used for repo variables and generated commits. | no |  |
+| `gh-fallback-token` | Fallback GitHub token for variable and workflow-file APIs. | no |  |
+| `repo-write-mode` | Repo mutation mode for generated assets and workflow files. | no | `commit-and-push` |
+| `current-ref` | Explicit ref override for detached checkout push semantics. | no |  |
+| `committer-name` | Commit author name for generated sync commits. | no | `Postman CSE` |
+| `committer-email` | Commit author email for generated sync commits. | no | `help@postman.com` |
+| `enable-insights` | Whether to enable Postman Insights. | no | `false` |
+| `skip-built-in-tests` | When 'true', skip the built-in smoke and contract Postman CLI test run and JUnit artifact upload that normally happen inside this action. Set this to 'true' when the caller workflow needs to perform additional post-onboarding setup (e.g. bearer-token injection, mTLS bootstrap, vault-hydrated secrets, dynamic env enrichment) before the smoke and contract suites can authenticate successfully, and will run the tests itself afterward. Default 'false' preserves existing behavior for all current callers. | no | `false` |
+| `cluster-name` | Insights cluster name passed to the downstream Insights onboarding step. | no |  |
+| `integration-backend` | Integration backend used to coordinate onboarding phases. | no | `bifrost` |
+| `org-mode` | Whether the Postman team uses org-mode. When true, x-entity-team-id header is included in Bifrost proxy calls. Non-org teams must omit this header. | no | `false` |
+| `ssl-client-cert` | Base64-encoded PEM client certificate for mTLS. Passed through to repo-sync for CI workflow generation. | no |  |
+| `ssl-client-key` | Base64-encoded PEM client private key. Passed through to repo-sync. | no |  |
+| `ssl-client-passphrase` | Passphrase for encrypted private key. Passed through to repo-sync. | no |  |
+| `ssl-extra-ca-certs` | Base64-encoded PEM additional CA certificates. Passed through to repo-sync. | no |  |
+<!-- inputs-table:end -->
+
+Tables are generated from `action.yml` by `npm run docs:tables`.
+
+## Outputs
+
+<!-- outputs-table:start -->
+| Name | Description |
+| --- | --- |
+| `integration-backend` | Resolved integration backend for the onboarding run. |
+| `workspace-id` | Postman workspace ID. |
+| `workspace-url` | Postman workspace URL. |
+| `spec-id` | Uploaded Postman spec ID. |
+| `collections-json` | JSON summary of generated collections. |
+| `environment-uids-json` | JSON map of environment slug to Postman environment uid. |
+| `mock-url` | Mock server URL. |
+| `monitor-id` | Smoke monitor ID. |
+| `repo-sync-summary-json` | JSON summary of repo materialization and workspace sync planning. |
+| `commit-sha` | Commit SHA produced by repo-write-mode. |
+| `bootstrap-outcome` | GitHub Actions runner outcome for the bootstrap step. |
+| `repo-sync-outcome` | GitHub Actions runner outcome for the repo sync step. |
+| `insights-outcome` | GitHub Actions runner outcome for the Insights onboarding step. |
+| `insights-status` | Insights onboarding status (success, not-found, error, or empty if insights disabled). |
+| `insights-verification-token` | Team verification token for Insights DaemonSet configuration. |
+| `insights-application-id` | Insights application binding ID. |
+| `insights-discovered-service-id` | Discovered service ID from Insights agent. |
+| `insights-discovered-service-name` | Discovered service name from Insights agent. |
+| `insights-collection-id` | Insights API Catalog collection ID. |
+<!-- outputs-table:end -->
+
+## How it works
+
+This is a composite action, the primary partner-facing entrypoint of the Postman onboarding suite. It chains three sibling actions in order:
+
+1. **Bootstrap** (`postman-cs/postman-bootstrap-action`) creates or reuses the workspace, uploads the spec, and generates baseline, smoke, and contract collections.
+2. **Repo sync** (`postman-cs/postman-repo-sync-action`) exports collection artifacts into the repository (Postman Collection v3 multi-file YAML), materializes environments, registers the mock server and smoke monitor, and optionally generates a CI workflow. Bootstrap outputs are explicitly mapped into repo-sync inputs in `action.yml`.
+3. **Insights** (`postman-cs/postman-insights-onboarding-action`, only when `enable-insights: true`) links discovered services to the workspace.
+
+Between repo sync and Insights, the action runs the generated smoke and contract collections with the Postman CLI and uploads JUnit results as a workflow artifact (skippable via `skip-built-in-tests`). Inputs are backend-neutral and kebab-case; the default `integration-backend` is `bifrost`. Full contract details, output mapping, and phase outcome semantics are in [docs/contract.md](docs/contract.md).
+
+Running outside GitHub Actions (GitLab CI, Bitbucket Pipelines, Azure DevOps)? The bootstrap and repo-sync CLIs cover that: see [docs/non-github-ci.md](docs/non-github-ci.md).
+
+Releases use immutable `v1.x.y` tags with `v1` as the rolling customer preview channel; pin an immutable tag for reproducibility. See [RELEASE_POLICY.md](RELEASE_POLICY.md).
+
+## Resources
+
+- Sibling actions in the onboarding suite:
+  - [postman-resolve-service-token-action](https://github.com/postman-cs/postman-resolve-service-token-action): mints the service-account access token and resolves the team ID
+  - [postman-bootstrap-action](https://github.com/postman-cs/postman-bootstrap-action): workspace, spec upload, collection generation
+  - [postman-repo-sync-action](https://github.com/postman-cs/postman-repo-sync-action): artifact export, environments, mocks, monitors, CI templates
+  - [postman-insights-onboarding-action](https://github.com/postman-cs/postman-insights-onboarding-action): Insights-to-workspace linking
+  - [postman-smoke-flow-action](https://github.com/postman-cs/postman-smoke-flow-action): applies a curated flow.yaml to the canonical Smoke collection
+  - [postman-aws-spec-discovery-action](https://github.com/postman-cs/postman-aws-spec-discovery-action): AWS API and spec discovery
+- npm package: [@postman-cse/onboarding-api](https://www.npmjs.com/package/@postman-cse/onboarding-api)
+- Docs in this repo: [credentials](docs/credentials.md), [contract and output mapping](docs/contract.md), [protected-branch workflows](docs/protected-branch-workflows.md), [deferred tests](docs/deferred-tests.md), [non-GitHub CI](docs/non-github-ci.md)
+- Postman references: [Postman API](https://learning.postman.com/docs/developer/postman-api/intro-api/), [Postman CLI](https://learning.postman.com/docs/postman-cli/postman-cli-overview/), [Postman Insights](https://learning.postman.com/docs/insights/insights-overview/)
+
+## License
+
+[MIT](LICENSE)
