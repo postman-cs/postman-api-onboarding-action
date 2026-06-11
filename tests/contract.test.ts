@@ -55,10 +55,6 @@ function loadReadme(): string {
   return readFileSync(path.join(repoRoot, 'README.md'), 'utf8');
 }
 
-function loadRestMigrationSeam(): string {
-  return readFileSync(path.join(repoRoot, 'REST_MIGRATION_SEAM.md'), 'utf8');
-}
-
 function loadReleaseWorkflow(): WorkflowManifest {
   return parse(
     readFileSync(path.join(repoRoot, '.github/workflows/release.yml'), 'utf8')
@@ -95,12 +91,6 @@ describe('postman-api-onboarding-action composite contract', () => {
           expect.fail(`README contains beta reference: "${line.trim()}"`);
         }
       }
-    });
-
-    it('REST_MIGRATION_SEAM.md references customer preview, not beta', () => {
-      const seam = loadRestMigrationSeam();
-      expect(seam).toContain('customer preview');
-      expect(seam).not.toMatch(/\bbeta\b/i);
     });
 
     it('package.json version is a publishable semver release', () => {

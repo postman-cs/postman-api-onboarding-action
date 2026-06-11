@@ -34,7 +34,6 @@ Use each document for one purpose only:
 | --- | --- |
 | `README.md` in each action repo | User-facing usage, inputs, outputs, examples, and high-level version guidance |
 | `RELEASE_POLICY.md` in this repo | Maintainer release rules, sequencing, compatibility guidance, and tag policy |
-| `REST_MIGRATION_SEAM.md` in this repo | Backend-neutral contract boundaries for the composite action |
 
 Do not duplicate full input and output tables across repositories. Link to the action-specific README instead.
 

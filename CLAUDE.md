@@ -18,7 +18,6 @@ action.yml              # Composite step definitions and I/O wiring
 tests/contract.test.ts  # Validates action.yml inputs/outputs match contract
 plans/                   # Implementation plans (existing-service-support)
 RELEASE_POLICY.md        # Suite-wide release rules, tag policy, ordering
-REST_MIGRATION_SEAM.md   # Backend-neutral contract boundaries for future migration
 ```
 
 ## Commands

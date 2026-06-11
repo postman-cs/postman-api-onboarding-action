@@ -341,9 +341,3 @@ npm test
 - Customer Preview channel tags use `v1.x.y`.
 - Consumers can pin immutable tags such as `v1.0.0` for reproducibility.
 - Moving tag `v1` is used only as the rolling customer preview channel.
-
-## REST Migration Seam
-
-This composite interface is backend-neutral and only passes stable inputs and outputs between bootstrap and repo-sync. `integration-backend` defaults to `bifrost` now, and future REST migration should occur inside the lower-level actions without changing this composite contract.
-
-Migration details are documented in [REST_MIGRATION_SEAM.md](REST_MIGRATION_SEAM.md).
