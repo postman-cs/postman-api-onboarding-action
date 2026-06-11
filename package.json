@@ -1,6 +1,6 @@
 {
   "name": "@postman-cse/onboarding-api",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Public customer preview composite Postman API onboarding GitHub Action.",
   "files": [
     "action.yml",
@@ -18,6 +18,7 @@
   },
   "scripts": {
     "test": "vitest run",
+    "docs:tables": "node scripts/render-action-tables.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix"
