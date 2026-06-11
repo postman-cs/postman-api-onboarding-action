@@ -63,9 +63,9 @@ function loadReleaseWorkflow(): WorkflowManifest {
 
 describe('postman-api-onboarding-action composite contract', () => {
   describe('Phase 1: Documentation & Metadata', () => {
-    it('action.yml name matches repository name', () => {
+    it('action.yml name matches the marketplace listing title', () => {
       const manifest = loadManifest();
-      expect(manifest.name).toBe('postman-api-onboarding-action');
+      expect(manifest.name).toBe('Postman API Onboarding');
     });
 
     it('package.json name matches repository name', () => {

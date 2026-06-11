@@ -1,5 +1,5 @@
-name: postman-api-onboarding-action
-description: Public customer preview composite action that orchestrates Postman bootstrap and repo sync.
+name: Postman API Onboarding
+description: One-step Postman onboarding for API repos with workspace bootstrap, repo sync, and Insights linking (customer preview).
 author: Postman
 branding:
   icon: send
