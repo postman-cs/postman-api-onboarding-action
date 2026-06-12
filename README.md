@@ -4,6 +4,8 @@
 
 One-step Postman onboarding for an API repo: a single composite action that bootstraps a workspace from your OpenAPI spec, syncs generated artifacts back to the repository, and optionally links Postman Insights.
 
+Part of the [Postman API Onboarding suite](https://github.com/postman-cs/postman-api-onboarding-action).
+
 ## Usage
 
 ```yaml
@@ -221,6 +223,18 @@ Running outside GitHub Actions (GitLab CI, Bitbucket Pipelines, Azure DevOps)? T
 Releases use immutable `v1.x.y` tags with `v1` as the rolling customer preview channel; pin an immutable tag for reproducibility. See [RELEASE_POLICY.md](RELEASE_POLICY.md).
 
 ## Resources
+
+### The suite
+
+| Action | Role |
+| --- | --- |
+| [Postman API Onboarding](https://github.com/postman-cs/postman-api-onboarding-action) | Entry point: chains workspace bootstrap, repo sync, and optional Insights linking |
+| [Postman Onboarding: Service Token](https://github.com/postman-cs/postman-resolve-service-token-action) | Mints the service-account access token and team ID |
+| [Postman Onboarding: AWS Spec Discovery](https://github.com/postman-cs/postman-aws-spec-discovery-action) | Discovers and exports API specs from AWS services |
+| [Postman Onboarding: Workspace Bootstrap](https://github.com/postman-cs/postman-bootstrap-action) | Creates the workspace, uploads the spec, generates collections |
+| [Postman Onboarding: Smoke Flow](https://github.com/postman-cs/postman-smoke-flow-action) | Applies a curated flow.yaml to the Smoke collection |
+| [Postman Onboarding: Repo Sync](https://github.com/postman-cs/postman-repo-sync-action) | Exports artifacts into the repo and wires CI, mocks, and monitors |
+| [Postman Onboarding: Insights Linking](https://github.com/postman-cs/postman-insights-onboarding-action) | Links Insights discovered services to the workspace |
 
 - Sibling actions in the onboarding suite:
   - [postman-resolve-service-token-action](https://github.com/postman-cs/postman-resolve-service-token-action): mints the service-account access token and resolves the team ID
