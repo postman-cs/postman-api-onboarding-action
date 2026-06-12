@@ -73,10 +73,10 @@ describe('postman-api-onboarding-action composite contract', () => {
       expect(pkg.name).toBe('@postman-cse/onboarding-api');
     });
 
-    it('description references customer preview, not beta', () => {
+    it('description carries the suite suffix, not beta', () => {
       const manifest = loadManifest();
       const pkg = loadPackageJson();
-      expect(manifest.description).toContain('customer preview');
+      expect(manifest.description).toContain('Part of the Postman API Onboarding suite');
       expect(manifest.description).not.toContain('beta');
       expect(String(pkg.description)).toContain('customer preview');
       expect(String(pkg.description)).not.toContain('beta');
@@ -693,7 +693,7 @@ describe('postman-api-onboarding-action composite contract', () => {
         for (const match of matches) {
           expect(
             inputNames.has(match[1]),
-            `Step "${step.id}" references non-existent input "${match[1]}"`
+            `Step "${step.id}" references non-existent input "${"$"}{match[1]}"`
           ).toBe(true);
         }
       }
@@ -709,7 +709,7 @@ describe('postman-api-onboarding-action composite contract', () => {
         for (const match of matches) {
           expect(
             stepIds.has(match[1]),
-            `Output "${outputName}" references non-existent step "${match[1]}"`
+            `Output "${outputName}" references non-existent step "${"$"}{match[1]}"`
           ).toBe(true);
         }
       }
