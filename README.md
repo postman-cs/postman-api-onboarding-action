@@ -153,6 +153,12 @@ Set `skip-built-in-tests: 'true'` when the caller workflow must perform post-onb
 | `workspace-team-id` | Numeric sub-team ID for org-mode workspace creation. Required by the Postman API when the PMAK's team is scoped under an organization. | no |  |
 | `spec-url` | HTTPS URL to the OpenAPI document to bootstrap. Provide either spec-url or spec-path. | no |  |
 | `spec-path` | Repo-root-relative path to the local spec file. Used for repo metadata generation and, when spec-url is not provided, as the spec source for bootstrap (read directly from the checked-out workspace). | no |  |
+| `breaking-change-mode` | OpenAPI breaking-change comparison mode passed through to bootstrap (off, pr-native, baseline-only, or previous-spec). | no | `off` |
+| `breaking-baseline-spec-path` | Repo-root-relative baseline OpenAPI spec path used by bootstrap baseline-only mode and pr-native fallback. | no |  |
+| `breaking-rules-path` | Repo-root-relative openapi-changes rules file passed through to bootstrap. Missing files are ignored. | no | `changes-rules.yaml` |
+| `breaking-target-ref` | Optional target branch or git ref override for bootstrap pr-native breaking-change comparisons. | no |  |
+| `breaking-summary-path` | Optional markdown breaking-change report path. Defaults to a bootstrap runner-temp file. | no |  |
+| `breaking-log-path` | Optional raw breaking-change log path. Defaults to a bootstrap runner-temp file. | no |  |
 | `environments-json` | JSON array of environment slugs to materialize. | no | `["prod"]` |
 | `system-env-map-json` | JSON map of environment slug to system environment id. | no | `{}` |
 | `environment-uids-json` | JSON map of environment slug to existing Postman environment UID. When provided, repo-sync reuses these environments instead of creating new ones. | no | `{}` |
@@ -192,6 +198,8 @@ Tables are generated from `action.yml` by `npm run docs:tables`.
 | `workspace-url` | Postman workspace URL. |
 | `spec-id` | Uploaded Postman spec ID. |
 | `collections-json` | JSON summary of generated collections. |
+| `breaking-change-status` | OpenAPI breaking-change check status from bootstrap. |
+| `breaking-change-summary-json` | JSON summary of the OpenAPI breaking-change check from bootstrap. |
 | `environment-uids-json` | JSON map of environment slug to Postman environment uid. |
 | `mock-url` | Mock server URL. |
 | `monitor-id` | Smoke monitor ID. |

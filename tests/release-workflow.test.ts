@@ -12,7 +12,7 @@ function namedStep(name: string): string {
 }
 
 function npmRegistrySetupStep(): string {
-  const match = releaseWorkflow.match(/ {6}- uses: actions\/setup-node@v5\n[\s\S]*?registry-url: 'https:\/\/registry\.npmjs\.org'\n/);
+  const match = releaseWorkflow.match(/ {6}- uses: actions\/setup-node@v\d+\n[\s\S]*?registry-url: 'https:\/\/registry\.npmjs\.org'\n/);
   return match?.[0] ?? '';
 }
 

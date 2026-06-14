@@ -81,6 +81,28 @@ inputs:
   spec-path:
     description: Repo-root-relative path to the local spec file. Used for repo metadata generation and, when spec-url is not provided, as the spec source for bootstrap (read directly from the checked-out workspace).
     required: false
+  breaking-change-mode:
+    description: OpenAPI breaking-change comparison mode passed through to bootstrap (off, pr-native, baseline-only, or previous-spec).
+    required: false
+    default: 'off'
+  breaking-baseline-spec-path:
+    description: Repo-root-relative baseline OpenAPI spec path used by bootstrap baseline-only mode and pr-native fallback.
+    required: false
+  breaking-rules-path:
+    description: Repo-root-relative openapi-changes rules file passed through to bootstrap. Missing files are ignored.
+    required: false
+    default: changes-rules.yaml
+  breaking-target-ref:
+    description: Optional target branch or git ref override for bootstrap pr-native breaking-change comparisons.
+    required: false
+  breaking-summary-path:
+    description: Optional markdown breaking-change report path. Defaults to a bootstrap runner-temp file.
+    required: false
+    default: ''
+  breaking-log-path:
+    description: Optional raw breaking-change log path. Defaults to a bootstrap runner-temp file.
+    required: false
+    default: ''
   environments-json:
     description: JSON array of environment slugs to materialize.
     required: false
@@ -194,6 +216,12 @@ outputs:
   collections-json:
     description: JSON summary of generated collections.
     value: ${{ steps.bootstrap.outputs.collections-json }}
+  breaking-change-status:
+    description: OpenAPI breaking-change check status from bootstrap.
+    value: ${{ steps.bootstrap.outputs.breaking-change-status }}
+  breaking-change-summary-json:
+    description: JSON summary of the OpenAPI breaking-change check from bootstrap.
+    value: ${{ steps.bootstrap.outputs.breaking-change-summary-json }}
   environment-uids-json:
     description: JSON map of environment slug to Postman environment uid.
     value: ${{ steps.repo_sync.outputs.environment-uids-json }}
@@ -281,6 +309,12 @@ runs:
         # repo metadata) keep working under the bootstrap action's one-of
         # contract.
         spec-path: ${{ inputs.spec-url == '' && inputs.spec-path || '' }}
+        breaking-change-mode: ${{ inputs.breaking-change-mode }}
+        breaking-baseline-spec-path: ${{ inputs.breaking-baseline-spec-path }}
+        breaking-rules-path: ${{ inputs.breaking-rules-path }}
+        breaking-target-ref: ${{ inputs.breaking-target-ref }}
+        breaking-summary-path: ${{ inputs.breaking-summary-path }}
+        breaking-log-path: ${{ inputs.breaking-log-path }}
         governance-mapping-json: ${{ inputs.governance-mapping-json }}
         github-token: ${{ inputs.github-token }}
         gh-fallback-token: ${{ inputs.gh-fallback-token }}
