@@ -334,9 +334,12 @@ This composite action runs no code of its own and sends no telemetry. The wired
 child actions (workspace bootstrap, repo sync, and Insights onboarding) each send
 a single anonymous usage event when they complete, so the Postman team can
 measure onboarding adoption across CI systems. See each child action README for
-the exact event contents and the privacy basis.
+the exact event contents and the privacy basis. The `events.pm-cse.dev`
+endpoint is operated by the Postman Customer Success Engineering team, and
+Postman, Inc. processes the events only to measure onboarding adoption in
+aggregate.
 
-The kill switch and endpoint override propagate to every child without extra
+The kill switch and endpoint override are inherited by every child without extra
 configuration. Set one of the following at the workflow or job level and it
 reaches all child action processes:
 
@@ -346,7 +349,7 @@ POSTMAN_ACTIONS_TELEMETRY=off
 DO_NOT_TRACK=1
 ```
 
-`POSTMAN_ACTIONS_TELEMETRY_ENDPOINT` propagates the same way: events go to
+`POSTMAN_ACTIONS_TELEMETRY_ENDPOINT` is inherited the same way: events go to
 `https://events.pm-cse.dev/v1/events` unless you set this variable to a collector
 URL you operate at the workflow or job level.
 

@@ -47,7 +47,7 @@ Do not duplicate full input and output tables across repositories. Link to the a
 
 - Use `@v1` in quick-start examples when the goal is a short marketplace install path.
 - Recommend immutable tags such as `@v1.x.y` for reproducible production workflows.
-- Treat `@v1` as a convenience channel, not as a reproducible reference.
+- Treat `@v1` as a convenience channel; pin an immutable `@v1.x.y` tag or commit SHA when you need a reproducible reference.
 - For security-sensitive environments, document that SHA pinning is the strongest option.
 
 ## Composite dependency policy
