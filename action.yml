@@ -105,17 +105,21 @@ inputs:
     description: Postman API key used for bootstrap and sync operations.
     required: true
   postman-access-token:
-    description: Postman access token used for Bifrost and governance integration.
+    description: Postman access token used for governance, workspace linking, and integration operations.
     required: false
   credential-preflight:
-    description: "Credential identity preflight policy forwarded to bootstrap, repo sync, and insights. warn (default) logs a note and continues when postman-api-key and postman-access-token resolve to different parent orgs; enforce fails the run on that condition before any workspace is created; off skips the identity probes entirely (the reactive error guidance still applies)."
+    description: "Credential identity preflight policy forwarded to bootstrap, repo sync, and insights. warn (default) logs a note and continues when postman-api-key and postman-access-token resolve to different parent orgs; enforce fails the run on that condition before any workspace is created."
     required: false
     default: warn
   postman-team-id:
-    description: Explicit Postman team ID override for org-mode Bifrost calls.
+    description: Explicit Postman team ID override for org-mode integration calls.
     required: false
+  postman-region:
+    description: Postman data residency region for public API and Postman CLI calls. One of us or eu.
+    required: false
+    default: us
   postman-stack:
-    description: Postman stack profile.
+    description: 'Postman stack profile. Use prod for Marketplace workflows; EU data residency requires prod.'
     required: false
     default: prod
   github-token:
@@ -134,11 +138,11 @@ inputs:
   committer-name:
     description: Commit author name for generated sync commits.
     required: false
-    default: Postman CSE
+    default: Postman
   committer-email:
     description: Commit author email for generated sync commits.
     required: false
-    default: help@postman.com
+    default: support@postman.com
   enable-insights:
     description: Whether to enable Postman Insights.
     required: false
@@ -163,7 +167,7 @@ inputs:
     required: false
     default: bifrost
   org-mode:
-    description: Whether the Postman team uses org-mode. When true, x-entity-team-id header is included in Bifrost proxy calls. Non-org teams must omit this header.
+    description: Whether the Postman team uses org-mode. When true, x-entity-team-id is included on integration calls. Non-org teams must omit this header.
     required: false
     default: 'false'
   ssl-client-cert:
@@ -240,11 +244,13 @@ runs:
   using: composite
   steps:
     - id: validate_postman_stack
-      name: Validate Postman stack
+      name: Validate Postman stack and region
       shell: bash
       env:
         POSTMAN_TEAM_ID: ${{ inputs.postman-team-id }}
+        POSTMAN_REGION: ${{ inputs.postman-region }}
         POSTMAN_STACK: ${{ inputs.postman-stack }}
+        CREDENTIAL_PREFLIGHT: ${{ inputs.credential-preflight }}
       run: |
         case "$POSTMAN_STACK" in
           prod|beta) ;;
@@ -253,9 +259,27 @@ runs:
             exit 1
             ;;
         esac
+        case "$POSTMAN_REGION" in
+          us|eu) ;;
+          *)
+            echo "::error::postman-region must be one of: us, eu; got: $POSTMAN_REGION"
+            exit 1
+            ;;
+        esac
+        if [ "$POSTMAN_STACK" = "beta" ] && [ "$POSTMAN_REGION" = "eu" ]; then
+          echo "::error::postman-region=eu is only supported with postman-stack=prod."
+          exit 1
+        fi
+        case "$CREDENTIAL_PREFLIGHT" in
+          warn|enforce) ;;
+          *)
+            echo "::error::credential-preflight must be one of: warn, enforce; got: $CREDENTIAL_PREFLIGHT"
+            exit 1
+            ;;
+        esac
     - id: bootstrap
       name: Bootstrap Postman Assets
-      uses: postman-cs/postman-bootstrap-action@v1.2.0
+      uses: postman-cs/postman-bootstrap-action@v1.2.3
       env:
         POSTMAN_TEAM_ID: ${{ inputs.postman-team-id }}
       with:
@@ -288,10 +312,11 @@ runs:
         postman-access-token: ${{ inputs.postman-access-token }}
         credential-preflight: ${{ inputs.credential-preflight }}
         integration-backend: ${{ inputs.integration-backend }}
+        postman-region: ${{ inputs.postman-region }}
         postman-stack: ${{ inputs.postman-stack }}
     - id: repo_sync
       name: Sync Repository and Workspace
-      uses: postman-cs/postman-repo-sync-action@v1.0.0
+      uses: postman-cs/postman-repo-sync-action@v1.0.4
       env:
         POSTMAN_TEAM_ID: ${{ inputs.postman-team-id }}
       with:
@@ -320,6 +345,7 @@ runs:
         gh-fallback-token: ${{ inputs.gh-fallback-token }}
         org-mode: ${{ inputs.org-mode }}
         integration-backend: ${{ inputs.integration-backend }}
+        postman-region: ${{ inputs.postman-region }}
         monitor-id: ${{ inputs.monitor-id }}
         mock-url: ${{ inputs.mock-url }}
         monitor-cron: ${{ inputs.monitor-cron }}
@@ -338,6 +364,7 @@ runs:
       env:
         POSTMAN_TEAM_ID: ${{ inputs.postman-team-id }}
         POSTMAN_API_KEY: ${{ inputs.postman-api-key }}
+        POSTMAN_REGION: ${{ inputs.postman-region }}
         COLLECTIONS_JSON: ${{ steps.bootstrap.outputs.collections-json }}
         ENVIRONMENT_UIDS_JSON: ${{ steps.repo_sync.outputs.environment-uids-json }}
         POSTMAN_CLI_INSTALL_URL: ${{ inputs.postman-stack == 'beta' && 'https://dl-cli.pstmn-beta.io/install/unix.sh' || 'https://dl-cli.pstmn.io/install/unix.sh' }}
@@ -355,7 +382,11 @@ runs:
           exit 1
         fi
 
-        postman login --with-api-key "$POSTMAN_API_KEY" >/dev/null 2>&1 || true
+        if [ "$POSTMAN_REGION" = "eu" ]; then
+          postman login --with-api-key "$POSTMAN_API_KEY" --region eu >/dev/null 2>&1 || true
+        else
+          postman login --with-api-key "$POSTMAN_API_KEY" >/dev/null 2>&1 || true
+        fi
 
         SMOKE=$(printf '%s' "$COLLECTIONS_JSON"    | jq -r '.smoke // empty')
         CONTRACT=$(printf '%s' "$COLLECTIONS_JSON" | jq -r '.contract // empty')
@@ -390,7 +421,7 @@ runs:
     - id: insights_onboarding
       if: inputs.enable-insights == 'true'
       name: Onboard Postman Insights
-      uses: postman-cs/postman-insights-onboarding-action@v1.0.0
+      uses: postman-cs/postman-insights-onboarding-action@v1.0.3
       env:
         POSTMAN_TEAM_ID: ${{ inputs.postman-team-id }}
       with:
@@ -404,4 +435,5 @@ runs:
         credential-preflight: ${{ inputs.credential-preflight }}
         postman-team-id: ${{ inputs.postman-team-id }}
         github-token: ${{ inputs.github-token }}
+        postman-region: ${{ inputs.postman-region }}
         postman-stack: ${{ inputs.postman-stack }}

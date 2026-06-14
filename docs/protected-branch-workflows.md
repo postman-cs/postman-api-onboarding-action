@@ -24,6 +24,11 @@ This enables idempotent reruns: reuse existing Postman assets (workspace ID, col
 ## Example
 
 ```yaml
+name: Postman protected-branch onboarding
+
+on:
+  workflow_dispatch:
+
 jobs:
   onboarding:
     runs-on: ubuntu-latest
@@ -38,14 +43,21 @@ jobs:
           BRANCH="postman-sync/$(date -u +%Y%m%d-%H%M%S)"
           git switch -c "$BRANCH"
           echo "SYNC_BRANCH=$BRANCH" >> "$GITHUB_ENV"
+      - id: postman-token
+        uses: postman-cs/postman-resolve-service-token-action@v1
+        with:
+          postman-api-key: ${{ secrets.POSTMAN_API_KEY }}
+          postman-region: us
       - id: onboard
         uses: postman-cs/postman-api-onboarding-action@v1
         with:
           project-name: core-payments
-          spec-url: https://example.com/openapi.yaml
+          spec-url: https://gist.githubusercontent.com/jaredboynton/a839de57db2c3c90b8f75906c56b00ee/raw/openapi.yaml
+          postman-region: us
           repo-write-mode: commit-only
           postman-api-key: ${{ secrets.POSTMAN_API_KEY }}
-          postman-access-token: ${{ secrets.POSTMAN_ACCESS_TOKEN }}
+          postman-access-token: ${{ steps.postman-token.outputs.token }}
+          postman-team-id: ${{ steps.postman-token.outputs.team-id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Open PR if artifacts changed
         if: steps.onboard.outputs.commit-sha != ''
@@ -59,3 +71,5 @@ jobs:
             --title "chore: sync Postman artifacts" \
             --body "Automated Postman onboarding artifact sync."
 ```
+
+For EU data residency, change both `postman-region` values to `eu`.

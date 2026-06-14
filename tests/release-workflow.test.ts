@@ -17,6 +17,14 @@ function npmRegistrySetupStep(): string {
 }
 
 describe('release workflow publishing contract', () => {
+  it('verifies composite sibling pins before publishing', () => {
+    expect(namedStep('Verify composite sibling pins')).toContain('node scripts/check-sibling-pins.mjs');
+    expect(releaseWorkflow.indexOf('npm test')).toBeLessThan(releaseWorkflow.indexOf('node scripts/check-sibling-pins.mjs'));
+    expect(releaseWorkflow.indexOf('node scripts/check-sibling-pins.mjs')).toBeLessThan(
+      releaseWorkflow.indexOf('Verify release tag matches package version')
+    );
+  });
+
   it('keeps v1 as the only rolling alias and v1.x as a zero-patch publish tag', () => {
     expect(releaseWorkflow).toContain('PUBLISH_TAGS=("$PKG_VERSION")');
     expect(releaseWorkflow).toContain('PUBLISH_TAGS+=("$MAJOR.$MINOR")');
