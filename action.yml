@@ -1,5 +1,5 @@
 name: Postman API Onboarding
-description: 'One-step Postman onboarding: bootstrap, repo sync, optional Insights. Part of the Postman API Onboarding suite.'
+description: 'Full Postman onboarding in one step: workspace bootstrap, repo sync, and optional Insights linking. Part of the Postman API Onboarding suite.'
 author: Postman
 branding:
   icon: send
