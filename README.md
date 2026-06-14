@@ -32,7 +32,7 @@ jobs:
       - id: onboard
         uses: postman-cs/postman-api-onboarding-action@v1
         with:
-          project-name: synthetic-telecom
+          project-name: core-payments
           spec-url: https://raw.githubusercontent.com/postman-cs/postman-api-onboarding-action/main/examples/core-payments-openapi.yaml
           postman-region: us
           postman-api-key: ${{ secrets.POSTMAN_API_KEY }}
