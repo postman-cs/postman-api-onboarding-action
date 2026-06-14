@@ -29,6 +29,14 @@ type ActionManifest = {
   outputs: Record<string, { description?: string; value: string }>;
 };
 
+type WorkflowManifest = {
+  jobs: {
+    release: {
+      steps: Step[];
+    };
+  };
+};
+
 const HIDDEN_INPUTS = new Set(['postman-stack']);
 
 function loadManifest(): ActionManifest {
@@ -47,15 +55,17 @@ function loadReadme(): string {
   return readFileSync(path.join(repoRoot, 'README.md'), 'utf8');
 }
 
-function loadRestMigrationSeam(): string {
-  return readFileSync(path.join(repoRoot, 'REST_MIGRATION_SEAM.md'), 'utf8');
+function loadReleaseWorkflow(): WorkflowManifest {
+  return parse(
+    readFileSync(path.join(repoRoot, '.github/workflows/release.yml'), 'utf8')
+  ) as WorkflowManifest;
 }
 
 describe('postman-api-onboarding-action composite contract', () => {
   describe('Phase 1: Documentation & Metadata', () => {
-    it('action.yml name matches repository name', () => {
+    it('action.yml name matches the marketplace listing title', () => {
       const manifest = loadManifest();
-      expect(manifest.name).toBe('postman-api-onboarding-action');
+      expect(manifest.name).toBe('Postman API Onboarding');
     });
 
     it('package.json name matches repository name', () => {
@@ -63,12 +73,12 @@ describe('postman-api-onboarding-action composite contract', () => {
       expect(pkg.name).toBe('@postman-cse/onboarding-api');
     });
 
-    it('description references open-alpha, not beta', () => {
+    it('description carries the suite suffix, not beta', () => {
       const manifest = loadManifest();
       const pkg = loadPackageJson();
-      expect(manifest.description).toContain('open-alpha');
+      expect(manifest.description).toContain('Part of the Postman API Onboarding suite');
       expect(manifest.description).not.toContain('beta');
-      expect(String(pkg.description)).toContain('open-alpha');
+      expect(String(pkg.description)).toContain('customer preview');
       expect(String(pkg.description)).not.toContain('beta');
     });
 
@@ -83,16 +93,41 @@ describe('postman-api-onboarding-action composite contract', () => {
       }
     });
 
-    it('REST_MIGRATION_SEAM.md references open-alpha, not beta', () => {
-      const seam = loadRestMigrationSeam();
-      expect(seam).toContain('open-alpha');
-      expect(seam).not.toMatch(/\bbeta\b/i);
-    });
-
     it('package.json version is a publishable semver release', () => {
       const pkg = loadPackageJson();
-      expect(String(pkg.version)).toMatch(/^0\.\d+\.\d+$/);
+      expect(String(pkg.version)).toMatch(/^1\.\d+\.\d+$/);
       expect(String(pkg.version)).not.toMatch(/beta/);
+    });
+
+    it('publishes immutable release tags while skipping npm for the rolling alias', () => {
+      const workflow = loadReleaseWorkflow();
+      const steps = workflow.jobs.release.steps;
+      const verifyStep = steps.find((step) => step.name === 'Verify release tag matches package version');
+      const releaseStep = steps.find((step) => step.name === 'Publish GitHub release');
+      const npmSetupStep = steps.find((step) => step.uses?.startsWith('actions/setup-node@') && step.with?.['registry-url']);
+      const npmPackageStep = steps.find((step) => step.name === 'Check npm package version');
+      const publishStep = steps.find((step) => step.name === 'Publish to npm');
+      const attachStep = steps.find((step) => step.name === 'Attach npm tarball to release');
+      const uploadStep = steps.find((step) => step.name === 'Upload tarball');
+
+      expect(verifyStep?.id).toBe('release_tag');
+      expect(verifyStep?.run).toContain('PUBLISH_TAGS=("$PKG_VERSION")');
+      expect(verifyStep?.run).toContain('PUBLISH_TAGS+=("$MAJOR.$MINOR")');
+      expect(verifyStep?.run).toContain('if [ "$TAG_VERSION" = "$MAJOR" ]; then');
+      expect(verifyStep?.run).not.toContain('if [ "$TAG_VERSION" = "0" ]; then');
+      expect(verifyStep?.run).toContain('or v$MAJOR');
+      expect(verifyStep?.run).toContain('npm_publish=true');
+      expect(verifyStep?.run).toContain('npm_publish=false');
+      expect(verifyStep?.run).toContain('skipping npm publish');
+      expect(verifyStep?.run).not.toContain('ALIAS_TAGS');
+      expect(verifyStep?.run).not.toContain('publish_tag');
+      expect(releaseStep?.if).toBeUndefined();
+      expect(npmSetupStep?.if).toBe("steps.release_tag.outputs.npm_publish == 'true'");
+      expect(npmPackageStep?.id).toBe('npm_package');
+      expect(npmPackageStep?.run).toContain('npm view "$PKG_NAME@$PKG_VERSION" version');
+      expect(publishStep?.if).toBe("steps.release_tag.outputs.npm_publish == 'true' && steps.npm_package.outputs.already_published != 'true'");
+      expect(attachStep?.if).toBeUndefined();
+      expect(uploadStep?.if).toBeUndefined();
     });
 
     it('README documents all inputs from action.yml', () => {
@@ -148,6 +183,7 @@ describe('postman-api-onboarding-action composite contract', () => {
         'project-name',
         'domain',
         'domain-code',
+        'governance-group',
         'requester-email',
         'workspace-admin-user-ids',
         'workspace-team-id',
@@ -166,6 +202,7 @@ describe('postman-api-onboarding-action composite contract', () => {
         'env-runtime-urls-json',
         'postman-api-key',
         'postman-access-token',
+        'credential-preflight',
         'postman-team-id',
         'postman-stack',
         'github-token',
@@ -175,6 +212,7 @@ describe('postman-api-onboarding-action composite contract', () => {
         'committer-name',
         'committer-email',
         'enable-insights',
+        'skip-built-in-tests',
         'cluster-name',
         'integration-backend',
         'org-mode',
@@ -212,6 +250,13 @@ describe('postman-api-onboarding-action composite contract', () => {
     it('defaults enable-insights to false', () => {
       const manifest = loadManifest();
       expect(manifest.inputs['enable-insights']?.default).toBe('false');
+    });
+
+    it('defaults skip-built-in-tests to false so existing callers see no behavior change', () => {
+      const manifest = loadManifest();
+      expect(manifest.inputs['skip-built-in-tests']).toBeDefined();
+      expect(manifest.inputs['skip-built-in-tests']?.required).toBe(false);
+      expect(manifest.inputs['skip-built-in-tests']?.default).toBe('false');
     });
 
     it('has the complete expected output set', () => {
@@ -260,14 +305,12 @@ describe('postman-api-onboarding-action composite contract', () => {
       const insightsStep = steps.find((step) => step.id === 'insights_onboarding');
 
       expect(validateStep?.shell).toBe('bash');
-      expect(bootstrapStep?.uses).toBe('postman-cs/postman-bootstrap-action@main');
-      expect(repoSyncStep?.uses).toBe('postman-cs/postman-repo-sync-action@v0.13.0');
+      expect(bootstrapStep?.uses).toBe('postman-cs/postman-bootstrap-action@v1.2.0');
+      expect(repoSyncStep?.uses).toBe('postman-cs/postman-repo-sync-action@v1.0.0');
       expect(junitStep?.shell).toBe('bash');
-      expect(uploadStep?.uses).toBe('actions/upload-artifact@v6');
-      expect(insightsStep?.uses).toBe('postman-cs/postman-insights-onboarding-action@v0.9.0');
-      // bootstrap is intentionally floating on @main during the spec-path rollout;
-      // re-pin to the next bootstrap tag (v0.14.0) once it ships.
-      for (const step of [repoSyncStep, insightsStep]) {
+      expect(uploadStep?.uses).toBe('actions/upload-artifact@v7.0.1');
+      expect(insightsStep?.uses).toBe('postman-cs/postman-insights-onboarding-action@v1.0.0');
+      for (const step of [bootstrapStep, repoSyncStep, insightsStep]) {
         expect(step?.uses).not.toMatch(/@(main|v0)$/);
       }
     });
@@ -287,6 +330,16 @@ describe('postman-api-onboarding-action composite contract', () => {
       const insightsStep = manifest.runs.steps.find((s) => s.id === 'insights_onboarding');
       expect(insightsStep?.if).toContain('enable-insights');
       expect(insightsStep?.if).toContain("'true'");
+    });
+
+    it('run_tests_junit and upload_junit_artifact are gated on skip-built-in-tests', () => {
+      const manifest = loadManifest();
+      const junitStep = manifest.runs.steps.find((s) => s.id === 'run_tests_junit');
+      const uploadStep = manifest.runs.steps.find((s) => s.id === 'upload_junit_artifact');
+      expect(junitStep?.if).toContain('skip-built-in-tests');
+      expect(junitStep?.if).toContain("'true'");
+      expect(uploadStep?.if).toContain('skip-built-in-tests');
+      expect(uploadStep?.if).toContain("'true'");
     });
 
     it('maps bootstrap outputs explicitly into repo-sync inputs', () => {
@@ -404,6 +457,40 @@ describe('postman-api-onboarding-action composite contract', () => {
       expect(bootstrapStep?.with?.['postman-access-token']).toBe('${{ inputs.postman-access-token }}');
       expect(repoSyncStep?.with?.['postman-api-key']).toBe('${{ inputs.postman-api-key }}');
       expect(repoSyncStep?.with?.['postman-access-token']).toBe('${{ inputs.postman-access-token }}');
+    });
+
+    it('credential-preflight defaults to warn and is optional', () => {
+      const manifest = loadManifest();
+      expect(manifest.inputs['credential-preflight']?.required).toBe(false);
+      expect(manifest.inputs['credential-preflight']?.default).toBe('warn');
+    });
+
+    it('passes credential-preflight to bootstrap, repo-sync, and insights', () => {
+      const manifest = loadManifest();
+      const bootstrapStep = manifest.runs.steps.find((s) => s.id === 'bootstrap');
+      const repoSyncStep = manifest.runs.steps.find((s) => s.id === 'repo_sync');
+      const insightsStep = manifest.runs.steps.find((s) => s.id === 'insights_onboarding');
+
+      expect(bootstrapStep?.with?.['credential-preflight']).toBe('${{ inputs.credential-preflight }}');
+      expect(repoSyncStep?.with?.['credential-preflight']).toBe('${{ inputs.credential-preflight }}');
+      expect(insightsStep?.with?.['credential-preflight']).toBe('${{ inputs.credential-preflight }}');
+    });
+
+    it('does not expose an iapub base URL knob on any child step', () => {
+      const manifest = loadManifest();
+      for (const stepId of ['bootstrap', 'repo_sync', 'insights_onboarding']) {
+        const step = manifest.runs.steps.find((s) => s.id === stepId);
+        expect(step?.with?.['iapub-base']).toBeUndefined();
+      }
+    });
+
+    it('passes governance group and GitHub tokens to bootstrap', () => {
+      const manifest = loadManifest();
+      const bootstrapStep = manifest.runs.steps.find((s) => s.id === 'bootstrap');
+
+      expect(bootstrapStep?.with?.['governance-group']).toBe('${{ inputs.governance-group }}');
+      expect(bootstrapStep?.with?.['github-token']).toBe('${{ inputs.github-token }}');
+      expect(bootstrapStep?.with?.['gh-fallback-token']).toBe('${{ inputs.gh-fallback-token }}');
     });
 
     it('passes integration-backend to bootstrap and repo-sync', () => {
@@ -646,7 +733,7 @@ describe('postman-api-onboarding-action composite contract', () => {
         for (const match of matches) {
           expect(
             inputNames.has(match[1]),
-            `Step "${step.id}" references non-existent input "${match[1]}"`
+            `Step "${step.id}" references non-existent input "${"$"}{match[1]}"`
           ).toBe(true);
         }
       }
@@ -662,7 +749,7 @@ describe('postman-api-onboarding-action composite contract', () => {
         for (const match of matches) {
           expect(
             stepIds.has(match[1]),
-            `Output "${outputName}" references non-existent step "${match[1]}"`
+            `Output "${outputName}" references non-existent step "${"$"}{match[1]}"`
           ).toBe(true);
         }
       }

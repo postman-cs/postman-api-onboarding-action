@@ -1,11 +1,10 @@
 {
   "name": "@postman-cse/onboarding-api",
-  "version": "0.13.1",
-  "description": "Public open-alpha composite Postman API onboarding GitHub Action.",
+  "version": "1.2.2",
+  "description": "Public customer preview composite Postman API onboarding GitHub Action.",
   "files": [
     "action.yml",
-    "README.md",
-    "REST_MIGRATION_SEAM.md"
+    "README.md"
   ],
   "engines": {
     "node": ">=24"
@@ -13,8 +12,13 @@
   "publishConfig": {
     "access": "public"
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/postman-cs/postman-api-onboarding-action"
+  },
   "scripts": {
     "test": "vitest run",
+    "docs:tables": "node scripts/render-action-tables.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix"
@@ -25,14 +29,14 @@
   ],
   "license": "MIT",
   "devDependencies": {
-    "@commitlint/cli": "^20.5.0",
-    "@commitlint/config-conventional": "^20.5.0",
+    "@commitlint/cli": "^21.0.2",
+    "@commitlint/config-conventional": "^20.5.3",
     "@eslint/js": "^10.0.1",
-    "@types/node": "^25.3.5",
-    "eslint": "^10.1.0",
-    "typescript": "^5.9.3",
-    "typescript-eslint": "^8.57.2",
-    "vitest": "^4.0.18",
-    "yaml": "^2.8.2"
+    "@types/node": "^24.12.4",
+    "eslint": "^10.4.1",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.60.0",
+    "vitest": "^4.1.7",
+    "yaml": "^2.9.0"
   }
 }

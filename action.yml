@@ -1,5 +1,9 @@
-name: postman-api-onboarding-action
-description: Public open-alpha composite action that orchestrates Postman bootstrap and repo sync.
+name: Postman API Onboarding
+description: 'One-step Postman onboarding: bootstrap, repo sync, optional Insights. Part of the Postman API Onboarding suite.'
+author: Postman
+branding:
+  icon: send
+  color: orange
 inputs:
 
   workspace-id:
@@ -58,6 +62,9 @@ inputs:
     required: false
   domain-code:
     description: Short domain code used in workspace naming.
+    required: false
+  governance-group:
+    description: Postman governance workspace group name. Overrides the postman-governance-group repository custom property and domain mapping.
     required: false
   requester-email:
     description: Requester email used for workspace membership.
@@ -122,6 +129,10 @@ inputs:
   postman-access-token:
     description: Postman access token used for Bifrost and governance integration.
     required: false
+  credential-preflight:
+    description: "Credential identity preflight policy forwarded to bootstrap, repo sync, and insights. warn (default) logs a note and continues when postman-api-key and postman-access-token resolve to different parent orgs; enforce fails the run on that condition before any workspace is created; off skips the identity probes entirely (the reactive error guidance still applies)."
+    required: false
+    default: warn
   postman-team-id:
     description: Explicit Postman team ID override for org-mode Bifrost calls.
     required: false
@@ -152,6 +163,18 @@ inputs:
     default: help@postman.com
   enable-insights:
     description: Whether to enable Postman Insights.
+    required: false
+    default: 'false'
+  skip-built-in-tests:
+    description: |
+      When 'true', skip the built-in smoke and contract Postman CLI test run
+      and JUnit artifact upload that normally happen inside this action. Set
+      this to 'true' when the caller workflow needs to perform additional
+      post-onboarding setup (e.g. bearer-token injection, mTLS bootstrap,
+      vault-hydrated secrets, dynamic env enrichment) before the smoke and
+      contract suites can authenticate successfully, and will run the tests
+      itself afterward. Default 'false' preserves existing behavior for all
+      current callers.
     required: false
     default: 'false'
   cluster-name:
@@ -260,7 +283,7 @@ runs:
         esac
     - id: bootstrap
       name: Bootstrap Postman Assets
-      uses: postman-cs/postman-bootstrap-action@main
+      uses: postman-cs/postman-bootstrap-action@v1.2.0
       env:
         POSTMAN_TEAM_ID: ${{ inputs.postman-team-id }}
       with:
@@ -276,6 +299,7 @@ runs:
         release-label: ${{ inputs.release-label }}
         domain: ${{ inputs.domain }}
         domain-code: ${{ inputs.domain-code }}
+        governance-group: ${{ inputs.governance-group }}
         requester-email: ${{ inputs.requester-email }}
         workspace-admin-user-ids: ${{ inputs.workspace-admin-user-ids }}
         workspace-team-id: ${{ inputs.workspace-team-id }}
@@ -292,13 +316,16 @@ runs:
         breaking-summary-path: ${{ inputs.breaking-summary-path }}
         breaking-log-path: ${{ inputs.breaking-log-path }}
         governance-mapping-json: ${{ inputs.governance-mapping-json }}
+        github-token: ${{ inputs.github-token }}
+        gh-fallback-token: ${{ inputs.gh-fallback-token }}
         postman-api-key: ${{ inputs.postman-api-key }}
         postman-access-token: ${{ inputs.postman-access-token }}
+        credential-preflight: ${{ inputs.credential-preflight }}
         integration-backend: ${{ inputs.integration-backend }}
         postman-stack: ${{ inputs.postman-stack }}
     - id: repo_sync
       name: Sync Repository and Workspace
-      uses: postman-cs/postman-repo-sync-action@v0.13.0
+      uses: postman-cs/postman-repo-sync-action@v1.0.0
       env:
         POSTMAN_TEAM_ID: ${{ inputs.postman-team-id }}
       with:
@@ -322,6 +349,7 @@ runs:
         committer-email: ${{ inputs.committer-email }}
         postman-api-key: ${{ inputs.postman-api-key }}
         postman-access-token: ${{ inputs.postman-access-token }}
+        credential-preflight: ${{ inputs.credential-preflight }}
         github-token: ${{ inputs.github-token }}
         gh-fallback-token: ${{ inputs.gh-fallback-token }}
         org-mode: ${{ inputs.org-mode }}
@@ -338,7 +366,7 @@ runs:
         postman-stack: ${{ inputs.postman-stack }}
     - id: run_tests_junit
       name: Run smoke and contract collections with JUnit output
-      if: ${{ steps.bootstrap.outputs.collections-json != '' }}
+      if: ${{ steps.bootstrap.outputs.collections-json != '' && inputs.skip-built-in-tests != 'true' }}
       shell: bash
       continue-on-error: true
       env:
@@ -385,10 +413,10 @@ runs:
         fi
     - id: upload_junit_artifact
       name: Upload Postman JUnit results
-      if: always()
+      if: always() && inputs.skip-built-in-tests != 'true'
       env:
         POSTMAN_TEAM_ID: ${{ inputs.postman-team-id }}
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@v7.0.1
       with:
         name: postman-test-results
         path: ${{ runner.temp }}/postman-junit/*.xml
@@ -396,7 +424,7 @@ runs:
     - id: insights_onboarding
       if: inputs.enable-insights == 'true'
       name: Onboard Postman Insights
-      uses: postman-cs/postman-insights-onboarding-action@v0.9.0
+      uses: postman-cs/postman-insights-onboarding-action@v1.0.0
       env:
         POSTMAN_TEAM_ID: ${{ inputs.postman-team-id }}
       with:
@@ -407,6 +435,7 @@ runs:
         cluster-name: ${{ inputs.cluster-name }}
         postman-api-key: ${{ inputs.postman-api-key }}
         postman-access-token: ${{ inputs.postman-access-token }}
+        credential-preflight: ${{ inputs.credential-preflight }}
         postman-team-id: ${{ inputs.postman-team-id }}
         github-token: ${{ inputs.github-token }}
         postman-stack: ${{ inputs.postman-stack }}
