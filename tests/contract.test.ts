@@ -301,11 +301,11 @@ describe('postman-api-onboarding-action composite contract', () => {
       const insightsStep = steps.find((step) => step.id === 'insights_onboarding');
 
       expect(validateStep?.shell).toBe('bash');
-      expect(bootstrapStep?.uses).toBe('postman-cs/postman-bootstrap-action@v1.2.3');
-      expect(repoSyncStep?.uses).toBe('postman-cs/postman-repo-sync-action@v1.0.4');
+      expect(bootstrapStep?.uses).toBe('postman-cs/postman-bootstrap-action@v1.2.4');
+      expect(repoSyncStep?.uses).toBe('postman-cs/postman-repo-sync-action@v1.0.5');
       expect(junitStep?.shell).toBe('bash');
       expect(uploadStep?.uses).toBe('actions/upload-artifact@v7.0.1');
-      expect(insightsStep?.uses).toBe('postman-cs/postman-insights-onboarding-action@v1.0.3');
+      expect(insightsStep?.uses).toBe('postman-cs/postman-insights-onboarding-action@v1.0.4');
       for (const step of [bootstrapStep, repoSyncStep, insightsStep]) {
         expect(step?.uses).not.toMatch(/@(main|v0)$/);
       }
