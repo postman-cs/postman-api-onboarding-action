@@ -332,7 +332,7 @@ Releases use immutable `v1.x.y` tags with `v1` as the rolling release channel; p
 
 This composite action emits no telemetry of its own. The wired
 child actions (workspace bootstrap, repo sync, and Insights onboarding) each send
-a single anonymous usage event when they complete, so the Postman team can
+a single non-identifying usage event when they complete, so the Postman team can
 measure onboarding adoption across CI systems. See each child action README for
 the exact event contents and the privacy basis. The `events.pm-cse.dev`
 endpoint is operated by the Postman Customer Success Engineering team, and
