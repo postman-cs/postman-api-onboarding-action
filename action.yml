@@ -163,9 +163,8 @@ inputs:
     description: Insights cluster name passed to the downstream Insights onboarding step.
     required: false
   integration-backend:
-    description: Integration backend used to coordinate onboarding phases.
+    description: Advanced/internal. Integration backend used to coordinate onboarding phases; leave unset to use the default.
     required: false
-    default: bifrost
   org-mode:
     description: Whether the Postman team uses org-mode. When true, x-entity-team-id is included on integration calls. Non-org teams must omit this header.
     required: false

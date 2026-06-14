@@ -52,7 +52,7 @@ jobs:
         uses: postman-cs/postman-api-onboarding-action@v1
         with:
           project-name: core-payments
-          spec-url: https://gist.githubusercontent.com/jaredboynton/a839de57db2c3c90b8f75906c56b00ee/raw/openapi.yaml
+          spec-url: https://raw.githubusercontent.com/postman-cs/postman-api-onboarding-action/main/examples/core-payments-openapi.yaml
           postman-region: us
           repo-write-mode: commit-only
           postman-api-key: ${{ secrets.POSTMAN_API_KEY }}

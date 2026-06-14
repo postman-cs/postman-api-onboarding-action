@@ -1,0 +1,139 @@
+openapi: 3.0.3
+info:
+  title: Core Payments API
+  version: 1.0.0
+  description: >-
+    Example OpenAPI definition used by the Postman API onboarding actions to
+    demonstrate spec upload, collection generation, and workspace provisioning.
+    Replace it with your own service's OpenAPI document.
+servers:
+  - url: https://api.example.com/v1
+    description: Production
+paths:
+  /payments:
+    get:
+      operationId: listPayments
+      summary: List payments
+      tags: [Payments]
+      parameters:
+        - name: limit
+          in: query
+          description: Maximum number of payments to return.
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: status
+          in: query
+          description: Filter payments by lifecycle status.
+          required: false
+          schema:
+            type: string
+            enum: [pending, settled, failed]
+      responses:
+        '200':
+          description: A page of payments.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Payment'
+                  next_cursor:
+                    type: string
+                    nullable: true
+    post:
+      operationId: createPayment
+      summary: Create a payment
+      tags: [Payments]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentRequest'
+      responses:
+        '201':
+          description: The created payment.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Payment'
+        '400':
+          description: The request was invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /payments/{paymentId}:
+    get:
+      operationId: getPayment
+      summary: Retrieve a payment
+      tags: [Payments]
+      parameters:
+        - name: paymentId
+          in: path
+          required: true
+          description: Unique identifier of the payment.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The requested payment.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Payment'
+        '404':
+          description: No payment matched the identifier.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Payment:
+      type: object
+      required: [id, amount, currency, status]
+      properties:
+        id:
+          type: string
+          description: Unique payment identifier.
+        amount:
+          type: integer
+          description: Amount in the smallest currency unit (for example, cents).
+        currency:
+          type: string
+          description: ISO 4217 currency code.
+          example: USD
+        status:
+          type: string
+          enum: [pending, settled, failed]
+        created_at:
+          type: string
+          format: date-time
+    PaymentRequest:
+      type: object
+      required: [amount, currency]
+      properties:
+        amount:
+          type: integer
+          minimum: 1
+        currency:
+          type: string
+          example: USD
+        description:
+          type: string
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+        message:
+          type: string

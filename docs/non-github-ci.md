@@ -29,7 +29,7 @@ Run bootstrap first and save its JSON output:
 ```bash
 postman-bootstrap \
   --project-name "my-api" \
-  --spec-url "https://gist.githubusercontent.com/jaredboynton/a839de57db2c3c90b8f75906c56b00ee/raw/openapi.yaml" \
+  --spec-url "https://raw.githubusercontent.com/postman-cs/postman-api-onboarding-action/main/examples/core-payments-openapi.yaml" \
   --postman-api-key "$POSTMAN_API_KEY" \
   --postman-access-token "$POSTMAN_ACCESS_TOKEN" \
   --postman-team-id "$POSTMAN_TEAM_ID" \

@@ -240,9 +240,9 @@ describe('postman-api-onboarding-action composite contract', () => {
       expect(manifest.inputs['spec-path']?.required).toBe(false);
     });
 
-    it('defaults integration-backend to bifrost', () => {
+    it('keeps integration-backend internal with no visible manifest default', () => {
       const manifest = loadManifest();
-      expect(manifest.inputs['integration-backend']?.default).toBe('bifrost');
+      expect(manifest.inputs['integration-backend']?.default).toBeUndefined();
     });
 
     it('defaults enable-insights to false', () => {
@@ -542,6 +542,8 @@ describe('postman-api-onboarding-action composite contract', () => {
       // login passes `--region eu` only for eu and omits the flag otherwise.
       expect(junitStep?.run).toContain('--region eu');
       expect(junitStep?.run).not.toContain('--region "$POSTMAN_REGION"');
+      expect(junitStep?.run).not.toContain('--region us');
+      expect(junitStep?.run).toContain('postman login --with-api-key "$POSTMAN_API_KEY" >/dev/null');
       expect(junitStep?.run).not.toContain('https://dl-cli.pstmn.io/install/unix.sh');
     });
 

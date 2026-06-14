@@ -33,7 +33,7 @@ jobs:
         uses: postman-cs/postman-api-onboarding-action@v1
         with:
           project-name: synthetic-telecom
-          spec-url: https://gist.githubusercontent.com/jaredboynton/a839de57db2c3c90b8f75906c56b00ee/raw/openapi.yaml
+          spec-url: https://raw.githubusercontent.com/postman-cs/postman-api-onboarding-action/main/examples/core-payments-openapi.yaml
           postman-region: us
           postman-api-key: ${{ secrets.POSTMAN_API_KEY }}
           postman-access-token: ${{ steps.postman-token.outputs.token }}
@@ -112,7 +112,7 @@ The examples below include credential resolution when they need `postman-access-
     project-name: core-payments
     domain: core-banking
     domain-code: AF
-    spec-url: https://gist.githubusercontent.com/jaredboynton/a839de57db2c3c90b8f75906c56b00ee/raw/openapi.yaml
+    spec-url: https://raw.githubusercontent.com/postman-cs/postman-api-onboarding-action/main/examples/core-payments-openapi.yaml
     postman-region: us
     environments-json: '["prod","stage"]'
     governance-mapping-json: '{"core-banking":"Core Banking"}'
@@ -143,7 +143,7 @@ Target an existing workspace/spec/collection set and suppress generated CI workf
     baseline-collection-id: col-baseline
     smoke-collection-id: col-smoke
     contract-collection-id: col-contract
-    spec-url: https://gist.githubusercontent.com/jaredboynton/a839de57db2c3c90b8f75906c56b00ee/raw/openapi.yaml
+    spec-url: https://raw.githubusercontent.com/postman-cs/postman-api-onboarding-action/main/examples/core-payments-openapi.yaml
     postman-region: us
     generate-ci-workflow: false
     postman-api-key: ${{ secrets.POSTMAN_API_KEY }}
@@ -160,7 +160,7 @@ For repositories whose branch protection requires all changes to land through pu
   uses: postman-cs/postman-api-onboarding-action@v1
   with:
     project-name: core-payments
-    spec-url: https://gist.githubusercontent.com/jaredboynton/a839de57db2c3c90b8f75906c56b00ee/raw/openapi.yaml
+    spec-url: https://raw.githubusercontent.com/postman-cs/postman-api-onboarding-action/main/examples/core-payments-openapi.yaml
     postman-region: us
     repo-write-mode: commit-only
     postman-api-key: ${{ secrets.POSTMAN_API_KEY }}
@@ -184,7 +184,7 @@ When `enable-insights: true`, the action chains `postman-cs/postman-insights-onb
 - uses: postman-cs/postman-api-onboarding-action@v1
   with:
     project-name: core-payments
-    spec-url: https://gist.githubusercontent.com/jaredboynton/a839de57db2c3c90b8f75906c56b00ee/raw/openapi.yaml
+    spec-url: https://raw.githubusercontent.com/postman-cs/postman-api-onboarding-action/main/examples/core-payments-openapi.yaml
     postman-region: us
     enable-insights: true
     cluster-name: my-cluster
@@ -330,7 +330,7 @@ Releases use immutable `v1.x.y` tags with `v1` as the rolling release channel; p
 
 ## Telemetry
 
-This composite action runs no code of its own and sends no telemetry. The wired
+This composite action emits no telemetry of its own. The wired
 child actions (workspace bootstrap, repo sync, and Insights onboarding) each send
 a single anonymous usage event when they complete, so the Postman team can
 measure onboarding adoption across CI systems. See each child action README for
