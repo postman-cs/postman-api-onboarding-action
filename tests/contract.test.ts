@@ -37,7 +37,8 @@ type WorkflowManifest = {
   };
 };
 
-const HIDDEN_INPUTS = new Set(['postman-stack']);
+const HIDDEN_INPUTS = new Set(['integration-backend', 'postman-stack']);
+const HIDDEN_OUTPUTS = new Set(['integration-backend']);
 
 function loadManifest(): ActionManifest {
   return parse(
@@ -78,7 +79,8 @@ describe('postman-api-onboarding-action composite contract', () => {
       const pkg = loadPackageJson();
       expect(manifest.description).toContain('Part of the Postman API Onboarding suite');
       expect(manifest.description).not.toContain('beta');
-      expect(String(pkg.description)).toContain('customer preview');
+      expect(String(pkg.description)).toContain('Postman API onboarding');
+      expect(String(pkg.description)).not.toContain('customer preview');
       expect(String(pkg.description)).not.toContain('beta');
     });
 
@@ -143,6 +145,7 @@ describe('postman-api-onboarding-action composite contract', () => {
       const manifest = loadManifest();
       const readme = loadReadme();
       for (const outputName of Object.keys(manifest.outputs)) {
+        if (HIDDEN_OUTPUTS.has(outputName)) continue;
         expect(readme).toContain(`\`${outputName}\``);
       }
     });
@@ -204,6 +207,7 @@ describe('postman-api-onboarding-action composite contract', () => {
         'postman-access-token',
         'credential-preflight',
         'postman-team-id',
+        'postman-region',
         'postman-stack',
         'github-token',
         'gh-fallback-token',
@@ -242,9 +246,9 @@ describe('postman-api-onboarding-action composite contract', () => {
       expect(manifest.inputs['spec-path']?.required).toBe(false);
     });
 
-    it('defaults integration-backend to bifrost', () => {
+    it('keeps integration-backend internal with no visible manifest default', () => {
       const manifest = loadManifest();
-      expect(manifest.inputs['integration-backend']?.default).toBe('bifrost');
+      expect(manifest.inputs['integration-backend']?.default).toBeUndefined();
     });
 
     it('defaults enable-insights to false', () => {
@@ -305,24 +309,28 @@ describe('postman-api-onboarding-action composite contract', () => {
       const insightsStep = steps.find((step) => step.id === 'insights_onboarding');
 
       expect(validateStep?.shell).toBe('bash');
-      expect(bootstrapStep?.uses).toBe('postman-cs/postman-bootstrap-action@v1.2.0');
-      expect(repoSyncStep?.uses).toBe('postman-cs/postman-repo-sync-action@v1.0.0');
+      expect(bootstrapStep?.uses).toBe('postman-cs/postman-bootstrap-action@v1.2.4');
+      expect(repoSyncStep?.uses).toBe('postman-cs/postman-repo-sync-action@v1.0.5');
       expect(junitStep?.shell).toBe('bash');
       expect(uploadStep?.uses).toBe('actions/upload-artifact@v7.0.1');
-      expect(insightsStep?.uses).toBe('postman-cs/postman-insights-onboarding-action@v1.0.0');
+      expect(insightsStep?.uses).toBe('postman-cs/postman-insights-onboarding-action@v1.0.4');
       for (const step of [bootstrapStep, repoSyncStep, insightsStep]) {
         expect(step?.uses).not.toMatch(/@(main|v0)$/);
       }
     });
 
-    it('validates the hidden postman-stack input before downstream actions run', () => {
+    it('validates the hidden postman-stack and public postman-region inputs before downstream actions run', () => {
       const manifest = loadManifest();
       const validateStep = manifest.runs.steps.find((step) => step.id === 'validate_postman_stack');
 
       expect(manifest.inputs['postman-stack']?.default).toBe('prod');
+      expect(manifest.inputs['postman-region']?.default).toBe('us');
+      expect(validateStep?.env?.POSTMAN_REGION).toBe('${{ inputs.postman-region }}');
       expect(validateStep?.env?.POSTMAN_STACK).toBe('${{ inputs.postman-stack }}');
       expect(validateStep?.run).toContain('prod|beta');
       expect(validateStep?.run).toContain('postman-stack must be one of: prod, beta');
+      expect(validateStep?.run).toContain('us|eu');
+      expect(validateStep?.run).toContain('postman-region must be one of: us, eu');
     });
 
     it('insights step is conditional on enable-insights', () => {
@@ -465,6 +473,16 @@ describe('postman-api-onboarding-action composite contract', () => {
       expect(manifest.inputs['credential-preflight']?.default).toBe('warn');
     });
 
+    it('validates credential-preflight as warn or enforce only before downstream actions run', () => {
+      const manifest = loadManifest();
+      const validateStep = manifest.runs.steps.find((step) => step.id === 'validate_postman_stack');
+
+      expect(validateStep?.env?.CREDENTIAL_PREFLIGHT).toBe('${{ inputs.credential-preflight }}');
+      expect(validateStep?.run).toContain('warn|enforce');
+      expect(validateStep?.run).toContain('credential-preflight must be one of: warn, enforce');
+      expect(validateStep?.run).not.toMatch(/\b(disabled|false|none|off|skip)\b/);
+    });
+
     it('passes credential-preflight to bootstrap, repo-sync, and insights', () => {
       const manifest = loadManifest();
       const bootstrapStep = manifest.runs.steps.find((s) => s.id === 'bootstrap');
@@ -527,6 +545,7 @@ describe('postman-api-onboarding-action composite contract', () => {
       const manifest = loadManifest();
       const bootstrapStep = manifest.runs.steps.find((s) => s.id === 'bootstrap');
 
+      expect(bootstrapStep?.with?.['postman-region']).toBe('${{ inputs.postman-region }}');
       expect(bootstrapStep?.with?.['postman-stack']).toBe('${{ inputs.postman-stack }}');
       expect(bootstrapStep?.with?.['postman-api-base']).toBeUndefined();
       expect(bootstrapStep?.with?.['postman-bifrost-base']).toBeUndefined();
@@ -538,6 +557,7 @@ describe('postman-api-onboarding-action composite contract', () => {
       const manifest = loadManifest();
       const repoSyncStep = manifest.runs.steps.find((s) => s.id === 'repo_sync');
 
+      expect(repoSyncStep?.with?.['postman-region']).toBe('${{ inputs.postman-region }}');
       expect(repoSyncStep?.with?.['postman-stack']).toBe('${{ inputs.postman-stack }}');
       expect(repoSyncStep?.with?.['postman-api-base']).toBeUndefined();
       expect(repoSyncStep?.with?.['postman-bifrost-base']).toBeUndefined();
@@ -550,6 +570,12 @@ describe('postman-api-onboarding-action composite contract', () => {
       const junitStep = manifest.runs.steps.find((s) => s.id === 'run_tests_junit');
 
       expect(junitStep?.run).toContain('$POSTMAN_CLI_INSTALL_URL');
+      // us is the CLI default and `--region us` is rejected by the Postman CLI, so the
+      // login passes `--region eu` only for eu and omits the flag otherwise.
+      expect(junitStep?.run).toContain('--region eu');
+      expect(junitStep?.run).not.toContain('--region "$POSTMAN_REGION"');
+      expect(junitStep?.run).not.toContain('--region us');
+      expect(junitStep?.run).toContain('postman login --with-api-key "$POSTMAN_API_KEY" >/dev/null');
       expect(junitStep?.run).not.toContain('https://dl-cli.pstmn.io/install/unix.sh');
     });
 
@@ -613,6 +639,7 @@ describe('postman-api-onboarding-action composite contract', () => {
       );
       expect(insightsStep?.with?.['cluster-name']).toBe('${{ inputs.cluster-name }}');
       expect(insightsStep?.with?.['postman-team-id']).toBe('${{ inputs.postman-team-id }}');
+      expect(insightsStep?.with?.['postman-region']).toBe('${{ inputs.postman-region }}');
       expect(insightsStep?.with?.['postman-stack']).toBe('${{ inputs.postman-stack }}');
     });
 
@@ -620,6 +647,7 @@ describe('postman-api-onboarding-action composite contract', () => {
       const manifest = loadManifest();
       const insightsStep = manifest.runs.steps.find((s) => s.id === 'insights_onboarding');
 
+      expect(insightsStep?.with?.['postman-region']).toBe('${{ inputs.postman-region }}');
       expect(insightsStep?.with?.['postman-stack']).toBe('${{ inputs.postman-stack }}');
       expect(insightsStep?.with?.['postman-api-base']).toBeUndefined();
       expect(insightsStep?.with?.['postman-bifrost-base']).toBeUndefined();
@@ -656,14 +684,14 @@ describe('postman-api-onboarding-action composite contract', () => {
       expect(manifest.inputs['repo-write-mode']?.default).toBe('commit-and-push');
     });
 
-    it('committer-name defaults to Postman CSE', () => {
+    it('committer-name defaults to Postman', () => {
       const manifest = loadManifest();
-      expect(manifest.inputs['committer-name']?.default).toBe('Postman CSE');
+      expect(manifest.inputs['committer-name']?.default).toBe('Postman');
     });
 
-    it('committer-email defaults to help@postman.com', () => {
+    it('committer-email defaults to support@postman.com', () => {
       const manifest = loadManifest();
-      expect(manifest.inputs['committer-email']?.default).toBe('help@postman.com');
+      expect(manifest.inputs['committer-email']?.default).toBe('support@postman.com');
     });
 
     it('JSON map inputs default to empty object', () => {
@@ -674,10 +702,12 @@ describe('postman-api-onboarding-action composite contract', () => {
       expect(manifest.inputs['environment-uids-json']?.default).toBe('{}');
     });
 
-    it('postman-stack defaults to prod and explicit base URL inputs are hidden from the composite', () => {
+    it('postman-stack and postman-region default to public production without explicit base URL inputs', () => {
       const manifest = loadManifest();
       expect(manifest.inputs['postman-stack']?.default).toBe('prod');
       expect(manifest.inputs['postman-stack']?.required).toBe(false);
+      expect(manifest.inputs['postman-region']?.default).toBe('us');
+      expect(manifest.inputs['postman-region']?.required).toBe(false);
       expect(manifest.inputs['postman-api-base']).toBeUndefined();
       expect(manifest.inputs['postman-bifrost-base']).toBeUndefined();
       expect(manifest.inputs['postman-gateway-base']).toBeUndefined();

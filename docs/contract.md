@@ -2,12 +2,13 @@
 
 ## Contract
 
-- Default `integration-backend` is `bifrost`.
+- The integration backend is selected by the action defaults.
 - Inputs are backend-neutral and kebab-case.
 - Bootstrap outputs are explicitly mapped into repo-sync inputs in `action.yml`.
 - Final outputs are surfaced from the two lower-level actions without exposing internal step mode controls.
 - Collection artifacts are exported in the Postman Collection v3 multi-file YAML directory structure (produced during the repo-sync step).
-- Workspace-to-repository linking supports both GitHub and GitLab (cloud and self-hosted) URLs via Bifrost.
+- Workspace-to-repository linking supports both GitHub and GitLab (cloud and self-hosted) URLs.
+- `credential-preflight` accepts `warn` and `enforce` only; there is no public opt-out mode.
 
 ## Output mapping
 

@@ -19,6 +19,9 @@ const MARKERS = {
   outputs: ['<!-- outputs-table:start -->', '<!-- outputs-table:end -->'],
 };
 
+const HIDDEN_INPUTS = new Set(['integration-backend', 'postman-stack']);
+const HIDDEN_OUTPUTS = new Set(['integration-backend']);
+
 function cell(text) {
   return String(text ?? '')
     .replace(/\s+/g, ' ')
@@ -27,7 +30,7 @@ function cell(text) {
 }
 
 export function renderInputsTable(manifest) {
-  const rows = Object.entries(manifest.inputs).map(([name, spec]) => {
+  const rows = Object.entries(manifest.inputs).filter(([name]) => !HIDDEN_INPUTS.has(name)).map(([name, spec]) => {
     const required = spec.required ? 'yes' : 'no';
     const def = spec.default !== undefined && spec.default !== '' ? `\`${cell(spec.default)}\`` : '';
     return `| \`${name}\` | ${cell(spec.description)} | ${required} | ${def} |`;
@@ -36,7 +39,7 @@ export function renderInputsTable(manifest) {
 }
 
 export function renderOutputsTable(manifest) {
-  const rows = Object.entries(manifest.outputs).map(
+  const rows = Object.entries(manifest.outputs).filter(([name]) => !HIDDEN_OUTPUTS.has(name)).map(
     ([name, spec]) => `| \`${name}\` | ${cell(spec.description)} |`
   );
   return ['| Name | Description |', '| --- | --- |', ...rows].join('\n');

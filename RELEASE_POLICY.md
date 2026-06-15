@@ -1,6 +1,6 @@
 # Release Policy
 
-This document governs how the Postman GitHub Actions customer preview suite is released and documented.
+This document governs how the Postman API Onboarding GitHub Actions suite is released and documented.
 
 It applies to these repositories:
 
@@ -17,14 +17,13 @@ It applies to these repositories:
 - Keep each action independently releasable.
 - Keep suite-level guidance in one place without duplicating per-action API details.
 - Prevent composite releases from drifting away from the lower-level actions they depend on.
-- Make consumer version guidance explicit during customer preview.
+- Make consumer version guidance explicit for marketplace and direct GitHub Action usage.
 
 ## Current state
 
 - Each repository owns its own CI workflow and its own `v*` tag-triggered GitHub release workflow.
 - The composite action references sibling actions through immutable release tags in `action.yml`.
-- Older released composite tags such as `v0.4`, `v0.4.1`, and `v0.5` resolved sibling actions through `@v0` aliases.
-- During the current customer preview period, the public release contract is the git tag and GitHub release. Do not treat `package.json` version fields as the authoritative public release identifier.
+- The public release contract is the git tag and GitHub release. Do not treat `package.json` version fields as the authoritative public release identifier.
 
 ## Source of truth
 
@@ -39,36 +38,38 @@ Do not duplicate full input and output tables across repositories. Link to the a
 
 ## Tag policy
 
-- Immutable release tags use the public `v1.x` or `v1.x.y` pattern. Older `v0.x.y` tags remain published and immutable.
-- The moving `v1` tag is the rolling customer preview channel. The retired `v0` alias is frozen at the last v0 release and no longer moves.
+- Immutable release tags use the public `v1.x.y` pattern.
+- The moving `v1` tag is the rolling release channel.
 - Never rewrite or force-push an existing release tag.
 - Every public tag should have a corresponding GitHub release with generated notes.
 
 ## Consumer guidance
 
-- Recommend immutable tags such as `@v1.0.0` in examples and onboarding docs.
-- Treat `@v1` as a convenience channel, never as a reproducible reference.
+- Use `@v1` in quick-start examples when the goal is a short marketplace install path.
+- Recommend immutable tags such as `@v1.x.y` for reproducible production workflows.
+- Treat `@v1` as a convenience channel; pin an immutable `@v1.x.y` tag or commit SHA when you need a reproducible reference.
 - For security-sensitive environments, document that SHA pinning is the strongest option.
 
 ## Composite dependency policy
 
-### Current customer preview rule
+### Current rule
 
 The composite action currently depends on:
 
-- `postman-cs/postman-bootstrap-action@v1.0.0`
-- `postman-cs/postman-repo-sync-action@v1.0.0`
-- `postman-cs/postman-insights-onboarding-action@v1.0.0` when Insights is enabled
+- `postman-cs/postman-bootstrap-action@v1.2.3`
+- `postman-cs/postman-repo-sync-action@v1.0.4`
+- `postman-cs/postman-insights-onboarding-action@v1.0.3` when Insights is enabled
 
 Because these are immutable sibling pins, a consumer who pins `postman-api-onboarding-action` to an immutable tag gets a reproducible lower-level action set at runtime.
 
-### Target policy before GA
+### Composite release rule
 
 The composite action references immutable sibling tags inside `action.yml`. Therefore:
 
 - Every composite release must record the exact sibling tags it uses.
 - Any change to a pinned sibling version requires a new composite release.
 - The compatibility matrix in this document and the README must be updated in the same change.
+- The release workflow must run `scripts/check-sibling-pins.mjs` so the composite cannot ship stale sibling refs.
 
 ## Release order
 
@@ -97,7 +98,7 @@ For those repos, pull requests targeting `main` must pass the central live e2e
 gate before approval or merge. The PR workflow dispatches
 `postman-cs/postman-actions-e2e` with the PR head SHA pinned for the changed
 action and waits for the correlated run to succeed. Branches must live in the
-target repository so GitHub can provide the internal e2e dispatch secret; forked
+target repository so GitHub can provide the central e2e dispatch secret; forked
 PRs cannot satisfy the required merge gate until moved to an in-repo branch.
 
 For those repos, immutable publishing tags must pass the central live e2e gate
@@ -107,7 +108,7 @@ exact action tag pinned, waits for the correlated workflow run to conclude
 successfully, and only then publishes. The release log must include the e2e run
 URL, correlation id, and conclusion.
 
-The rolling `v1` customer-preview alias validates locally but skips npm publish
+The rolling `v1` alias validates locally but skips npm publish
 and the live e2e gate.
 
 The composite action, Insights onboarding, and AWS spec discovery are not
@@ -117,12 +118,21 @@ the repo's release workflow blocks on that gate.
 
 ## Compatibility matrix
 
-This matrix describes the current customer preview release model.
+This matrix describes the current release model.
 
 | Composite reference used by consumers | Composite repository content | Lower-level dependency references | Result |
 | --- | --- | --- | --- |
 | `postman-api-onboarding-action@v1` | Rolling composite alias | Immutable sibling tags in the current composite content | Rolling composite channel with pinned siblings per composite revision |
 | Immutable composite release | Immutable composite repo tag | Immutable sibling tags | Fully reproducible |
+
+## Marketplace documentation surface
+
+Every composite release should keep these public docs aligned:
+
+- `README.md`: canonical suite entrypoint, happy-path workflow, scenario navigation, generated input and output tables, and version guidance.
+- `SUPPORT.md`: where users file bugs, support requests, and troubleshooting details.
+- `SECURITY.md`: vulnerability reporting and credential-handling expectations.
+- `RELEASE_POLICY.md`: maintainer release sequencing, tag policy, and compatibility guidance.
 
 ## Maintainer release checklist
 
@@ -132,18 +142,19 @@ Before pushing a new release tag:
 2. Run the repository's CI-equivalent checks locally when practical.
 3. Confirm the README examples still reflect the recommended consumer tag.
 4. Confirm `README.md` and `RELEASE_POLICY.md` still match the actual composite wiring.
-5. If lower-level actions changed behavior, verify whether the composite repo needs a coordinated release.
-6. For a live-e2e-gated repo, confirm `E2E_DISPATCH_TOKEN` is configured and the
+5. Confirm `SUPPORT.md` and `SECURITY.md` still match the current support and vulnerability-reporting paths.
+6. If lower-level actions changed behavior, verify whether the composite repo needs a coordinated release.
+7. For a live-e2e-gated repo, confirm `E2E_DISPATCH_TOKEN` is configured and the
    release workflow records a successful central e2e run before publish.
-7. Push the immutable release tag.
-8. Confirm that the matching GitHub release was published with generated notes.
+8. Push the immutable release tag.
+9. Confirm that the matching GitHub release was published with generated notes.
 
 ## What changes the policy
 
 Update this document whenever one of the following changes:
 
 - The tag naming strategy changes.
-- The composite action switches from floating aliases to immutable internal pins.
+- The composite action switches from floating aliases to immutable sibling pins.
 - The release order changes because suite dependencies changed.
 - A new action joins or leaves the suite.
 - The README's compatibility guidance would otherwise become inaccurate.
