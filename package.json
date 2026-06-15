@@ -1,6 +1,6 @@
 {
   "name": "@postman-cse/onboarding-api",
-  "version": "1.2.5",
+  "version": "1.3.0",
   "description": "Composite Postman API onboarding GitHub Action.",
   "files": [
     "action.yml",
