@@ -389,9 +389,21 @@ runs:
         spec-id: ${{ steps.bootstrap.outputs.spec-id }}
         spec-path: ${{ inputs.spec-path }}
         postman-stack: ${{ inputs.postman-stack }}
+    - id: warn_tests_skipped_no_api_key
+      name: Warn when built-in tests are skipped because no Postman API key is present
+      # D2: the built-in test step authenticates the Postman CLI with
+      # `postman login --with-api-key`, which has no access-token login path. When
+      # postman-api-key is absent (access-token-primary runs), skip the tests with
+      # a warning instead of failing the run.
+      if: ${{ steps.bootstrap.outputs.collections-json != '' && inputs.skip-built-in-tests != 'true' && inputs.postman-api-key == '' }}
+      shell: bash
+      env:
+        POSTMAN_TEAM_ID: ${{ inputs.postman-team-id }}
+      run: |
+        echo "::warning::Skipping built-in smoke and contract tests: no postman-api-key was provided. The Postman CLI (postman login --with-api-key, then postman collection run) has no access-token login, so these tests require a PMAK. Provide postman-api-key to enable them, or set skip-built-in-tests: true to silence this warning."
     - id: run_tests_junit
       name: Run smoke and contract collections with JUnit output
-      if: ${{ steps.bootstrap.outputs.collections-json != '' && inputs.skip-built-in-tests != 'true' }}
+      if: ${{ steps.bootstrap.outputs.collections-json != '' && inputs.skip-built-in-tests != 'true' && inputs.postman-api-key != '' }}
       shell: bash
       continue-on-error: true
       env:

@@ -295,7 +295,9 @@ describe('postman-api-onboarding-action composite contract', () => {
     it('is a composite action with the expected step count', () => {
       const manifest = loadManifest();
       expect(manifest.runs.using).toBe('composite');
-      expect(manifest.runs.steps).toHaveLength(6);
+      // bootstrap, repo-sync, warn-no-api-key (D2 skip+warn), junit-runner,
+      // junit-uploader, insights.
+      expect(manifest.runs.steps).toHaveLength(7);
     });
 
     it('uses pinned bootstrap, repo-sync, junit-runner, junit-uploader, and insights actions', () => {
