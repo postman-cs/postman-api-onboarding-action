@@ -31,7 +31,7 @@ npm run typecheck
 
 - `project-name` (required), `spec-url` (required)
 - `workspace-id`, `spec-id`, `*-collection-id` -- for existing service reruns
-- `postman-api-key` (required), `postman-access-token` (for Bifrost/governance)
+- `postman-access-token` (primary asset credential; every wrapped-action asset op runs through the access-token gateway), `postman-api-key` (required; mints/re-mints the access token and authenticates the Postman CLI logins)
 - `enable-insights` -- chains insights onboarding step
 - `generate-ci-workflow`, `ci-workflow-path` -- controls CI generation in target repo
 
