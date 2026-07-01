@@ -97,7 +97,7 @@ describe('postman-api-onboarding-action composite contract', () => {
 
     it('package.json version is a publishable semver release', () => {
       const pkg = loadPackageJson();
-      expect(String(pkg.version)).toMatch(/^1\.\d+\.\d+$/);
+      expect(String(pkg.version)).toMatch(/^\d+\.\d+\.\d+$/);
       expect(String(pkg.version)).not.toMatch(/beta/);
     });
 
@@ -316,11 +316,11 @@ describe('postman-api-onboarding-action composite contract', () => {
       const insightsStep = steps.find((step) => step.id === 'insights_onboarding');
 
       expect(validateStep?.shell).toBe('bash');
-      expect(bootstrapStep?.uses).toBe('postman-cs/postman-bootstrap-action@v1.2.4');
-      expect(repoSyncStep?.uses).toBe('postman-cs/postman-repo-sync-action@v1.0.5');
+      expect(bootstrapStep?.uses).toBe('postman-cs/postman-bootstrap-action@v2.0.0');
+      expect(repoSyncStep?.uses).toBe('postman-cs/postman-repo-sync-action@v2.0.0');
       expect(junitStep?.shell).toBe('bash');
       expect(uploadStep?.uses).toBe('actions/upload-artifact@v7.0.1');
-      expect(insightsStep?.uses).toBe('postman-cs/postman-insights-onboarding-action@v1.0.4');
+      expect(insightsStep?.uses).toBe('postman-cs/postman-insights-onboarding-action@v2.0.0');
       for (const step of [bootstrapStep, repoSyncStep, insightsStep]) {
         expect(step?.uses).not.toMatch(/@(main|v0)$/);
       }

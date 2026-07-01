@@ -24,13 +24,13 @@ jobs:
       - uses: actions/checkout@v5
 
       - id: postman-token
-        uses: postman-cs/postman-resolve-service-token-action@v1
+        uses: postman-cs/postman-resolve-service-token-action@v2
         with:
           postman-api-key: ${{ secrets.POSTMAN_API_KEY }}
           postman-region: us
 
       - id: onboard
-        uses: postman-cs/postman-api-onboarding-action@v1
+        uses: postman-cs/postman-api-onboarding-action@v2
         with:
           project-name: core-payments
           spec-url: https://raw.githubusercontent.com/postman-cs/postman-api-onboarding-action/main/examples/core-payments-openapi.yaml
@@ -102,12 +102,12 @@ The examples below include credential resolution when they need `postman-access-
 ```yaml
 - uses: actions/checkout@v5
 - id: postman-token
-  uses: postman-cs/postman-resolve-service-token-action@v1
+  uses: postman-cs/postman-resolve-service-token-action@v2
   with:
     postman-api-key: ${{ secrets.POSTMAN_API_KEY }}
     postman-region: us
 
-- uses: postman-cs/postman-api-onboarding-action@v1
+- uses: postman-cs/postman-api-onboarding-action@v2
   with:
     project-name: core-payments
     domain: core-banking
@@ -130,12 +130,12 @@ Target an existing workspace/spec/collection set and suppress generated CI workf
 ```yaml
 - uses: actions/checkout@v5
 - id: postman-token
-  uses: postman-cs/postman-resolve-service-token-action@v1
+  uses: postman-cs/postman-resolve-service-token-action@v2
   with:
     postman-api-key: ${{ secrets.POSTMAN_API_KEY }}
     postman-region: us
 
-- uses: postman-cs/postman-api-onboarding-action@v1
+- uses: postman-cs/postman-api-onboarding-action@v2
   with:
     project-name: core-payments
     workspace-id: ws-123
@@ -157,7 +157,7 @@ For repositories whose branch protection requires all changes to land through pu
 
 ```yaml
 - id: onboard
-  uses: postman-cs/postman-api-onboarding-action@v1
+  uses: postman-cs/postman-api-onboarding-action@v2
   with:
     project-name: core-payments
     spec-url: https://raw.githubusercontent.com/postman-cs/postman-api-onboarding-action/main/examples/core-payments-openapi.yaml
@@ -171,17 +171,17 @@ The full pattern, including sync-branch creation and programmatic PR opening, is
 
 ### Insights linking
 
-When `enable-insights: true`, the action chains `postman-cs/postman-insights-onboarding-action@v1` after bootstrap and repo sync, using the workspace from bootstrap plus the first environment from `environments-json`.
+When `enable-insights: true`, the action chains `postman-cs/postman-insights-onboarding-action@v2` after bootstrap and repo sync, using the workspace from bootstrap plus the first environment from `environments-json`.
 
 ```yaml
 - uses: actions/checkout@v5
 - id: postman-token
-  uses: postman-cs/postman-resolve-service-token-action@v1
+  uses: postman-cs/postman-resolve-service-token-action@v2
   with:
     postman-api-key: ${{ secrets.POSTMAN_API_KEY }}
     postman-region: us
 
-- uses: postman-cs/postman-api-onboarding-action@v1
+- uses: postman-cs/postman-api-onboarding-action@v2
   with:
     project-name: core-payments
     spec-url: https://raw.githubusercontent.com/postman-cs/postman-api-onboarding-action/main/examples/core-payments-openapi.yaml
@@ -200,16 +200,16 @@ Run AWS spec discovery before this composite action when the OpenAPI document sh
 ```yaml
 - uses: actions/checkout@v5
 - id: postman-token
-  uses: postman-cs/postman-resolve-service-token-action@v1
+  uses: postman-cs/postman-resolve-service-token-action@v2
   with:
     postman-api-key: ${{ secrets.POSTMAN_API_KEY }}
     postman-region: us
 
 - id: discover-spec
-  uses: postman-cs/postman-aws-spec-discovery-action@v1
+  uses: postman-cs/postman-aws-spec-discovery-action@v2
   with:
     aws-region: us-east-1
-- uses: postman-cs/postman-api-onboarding-action@v1
+- uses: postman-cs/postman-api-onboarding-action@v2
   with:
     project-name: core-payments
     spec-path: ${{ steps.discover-spec.outputs.spec-path }}
