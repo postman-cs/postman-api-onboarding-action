@@ -19,10 +19,13 @@ jobs:
         with:
           node-version: '24'
           cache: npm
+          registry-url: 'https://registry.npmjs.org'
       - uses: actions/setup-go@v6
         with:
           go-version: '1.24'
       - run: npm ci
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       - run: npm test
       - name: Verify composite sibling pins
         run: node scripts/check-sibling-pins.mjs

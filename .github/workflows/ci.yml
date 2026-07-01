@@ -18,7 +18,10 @@ jobs:
         with:
           node-version: '24'
           cache: npm
+          registry-url: 'https://registry.npmjs.org'
       - run: npm ci
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test
