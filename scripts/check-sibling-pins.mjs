@@ -14,10 +14,16 @@ const requiredPins = [
   { repo: 'postman-insights-onboarding-action', stepId: 'insights_onboarding' }
 ];
 
-function semverFromTag(tag) {
-  const match = tag.match(/^v(1)\.(\d+)\.(\d+)$/);
+// Siblings are pinned to the latest immutable tag of the composite's own major
+// version, so the pins advance in lockstep with the suite release train.
+const compositeVersion = JSON.parse(readFileSync(path.join(repoRoot, 'package.json'), 'utf8')).version;
+const compositeMajor = Number(String(compositeVersion).split('.')[0]);
+
+function semverForMajor(tag, major) {
+  const match = tag.match(/^v(\d+)\.(\d+)\.(\d+)$/);
   if (!match) return undefined;
-  return match.slice(1).map(Number);
+  const parts = match.slice(1).map(Number);
+  return parts[0] === major ? parts : undefined;
 }
 
 function compareSemver(left, right) {
@@ -29,19 +35,19 @@ function compareSemver(left, right) {
   return 0;
 }
 
-function latestV1Tag(repo) {
+function latestTag(repo, major) {
   const remote = 'https://github.com/postman-cs/' + repo + '.git';
-  const output = execFileSync('git', ['ls-remote', '--tags', remote, 'refs/tags/v1.*'], {
+  const output = execFileSync('git', ['ls-remote', '--tags', remote, 'refs/tags/v' + major + '.*'], {
     encoding: 'utf8'
   });
   const tags = output
     .split('\n')
     .map((line) => line.trim().split('/').pop())
     .filter(Boolean)
-    .map((tag) => ({ tag, semver: semverFromTag(tag) }))
+    .map((tag) => ({ tag, semver: semverForMajor(tag, major) }))
     .filter((entry) => entry.semver);
   if (tags.length === 0) {
-    throw new Error('No immutable v1 tags found for ' + repo);
+    throw new Error('No immutable v' + major + ' tags found for ' + repo);
   }
   tags.sort((left, right) => compareSemver(left.semver, right.semver));
   return tags.at(-1).tag;
@@ -53,7 +59,7 @@ const failures = [];
 for (const { repo, stepId } of requiredPins) {
   const step = manifest.runs.steps.find((candidate) => candidate.id === stepId);
   const actual = step?.uses;
-  const latest = latestV1Tag(repo);
+  const latest = latestTag(repo, compositeMajor);
   const expected = 'postman-cs/' + repo + '@' + latest;
   if (actual !== expected) {
     failures.push(stepId + ': expected ' + expected + ', found ' + (actual || '<missing>'));
@@ -68,4 +74,4 @@ if (failures.length > 0) {
   process.exit(1);
 }
 
-console.log('Composite sibling pins match the latest immutable v1 tags.');
+console.log('Composite sibling pins match the latest immutable v' + compositeMajor + ' tags.');
