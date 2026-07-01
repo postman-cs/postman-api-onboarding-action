@@ -4,7 +4,7 @@
 
 The `postman-api-key` is a [Postman API key](https://learning.postman.com/docs/reference/postman-api/authentication/) (PMAK) used for all standard Postman API operations: creating workspaces, uploading specs, generating collections, exporting artifacts, and managing environments.
 
-For CI, use a service-account PMAK. The same key can run the standard Postman API calls and mint the short-lived access token used by integration steps. See Postman's [service accounts documentation](https://learning.postman.com/docs/administration/service-accounts/) for setup and assignment guidance.
+For CI, use a service-account PMAK. The same key can run the standard Postman API calls and mint the short-lived access token used by integration steps. See the [service accounts documentation](https://learning.postman.com/docs/administration/service-accounts/) for setup and assignment guidance.
 
 To generate one:
 
@@ -79,7 +79,7 @@ The service-token action emits `team-id` with the minted token. Pass it to `post
 
 The underlying actions include the `x-entity-team-id` header on integration calls only when an explicit team override is supplied. For non-org-mode tokens, omit `postman-team-id` so the header stays unset.
 
-Postman's [roles and permissions](https://learning.postman.com/docs/administration/roles-and-permissions/) and [manage roles](https://learning.postman.com/docs/administration/managing-your-team/team-members/manage-roles/) docs are the source of truth for team and workspace assignment behavior.
+The [roles and permissions](https://learning.postman.com/docs/administration/roles-and-permissions/) and [manage roles](https://learning.postman.com/docs/administration/managing-your-team/team-members/manage-roles/) docs are the source of truth for team and workspace assignment behavior.
 
 ## Credential preflight
 
@@ -89,4 +89,4 @@ Postman's [roles and permissions](https://learning.postman.com/docs/administrati
 
 `postman-repo-sync-action` and `postman-insights-onboarding-action` can create or rotate a PMAK from `postman-access-token` when they encounter a clear auth failure, but this composite still requires `postman-api-key` up front because `postman-bootstrap-action` cannot start without it.
 
-For org-wide API key expiration, revocation, and exposed-key handling, see Postman's [managing API keys](https://learning.postman.com/docs/administration/managing-your-team/managing-api-keys/) guide.
+For org-wide API key expiration, revocation, and exposed-key handling, see the [managing API keys](https://learning.postman.com/docs/administration/managing-your-team/managing-api-keys/) guide.
