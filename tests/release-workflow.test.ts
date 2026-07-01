@@ -12,8 +12,9 @@ function namedStep(name: string): string {
 }
 
 function npmRegistrySetupStep(): string {
-  const match = releaseWorkflow.match(/ {6}- uses: actions\/setup-node@v\d+\n[\s\S]*?registry-url: 'https:\/\/registry\.npmjs\.org'\n/);
-  return match?.[0] ?? '';
+  return releaseWorkflow
+    .match(/ {6}- uses: actions\/setup-node@v\d+\n(?: {8}[^\n]+\n| {10}[^\n]+\n)*/g)
+    ?.find((step) => step.includes("registry-url: 'https://registry.npmjs.org'") && step.includes("if: steps.release_tag.outputs.npm_publish == 'true'")) ?? '';
 }
 
 describe('release workflow publishing contract', () => {

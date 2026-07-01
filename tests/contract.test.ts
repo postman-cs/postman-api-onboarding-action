@@ -106,7 +106,12 @@ describe('postman-api-onboarding-action composite contract', () => {
       const steps = workflow.jobs.release.steps;
       const verifyStep = steps.find((step) => step.name === 'Verify release tag matches package version');
       const releaseStep = steps.find((step) => step.name === 'Publish GitHub release');
-      const npmSetupStep = steps.find((step) => step.uses?.startsWith('actions/setup-node@') && step.with?.['registry-url']);
+      const npmSetupStep = steps.find(
+        (step) =>
+          step.uses?.startsWith('actions/setup-node@') &&
+          step.with?.['registry-url'] &&
+          step.if === "steps.release_tag.outputs.npm_publish == 'true'"
+      );
       const npmPackageStep = steps.find((step) => step.name === 'Check npm package version');
       const publishStep = steps.find((step) => step.name === 'Publish to npm');
       const attachStep = steps.find((step) => step.name === 'Attach npm tarball to release');
