@@ -326,6 +326,9 @@ Running outside GitHub Actions (GitLab CI, Bitbucket Pipelines, Azure DevOps)? T
 
 Releases use immutable `v1.x.y` tags with `v1` as the rolling release channel; pin an immutable tag for reproducibility. See [RELEASE_POLICY.md](RELEASE_POLICY.md).
 
+
+The pipeline leaves executable tests behind, not just assets: bootstrap injects contract assertions derived from the spec into the `[Contract]` collection, the Smoke collection carries generated smoke scripts (curated further by postman-smoke-flow-action), and repo-sync writes a CI workflow that runs both collections with the Postman CLI on every push, pull request, and schedule. The per-check reference for what those tests assert lives with each action: [bootstrap's Generated Assertions](https://github.com/postman-cs/postman-bootstrap-action/blob/main/docs/generated-assertions.md) and [smoke-flow's Generated Test Scripts](https://github.com/postman-cs/postman-smoke-flow-action/blob/main/docs/generated-tests.md).
+
 ## Resources
 
 - npm package: [@postman-cse/onboarding-api](https://www.npmjs.com/package/@postman-cse/onboarding-api)
