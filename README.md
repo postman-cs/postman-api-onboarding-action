@@ -4,6 +4,8 @@
 
 Canonical entrypoint for the Postman API Onboarding suite. Use this composite action when a GitHub repository needs the full onboarding path: workspace bootstrap, OpenAPI upload, collection generation, repository artifact sync, built-in smoke and contract runs, and optional Postman Insights linking.
 
+> **The pipeline leaves executable, standards-grounded tests behind.** Generated collections ship with spec-derived contract assertions (JSON Schema draft-07 / 2020-12 validation, RFC-checked formats, RFC 9110 credential checks) and chained smoke tests. Full inventories: [Generated assertions](https://github.com/postman-cs/postman-bootstrap-action/blob/main/docs/generated-assertions.md) and [Smoke generated tests](https://github.com/postman-cs/postman-smoke-flow-action/blob/main/docs/generated-tests.md).
+
 ## Quick start
 
 This workflow is the happy path for a new API repository. It mints a service-account access token and team ID with [Postman Onboarding: Service Token](https://github.com/postman-cs/postman-resolve-service-token-action), then feeds those outputs into this composite action. The OpenAPI fixture is public, so the workflow is paste-runnable after `POSTMAN_API_KEY` is configured.
