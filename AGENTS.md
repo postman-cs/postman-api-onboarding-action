@@ -41,3 +41,12 @@ npm run typecheck
 - `spec-url` is always required, even when reusing an existing `spec-id` (bootstrap updates from source)
 - `POSTMAN_TEAM_ID` env var is passed via `env:` block, not as an input
 - `package.json` version is NOT the release identifier -- git tags are
+
+## CI
+
+`.github/workflows/ci.yml` runs a single `gate` job that fans out lint, typecheck, test, commitlint, and actionlint
+as backgrounded shell processes on one runner: wall-clock is `max(gate)`, not
+`sum`, setup runs once, and every gate prints its result under a `::group::`
+block even when another fails.
+
+See the workspace `docs/CI.md` for the shared rationale.
