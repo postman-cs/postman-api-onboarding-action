@@ -322,6 +322,21 @@ This is a composite action, the primary partner-facing entrypoint of the Postman
 2. **Repo sync** (`postman-cs/postman-repo-sync-action`) exports [Postman Collection v3](https://learning.postman.com/docs/use/use-collections/collections-schemas/) multi-file YAML artifacts into the repository, materializes environments, registers the mock server and smoke monitor, and optionally generates a CI workflow. Bootstrap outputs are explicitly mapped into repo-sync inputs in `action.yml`.
 3. **Insights** (`postman-cs/postman-insights-onboarding-action`, only when `enable-insights: true`) links [Postman Insights](https://learning.postman.com/docs/insights/overview/) discovered services to the workspace.
 
+```mermaid
+flowchart TB
+    TOKEN["resolve-service-token<br/>mints access token + team ID"] --> COMP
+    AWS["aws-spec-discovery<br/>optional spec source"] -.->|"spec-url / spec-path"| COMP
+    subgraph COMP["postman-api-onboarding-action (composite)"]
+        B["bootstrap<br/>workspace + spec + collections<br/>+ injected contract tests"] --> RS["repo-sync<br/>artifacts, environments, mocks,<br/>monitors, CI workflow"]
+        RS --> T["built-in smoke + contract run<br/>Postman CLI, JUnit artifact"]
+        T --> INS["insights linking<br/>enable-insights: true"]
+    end
+    B -.->|"workspace-id / spec-id /<br/>smoke-collection-id"| SF["smoke-flow<br/>curated flow.yaml"]
+    RS --> CI["generated CI workflow<br/>reruns both collections<br/>on push and schedule"]
+```
+
+`resolve-service-token`, `aws-spec-discovery`, and `smoke-flow` are standalone steps that feed the composite's inputs or consume its outputs; they are not invoked from inside it.
+
 Between repo sync and Insights, the action runs the generated smoke and contract collections with the [Postman CLI](https://learning.postman.com/docs/postman-cli/postman-cli-collections/) and uploads [JUnit results](https://learning.postman.com/docs/postman-cli/postman-cli-reporters/) as a workflow artifact (skippable via `skip-built-in-tests`). Inputs are backend-neutral and kebab-case. Full contract details, output mapping, and phase outcome semantics are in [docs/contract.md](docs/contract.md).
 
 Running outside GitHub Actions (GitLab CI, Bitbucket Pipelines, Azure DevOps)? The bootstrap and repo-sync CLIs cover that: see [docs/non-github-ci.md](docs/non-github-ci.md).
@@ -329,7 +344,7 @@ Running outside GitHub Actions (GitLab CI, Bitbucket Pipelines, Azure DevOps)? T
 Releases use immutable `v1.x.y` tags with `v1` as the rolling release channel; pin an immutable tag for reproducibility. See [RELEASE_POLICY.md](RELEASE_POLICY.md).
 
 
-The pipeline leaves executable tests behind, not just assets: bootstrap injects contract assertions derived from the spec into the `[Contract]` collection, the Smoke collection carries generated smoke scripts (curated further by postman-smoke-flow-action), and repo-sync writes a CI workflow that runs both collections with the Postman CLI on every push, pull request, and schedule. The per-check reference for what those tests assert lives with each action: [bootstrap's Generated Assertions](https://github.com/postman-cs/postman-bootstrap-action/blob/main/docs/generated-assertions.md) and [smoke-flow's Generated Test Scripts](https://github.com/postman-cs/postman-smoke-flow-action/blob/main/docs/generated-tests.md).
+The pipeline leaves executable tests behind, not just assets: bootstrap injects contract assertions derived from the spec into the `[Contract]` collection, the Smoke collection carries generated smoke scripts (curated further by postman-smoke-flow-action), and repo-sync writes a CI workflow that runs both collections with the Postman CLI on every push, pull request, and schedule. The per-check reference for what those tests assert lives with each action: [bootstrap's Generated Assertions](https://github.com/postman-cs/postman-bootstrap-action/blob/main/docs/generated-assertions.md) and [smoke-flow's Generated Test Scripts](https://github.com/postman-cs/postman-smoke-flow-action/blob/main/docs/generated-tests.md). How the runtime tests relate to bootstrap-time static spec lints is in [Contract Enforcement Layers](https://github.com/postman-cs/postman-bootstrap-action/blob/main/docs/contract-enforcement-layers.md).
 
 ## Resources
 
