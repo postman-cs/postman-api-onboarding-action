@@ -4,7 +4,7 @@
 
 Canonical entrypoint for the Postman API Onboarding suite. Use this composite action when a GitHub repository needs the full onboarding path: workspace bootstrap, OpenAPI upload, collection generation, repository artifact sync, built-in smoke and contract runs, and optional Postman Insights linking.
 
-> **The pipeline leaves executable, standards-grounded tests behind.** Generated collections ship with spec-derived contract assertions (JSON Schema draft-07 / 2020-12 validation, RFC-checked formats, RFC 9110 credential checks) and chained smoke tests. Full inventories: [Generated assertions](https://github.com/postman-cs/postman-bootstrap-action/blob/main/docs/generated-assertions.md) and [Smoke generated tests](https://github.com/postman-cs/postman-smoke-flow-action/blob/main/docs/generated-tests.md).
+> **The pipeline leaves executable, standards-grounded tests behind, not just assets.** Bootstrap injects spec-derived contract assertions into the `[Contract]` collection, the Smoke collection carries generated smoke scripts, and repo-sync writes a CI workflow that reruns both with the Postman CLI on every push, pull request, and schedule. Full inventories: [Generated assertions](https://github.com/postman-cs/postman-bootstrap-action/blob/main/docs/generated-assertions.md), [Smoke generated tests](https://github.com/postman-cs/postman-smoke-flow-action/blob/main/docs/generated-tests.md), and [Contract Enforcement Layers](https://github.com/postman-cs/postman-bootstrap-action/blob/main/docs/contract-enforcement-layers.md).
 
 ## Quick start
 
@@ -72,16 +72,7 @@ Use `postman-region: eu` for [EU data residency](https://learning.postman.com/do
 
 ## Credentials and region
 
-| Need | Inputs | Recommended source |
-| --- | --- | --- |
-| Postman asset operations | `postman-access-token`, `postman-team-id` | Run `postman-resolve-service-token-action` before this action and pass `steps.<id>.outputs.token` plus `steps.<id>.outputs.team-id`. This is the primary credential: every asset operation in the wrapped actions (workspace, spec, collection, environment, mock, monitor, tagging, identity) runs through the access-token gateway. |
-| Token minting and Postman CLI | `postman-api-key` | Store a [Postman API key](https://learning.postman.com/docs/reference/postman-api/authentication/) as `POSTMAN_API_KEY`. The wrapped actions use it to mint and re-mint the access token and to authenticate the Postman CLI logins (bootstrap spec lint, repo-sync generated-CI collection run). |
-| Legacy access-token fallback | `postman-access-token` | Read the access token from the [Postman CLI credential store](https://learning.postman.com/docs/postman-cli/postman-cli-auth/) populated by `postman login` only when the service-token action cannot be used. Do not use copied web-session credentials in shared workflows. |
-| Data residency | `postman-region` | Use `us` by default or `eu` for [EU data residency](https://learning.postman.com/docs/administration/enterprise/about-eu-data-residency/). Set the same region on service-token and onboarding steps. |
-| Repository writes | `github-token`, `gh-fallback-token` | Use `GITHUB_TOKEN` for normal commits and variables. Add a fallback token only when workflow-file APIs require it. |
-| Credential identity checks | `credential-preflight` | Use `warn` for advisory checks or `enforce` to fail before workspace creation when credentials resolve to different parent orgs. |
-
-See [docs/credentials.md](docs/credentials.md) for detailed credential setup.
+Run `postman-resolve-service-token-action` first and pass its `token` and `team-id` outputs as `postman-access-token` and `postman-team-id`: the access token is the primary credential, carrying every Postman asset operation in the wrapped actions through the access-token gateway. The `postman-api-key` PMAK mints and re-mints that token and authenticates the Postman CLI logins (bootstrap spec lint, repo-sync generated-CI collection run). `github-token` (and optionally `gh-fallback-token`) handles repository writes, and `credential-preflight: enforce` fails before workspace creation when the PMAK and access token resolve to different parent orgs. Detailed setup and the legacy fallback: [docs/credentials.md](docs/credentials.md).
 
 ### Authentication matrix
 
@@ -343,9 +334,6 @@ Running outside GitHub Actions (GitLab CI, Bitbucket Pipelines, Azure DevOps)? T
 
 Releases use immutable `v1.x.y` tags with `v1` as the rolling release channel; pin an immutable tag for reproducibility. See [RELEASE_POLICY.md](RELEASE_POLICY.md).
 
-
-The pipeline leaves executable tests behind, not just assets: bootstrap injects contract assertions derived from the spec into the `[Contract]` collection, the Smoke collection carries generated smoke scripts (curated further by postman-smoke-flow-action), and repo-sync writes a CI workflow that runs both collections with the Postman CLI on every push, pull request, and schedule. The per-check reference for what those tests assert lives with each action: [bootstrap's Generated Assertions](https://github.com/postman-cs/postman-bootstrap-action/blob/main/docs/generated-assertions.md) and [smoke-flow's Generated Test Scripts](https://github.com/postman-cs/postman-smoke-flow-action/blob/main/docs/generated-tests.md). How the runtime tests relate to bootstrap-time static spec lints is in [Contract Enforcement Layers](https://github.com/postman-cs/postman-bootstrap-action/blob/main/docs/contract-enforcement-layers.md).
-
 ## Resources
 
 - npm package: [@postman-cse/onboarding-api](https://www.npmjs.com/package/@postman-cse/onboarding-api)
@@ -358,31 +346,7 @@ The pipeline leaves executable tests behind, not just assets: bootstrap injects 
 
 ## Telemetry
 
-This composite action emits no telemetry of its own. The wired
-child actions (workspace bootstrap, repo sync, and Insights onboarding) each send
-a single non-identifying usage event when they complete, so the Postman team can
-measure onboarding adoption across CI systems. See each child action README for
-the exact event contents and the privacy basis. The `events.pm-cse.dev`
-endpoint is operated by the Postman Customer Success Engineering team, and
-Postman, Inc. processes the events only to measure onboarding adoption in
-aggregate.
-
-The kill switch and endpoint override are inherited by every child without extra
-configuration. Set one of the following at the workflow or job level and it
-reaches all child action processes:
-
-```sh
-POSTMAN_ACTIONS_TELEMETRY=off
-# or the cross-tool standard
-DO_NOT_TRACK=1
-```
-
-`POSTMAN_ACTIONS_TELEMETRY_ENDPOINT` is inherited the same way: events go to
-`https://events.pm-cse.dev/v1/events` unless you set this variable to a collector
-URL you operate at the workflow or job level.
-
-Step-level inputs on the child steps do not strip workflow or job environment, so
-no per-child configuration is needed to opt out.
+This composite action emits no telemetry of its own; each wired child action sends one anonymous usage event per run (action name/version, outcome, coarse CI metadata; never secrets, spec content, or repo names). Set `POSTMAN_ACTIONS_TELEMETRY=off` or `DO_NOT_TRACK=1` at the workflow or job level to disable it for every child step, or point `POSTMAN_ACTIONS_TELEMETRY_ENDPOINT` at your own collector the same way.
 
 ## License
 
