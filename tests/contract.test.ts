@@ -232,9 +232,12 @@ describe('postman-api-onboarding-action composite contract', () => {
       ]);
     });
 
-    it('postman-api-key is required because bootstrap depends on it', () => {
+    it('postman-api-key and postman-access-token are individually optional; validation requires at least one', () => {
       const manifest = loadManifest();
-      expect(manifest.inputs['postman-api-key']?.required).toBe(true);
+      expect(manifest.inputs['postman-api-key']?.required).toBe(false);
+      expect(manifest.inputs['postman-access-token']?.required).toBe(false);
+      const validateStep = manifest.runs.steps.find((step) => step.id === 'validate_postman_stack');
+      expect(validateStep?.run).toContain('One of postman-api-key or postman-access-token is required');
     });
 
     it('postman-team-id remains an optional explicit override', () => {
@@ -338,6 +341,33 @@ describe('postman-api-onboarding-action composite contract', () => {
       expect(validateStep?.run).toContain('postman-stack must be one of: prod, beta');
       expect(validateStep?.run).toContain('us|eu');
       expect(validateStep?.run).toContain('postman-region must be one of: us, eu');
+    });
+
+    it('validates repo-write-mode in the first composite step before any child runs', () => {
+      const manifest = loadManifest();
+      const steps = manifest.runs.steps;
+      const validateStep = steps[0];
+
+      expect(validateStep?.id).toBe('validate_postman_stack');
+      expect(validateStep?.env?.REPO_WRITE_MODE).toBe('${{ inputs.repo-write-mode }}');
+      expect(validateStep?.run).toContain('none|commit-only|commit-and-push');
+      expect(validateStep?.run).toContain(
+        'repo-write-mode must be one of: none, commit-only, commit-and-push'
+      );
+      expect(manifest.inputs['repo-write-mode']?.default).toBe('commit-and-push');
+      expect(steps.findIndex((step) => step.uses?.includes('postman-bootstrap-action'))).toBeGreaterThan(
+        0
+      );
+    });
+
+    it('invokes bootstrap, repo-sync, and insights exactly once in that order', () => {
+      const childIds = loadManifest()
+        .runs.steps.map((step) => step.id)
+        .filter(
+          (id): id is string =>
+            id === 'bootstrap' || id === 'repo_sync' || id === 'insights_onboarding'
+        );
+      expect(childIds).toEqual(['bootstrap', 'repo_sync', 'insights_onboarding']);
     });
 
     it('insights step is conditional on enable-insights', () => {
@@ -463,15 +493,13 @@ describe('postman-api-onboarding-action composite contract', () => {
       }
     });
 
-    it('passes postman-api-key and postman-access-token to bootstrap and repo-sync', () => {
+    it('passes postman-api-key and postman-access-token to bootstrap, repo-sync, and insights', () => {
       const manifest = loadManifest();
-      const bootstrapStep = manifest.runs.steps.find((s) => s.id === 'bootstrap');
-      const repoSyncStep = manifest.runs.steps.find((s) => s.id === 'repo_sync');
-
-      expect(bootstrapStep?.with?.['postman-api-key']).toBe('${{ inputs.postman-api-key }}');
-      expect(bootstrapStep?.with?.['postman-access-token']).toBe('${{ inputs.postman-access-token }}');
-      expect(repoSyncStep?.with?.['postman-api-key']).toBe('${{ inputs.postman-api-key }}');
-      expect(repoSyncStep?.with?.['postman-access-token']).toBe('${{ inputs.postman-access-token }}');
+      for (const stepId of ['bootstrap', 'repo_sync', 'insights_onboarding'] as const) {
+        const step = manifest.runs.steps.find((s) => s.id === stepId);
+        expect(step?.with?.['postman-api-key']).toBe('${{ inputs.postman-api-key }}');
+        expect(step?.with?.['postman-access-token']).toBe('${{ inputs.postman-access-token }}');
+      }
     });
 
     it('credential-preflight defaults to warn and is optional', () => {
@@ -483,11 +511,14 @@ describe('postman-api-onboarding-action composite contract', () => {
     it('validates credential-preflight as warn or enforce only before downstream actions run', () => {
       const manifest = loadManifest();
       const validateStep = manifest.runs.steps.find((step) => step.id === 'validate_postman_stack');
+      const preflightCase = validateStep?.run?.match(
+        /case "\$CREDENTIAL_PREFLIGHT" in[\s\S]*?esac/
+      )?.[0];
 
       expect(validateStep?.env?.CREDENTIAL_PREFLIGHT).toBe('${{ inputs.credential-preflight }}');
-      expect(validateStep?.run).toContain('warn|enforce');
-      expect(validateStep?.run).toContain('credential-preflight must be one of: warn, enforce');
-      expect(validateStep?.run).not.toMatch(/\b(disabled|false|none|off|skip)\b/);
+      expect(preflightCase).toContain('warn|enforce');
+      expect(preflightCase).toContain('credential-preflight must be one of: warn, enforce');
+      expect(preflightCase).not.toMatch(/\b(disabled|false|none|off|skip)\b/);
     });
 
     it('passes credential-preflight to bootstrap, repo-sync, and insights', () => {

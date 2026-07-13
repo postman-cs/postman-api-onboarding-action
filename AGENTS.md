@@ -1,6 +1,6 @@
 # postman-api-onboarding-action
 
-Composite GitHub Action -- the primary partner-facing entrypoint. Chains bootstrap -> repo-sync -> (optional) insights. Contains NO runtime TypeScript; only `action.yml` wiring, tests, and type definitions.
+Composite GitHub Action -- primary partner-facing entrypoint. Chains bootstrap -> repo-sync -> (optional) insights. Contains NO runtime TypeScript; only `action.yml` wiring, tests, and type definitions.
 
 ## How It Works
 
@@ -31,22 +31,23 @@ npm run typecheck
 
 - `project-name` (required), `spec-url` (required)
 - `workspace-id`, `spec-id`, `*-collection-id` -- for existing service reruns
-- `postman-access-token` (primary asset credential; every wrapped-action asset op runs through the access-token gateway), `postman-api-key` (required; mints/re-mints the access token and authenticates the Postman CLI logins)
+- `postman-access-token` (primary asset credential; every wrapped-action asset op runs through access-token gateway), `postman-api-key` (mints/re-mints access token and authenticates Postman CLI logins). Individually optional; at least one is required.
 - `enable-insights` -- chains insights onboarding step
 - `generate-ci-workflow`, `ci-workflow-path` -- controls CI generation in target repo
 
 ## Gotchas
 
 - Sibling action refs are pinned; update them deliberately during coordinated releases
-- `spec-url` is always required, even when reusing an existing `spec-id` (bootstrap updates from source)
-- `POSTMAN_TEAM_ID` env var is passed via `env:` block, not as an input
-- `package.json` version is NOT the release identifier -- git tags are
+- Do not advance sibling immutable release pins from this composite; never log credentials from inputs
+- `spec-url` is always required, even when reusing existing `spec-id` (bootstrap updates from source)
+- `POSTMAN_TEAM_ID` env var is passed via `env:` block, not as input
+- `package.json` version is NOT release identifier -- git tags are
 
 ## CI
 
-`.github/workflows/ci.yml` runs a single `gate` job that fans out lint, typecheck, test, commitlint, and actionlint
+`.github/workflows/ci.yml` runs single `gate` job that fans out lint, typecheck, test, sibling-pins, commitlint, and actionlint
 as backgrounded shell processes on one runner: wall-clock is `max(gate)`, not
 `sum`, setup runs once, and every gate prints its result under a `::group::`
 block even when another fails.
 
-See the workspace `docs/CI.md` for the shared rationale.
+See workspace monorepo CI doc for shared rationale.

@@ -124,10 +124,10 @@ inputs:
     required: false
     default: '{}'
   postman-api-key:
-    description: Postman API key (PMAK). Threaded to the wrapped actions to mint and re-mint the access token and to authenticate the Postman CLI logins (bootstrap spec lint, repo-sync generated-CI collection run).
-    required: true
+    description: Postman API key (PMAK). Threaded to the wrapped actions to mint and re-mint the access token and to authenticate the Postman CLI logins (bootstrap spec lint, repo-sync generated-CI collection run). Individually optional; at least one of postman-api-key or postman-access-token is required.
+    required: false
   postman-access-token:
-    description: Postman access token (x-access-token). Primary credential threaded to the wrapped actions; every Postman asset operation runs through the access-token gateway. Mint it with postman-resolve-service-token-action.
+    description: Postman access token (x-access-token). Primary credential threaded to the wrapped actions; every Postman asset operation runs through the access-token gateway. Mint it with postman-resolve-service-token-action. Individually optional; at least one of postman-api-key or postman-access-token is required.
     required: false
   credential-preflight:
     description: "Credential identity preflight policy forwarded to bootstrap, repo sync, and insights. warn (default) logs a note and continues when postman-api-key and postman-access-token resolve to different parent orgs; enforce fails the run on that condition before any workspace is created."
@@ -151,7 +151,7 @@ inputs:
     description: Fallback GitHub token for variable and workflow-file APIs.
     required: false
   repo-write-mode:
-    description: Repo mutation mode for generated assets and workflow files.
+    description: Repo mutation mode for generated assets and workflow files. One of none, commit-only, or commit-and-push.
     required: false
     default: commit-and-push
   current-ref:
@@ -278,6 +278,9 @@ runs:
         POSTMAN_REGION: ${{ inputs.postman-region }}
         POSTMAN_STACK: ${{ inputs.postman-stack }}
         CREDENTIAL_PREFLIGHT: ${{ inputs.credential-preflight }}
+        REPO_WRITE_MODE: ${{ inputs.repo-write-mode }}
+        POSTMAN_API_KEY: ${{ inputs.postman-api-key }}
+        POSTMAN_ACCESS_TOKEN: ${{ inputs.postman-access-token }}
       run: |
         case "$POSTMAN_STACK" in
           prod|beta) ;;
@@ -304,6 +307,17 @@ runs:
             exit 1
             ;;
         esac
+        case "$REPO_WRITE_MODE" in
+          none|commit-only|commit-and-push) ;;
+          *)
+            echo "::error::repo-write-mode must be one of: none, commit-only, commit-and-push; got: $REPO_WRITE_MODE"
+            exit 1
+            ;;
+        esac
+        if [ -z "$POSTMAN_API_KEY" ] && [ -z "$POSTMAN_ACCESS_TOKEN" ]; then
+          echo "::error::One of postman-api-key or postman-access-token is required."
+          exit 1
+        fi
     - id: bootstrap
       name: Bootstrap Postman Assets
       uses: postman-cs/postman-bootstrap-action@v2.9.0
