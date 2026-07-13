@@ -87,6 +87,6 @@ The [roles and permissions](https://learning.postman.com/docs/administration/rol
 
 ## API key auto-creation
 
-`postman-repo-sync-action` and `postman-insights-onboarding-action` can create or rotate a PMAK from `postman-access-token` when they encounter a clear auth failure, but this composite still requires `postman-api-key` up front because `postman-bootstrap-action` cannot start without it.
+`postman-api-key` and `postman-access-token` are individually optional, but at least one is required. Access-token-only runs match the wrapped bootstrap/repo-sync contract: the composite fails in the first validation step when neither credential is present. Built-in Postman CLI smoke/contract tests still need a PMAK (they use `postman login --with-api-key`); without one the composite skips those tests with a warning. `postman-repo-sync-action` and `postman-insights-onboarding-action` can create or rotate a PMAK from `postman-access-token` when they encounter a clear auth failure.
 
 For org-wide API key expiration, revocation, and exposed-key handling, see the [managing API keys](https://learning.postman.com/docs/administration/managing-your-team/managing-api-keys/) guide.

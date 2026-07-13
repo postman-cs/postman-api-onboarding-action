@@ -255,14 +255,14 @@ Set `skip-built-in-tests: 'true'` when the caller workflow must perform post-onb
 | `environment-uids-json` | JSON map of environment slug to existing Postman environment UID. When provided, repo-sync reuses these environments instead of creating new ones. | no | `{}` |
 | `governance-mapping-json` | JSON map of business domain to governance group name. | no | `{}` |
 | `env-runtime-urls-json` | JSON map of environment slug to runtime base URL. | no | `{}` |
-| `postman-api-key` | Postman API key (PMAK). Threaded to the wrapped actions to mint and re-mint the access token and to authenticate the Postman CLI logins (bootstrap spec lint, repo-sync generated-CI collection run). | yes |  |
-| `postman-access-token` | Postman access token (x-access-token). Primary credential threaded to the wrapped actions; every Postman asset operation runs through the access-token gateway. Mint it with postman-resolve-service-token-action. | no |  |
+| `postman-api-key` | Postman API key (PMAK). Threaded to the wrapped actions to mint and re-mint the access token and to authenticate the Postman CLI logins (bootstrap spec lint, repo-sync generated-CI collection run). Individually optional; at least one of postman-api-key or postman-access-token is required. | no |  |
+| `postman-access-token` | Postman access token (x-access-token). Primary credential threaded to the wrapped actions; every Postman asset operation runs through the access-token gateway. Mint it with postman-resolve-service-token-action. Individually optional; at least one of postman-api-key or postman-access-token is required. | no |  |
 | `credential-preflight` | Credential identity preflight policy forwarded to bootstrap, repo sync, and insights. warn (default) logs a note and continues when postman-api-key and postman-access-token resolve to different parent orgs; enforce fails the run on that condition before any workspace is created. | no | `warn` |
 | `postman-team-id` | Explicit Postman team ID override for org-mode integration calls. | no |  |
 | `postman-region` | Postman data residency region for public API and Postman CLI calls. One of us or eu. | no | `us` |
 | `github-token` | GitHub token used for repo variables and generated commits. | no |  |
 | `gh-fallback-token` | Fallback GitHub token for variable and workflow-file APIs. | no |  |
-| `repo-write-mode` | Repo mutation mode for generated assets and workflow files. | no | `commit-and-push` |
+| `repo-write-mode` | Repo mutation mode for generated assets and workflow files. One of none, commit-only, or commit-and-push. | no | `commit-and-push` |
 | `current-ref` | Explicit ref override for detached checkout push semantics. | no |  |
 | `committer-name` | Commit author name for generated sync commits. | no | `Postman` |
 | `committer-email` | Commit author email for generated sync commits. | no | `support@postman.com` |
