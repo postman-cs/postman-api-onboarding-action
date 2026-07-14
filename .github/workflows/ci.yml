@@ -32,14 +32,32 @@ jobs:
         run: |
           bash <(curl -sSfL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash) 1.7.11 "$RUNNER_TEMP"
           echo "ACTIONLINT_BIN=$RUNNER_TEMP/actionlint" >> "$GITHUB_ENV"
-      # All checks run in parallel as backgrounded shell processes on one runner,
-      # so wall-clock is max(gate), not sum, and setup/npm-ci run once. Failures
-      # aggregate under ::group:: logs, so one pass shows every result.
+      # Keep at most two checks active on the two-vCPU runner. Failures aggregate
+      # under ::group:: logs so one pass still shows every result.
       - name: Run gates
         run: |
           set -uo pipefail
-          declare -A pid
-          run() { local n=$1; shift; ( "$@" ) >"$n.log" 2>&1 & pid[$n]=$!; }
+          declare -A pid=()
+          declare -A result=()
+          declare -a names=()
+          MAX_PARALLEL_GATES=2
+          finish_one() {
+            local finished_pid status n
+            if wait -n -p finished_pid "${pid[@]}"; then status=0; else status=$?; fi
+            for n in "${!pid[@]}"; do
+              if [ "${pid[$n]}" = "$finished_pid" ]; then
+                result[$n]=$status
+                unset 'pid[$n]'
+                return
+              fi
+            done
+          }
+          run() {
+            while [ "${#pid[@]}" -ge "$MAX_PARALLEL_GATES" ]; do finish_one; done
+            local n=$1; shift
+            names+=("$n")
+            ( "$@" ) >"$n.log" 2>&1 & pid[$n]=$!
+          }
 
           run lint          npm run lint
           run typecheck     npm run typecheck
@@ -52,11 +70,12 @@ jobs:
               --to "${{ github.event.pull_request.head.sha }}"
           fi
 
+          while [ "${#pid[@]}" -gt 0 ]; do finish_one; done
           fail=0
-          for n in "${!pid[@]}"; do
-            if wait "${pid[$n]}"; then echo "gate:$n=pass"; else echo "gate:$n=fail"; fail=1; fi
+          for n in "${names[@]}"; do
+            if [ "${result[$n]}" -eq 0 ]; then echo "gate:$n=pass"; else echo "gate:$n=fail"; fail=1; fi
           done
-          for n in "${!pid[@]}"; do
+          for n in "${names[@]}"; do
             echo "::group::$n"; cat "$n.log"; echo "::endgroup::"
           done
           exit $fail

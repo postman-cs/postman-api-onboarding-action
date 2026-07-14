@@ -45,9 +45,8 @@ npm run typecheck
 
 ## CI
 
-`.github/workflows/ci.yml` runs single `gate` job that fans out lint, typecheck, test, sibling-pins, commitlint, and actionlint
-as backgrounded shell processes on one runner: wall-clock is `max(gate)`, not
-`sum`, setup runs once, and every gate prints its result under a `::group::`
-block even when another fails.
+`.github/workflows/ci.yml` runs one `gate` job. One runner queues at most two of
+lint, typecheck, test, sibling-pins, commitlint, and actionlint. Every check
+prints a `::group::` result even when another check fails.
 
 See workspace monorepo CI doc for shared rationale.
