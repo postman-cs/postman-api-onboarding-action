@@ -7,7 +7,7 @@ const releaseWorkflow = readFileSync(join(process.cwd(), '.github/workflows/rele
 
 function namedStep(name: string): string {
   const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const match = releaseWorkflow.match(new RegExp(`      - name: ${escapedName}\\n[\\s\\S]*?(?=\\n      - |\\n?$)`));
+  const match = releaseWorkflow.match(new RegExp(`      - name: ${escapedName}\\n[\\s\\S]*?(?=\\n      - |\\n  [a-zA-Z0-9_-]+:|\\n?$)`));
   return match?.[0] ?? '';
 }
 
@@ -48,5 +48,13 @@ describe('release workflow publishing contract', () => {
     expect(namedStep('Publish to npm')).toContain("if: steps.release_tag.outputs.npm_publish == 'true' && steps.npm_package.outputs.already_published != 'true'");
     expect(namedStep('Attach npm tarball to release')).not.toMatch(/\n\s+if:/);
     expect(namedStep('Upload tarball')).not.toMatch(/\n\s+if:/);
+  });
+
+  it('advances the rolling major alias after an immutable release publishes', () => {
+    expect(releaseWorkflow).toContain('advance-major-alias:');
+    expect(releaseWorkflow).toContain("needs: release");
+    expect(releaseWorkflow).toContain("if: ${{ needs.release.outputs.npm_publish == 'true' }}");
+    expect(namedStep('Force-move rolling major alias tag')).toContain('git tag -fa "$MAJOR"');
+    expect(namedStep('Force-move rolling major alias tag')).toContain('git push origin "$MAJOR" --force');
   });
 });
