@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/* global console, process */
+/* global console, fetch, process */
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -56,6 +56,20 @@ function latestTag(repo, major) {
 const manifest = parse(readFileSync(path.join(repoRoot, 'action.yml'), 'utf8'));
 const failures = [];
 
+// P3 composite wiring lint (.plans/e2e-suite-tuneup.md): beyond pin freshness,
+// assert every `with:` key the composite forwards exists as a declared input on
+// the pinned sibling's manifest, so an input rename in a sibling cannot ship a
+// silently-dropped forward.
+async function fetchSiblingInputs(repo, tag) {
+  const url = 'https://raw.githubusercontent.com/postman-cs/' + repo + '/' + tag + '/action.yml';
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error('Failed to fetch ' + url + ': HTTP ' + response.status);
+  }
+  const sibling = parse(await response.text());
+  return new Set(Object.keys(sibling.inputs ?? {}));
+}
+
 for (const { repo, stepId } of requiredPins) {
   const step = manifest.runs.steps.find((candidate) => candidate.id === stepId);
   const actual = step?.uses;
@@ -63,6 +77,13 @@ for (const { repo, stepId } of requiredPins) {
   const expected = 'postman-cs/' + repo + '@' + latest;
   if (actual !== expected) {
     failures.push(stepId + ': expected ' + expected + ', found ' + (actual || '<missing>'));
+    continue;
+  }
+  const siblingInputs = await fetchSiblingInputs(repo, latest);
+  for (const key of Object.keys(step?.with ?? {})) {
+    if (!siblingInputs.has(key)) {
+      failures.push(stepId + ': forwards with-key `' + key + '` but ' + repo + '@' + latest + ' declares no such input');
+    }
   }
 }
 
@@ -74,4 +95,4 @@ if (failures.length > 0) {
   process.exit(1);
 }
 
-console.log('Composite sibling pins match the latest immutable v' + compositeMajor + ' tags.');
+console.log('Composite sibling pins match the latest immutable v' + compositeMajor + ' tags and every forwarded with-key is a declared sibling input.');
