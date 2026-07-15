@@ -320,7 +320,7 @@ runs:
         fi
     - id: bootstrap
       name: Bootstrap Postman Assets
-      uses: postman-cs/postman-bootstrap-action@v2.9.1
+      uses: postman-cs/postman-bootstrap-action@v2.9.4
       env:
         POSTMAN_TEAM_ID: ${{ inputs.postman-team-id }}
       with:
@@ -363,7 +363,7 @@ runs:
         postman-stack: ${{ inputs.postman-stack }}
     - id: repo_sync
       name: Sync Repository and Workspace
-      uses: postman-cs/postman-repo-sync-action@v2.1.3
+      uses: postman-cs/postman-repo-sync-action@v2.1.4
       env:
         POSTMAN_TEAM_ID: ${{ inputs.postman-team-id }}
       with:
