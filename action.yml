@@ -81,6 +81,10 @@ inputs:
   spec-path:
     description: Repo-root-relative path to the local spec file. Used for repo metadata generation and, when spec-url is not provided, as the spec source for bootstrap (read directly from the checked-out workspace).
     required: false
+  preserve-oas30-type-null:
+    description: Preserve supported OpenAPI 3.0 type null oneOf members in the uploaded source while using an internal nullable view for validation and generated artifacts.
+    required: false
+    default: 'true'
   breaking-change-mode:
     description: OpenAPI breaking-change comparison mode passed through to bootstrap (off, pr-native, baseline-only, or previous-spec).
     required: false
@@ -320,7 +324,7 @@ runs:
         fi
     - id: bootstrap
       name: Bootstrap Postman Assets
-      uses: postman-cs/postman-bootstrap-action@v2.9.4
+      uses: postman-cs/postman-bootstrap-action@8eb76d9f6aed69bb458b884c161cc9be5815dc06
       env:
         POSTMAN_TEAM_ID: ${{ inputs.postman-team-id }}
       with:
@@ -346,6 +350,7 @@ runs:
         # repo metadata) keep working under the bootstrap action's one-of
         # contract.
         spec-path: ${{ inputs.spec-url == '' && inputs.spec-path || '' }}
+        preserve-oas30-type-null: ${{ inputs.preserve-oas30-type-null }}
         breaking-change-mode: ${{ inputs.breaking-change-mode }}
         breaking-baseline-spec-path: ${{ inputs.breaking-baseline-spec-path }}
         breaking-rules-path: ${{ inputs.breaking-rules-path }}
@@ -363,7 +368,7 @@ runs:
         postman-stack: ${{ inputs.postman-stack }}
     - id: repo_sync
       name: Sync Repository and Workspace
-      uses: postman-cs/postman-repo-sync-action@v2.1.5
+      uses: postman-cs/postman-repo-sync-action@902d62246f4a53c6ba0abceb958868e610c84ffb
       env:
         POSTMAN_TEAM_ID: ${{ inputs.postman-team-id }}
       with:

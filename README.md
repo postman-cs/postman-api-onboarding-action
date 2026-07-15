@@ -244,6 +244,7 @@ Set `skip-built-in-tests: 'true'` when the caller workflow must perform post-onb
 | `workspace-team-id` | Numeric sub-team ID for org-mode workspace creation. Required by the Postman API when the PMAK's team is scoped under an organization. | no |  |
 | `spec-url` | HTTPS URL to the OpenAPI document to bootstrap. Provide either spec-url or spec-path. | no |  |
 | `spec-path` | Repo-root-relative path to the local spec file. Used for repo metadata generation and, when spec-url is not provided, as the spec source for bootstrap (read directly from the checked-out workspace). | no |  |
+| `preserve-oas30-type-null` | Preserve supported OpenAPI 3.0 type null oneOf members in the uploaded source while using an internal nullable view for validation and generated artifacts. | no | `true` |
 | `breaking-change-mode` | OpenAPI breaking-change comparison mode passed through to bootstrap (off, pr-native, baseline-only, or previous-spec). | no | `off` |
 | `breaking-baseline-spec-path` | Repo-root-relative baseline OpenAPI spec path used by bootstrap baseline-only mode and pr-native fallback. | no |  |
 | `breaking-rules-path` | Repo-root-relative openapi-changes rules file passed through to bootstrap. Missing files are ignored. | no | `changes-rules.yaml` |

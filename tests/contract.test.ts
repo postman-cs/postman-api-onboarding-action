@@ -197,6 +197,7 @@ describe('postman-api-onboarding-action composite contract', () => {
         'workspace-team-id',
         'spec-url',
         'spec-path',
+        'preserve-oas30-type-null',
         'breaking-change-mode',
         'breaking-baseline-spec-path',
         'breaking-rules-path',
@@ -319,8 +320,8 @@ describe('postman-api-onboarding-action composite contract', () => {
       const insightsStep = steps.find((step) => step.id === 'insights_onboarding');
 
       expect(validateStep?.shell).toBe('bash');
-      expect(bootstrapStep?.uses).toBe('postman-cs/postman-bootstrap-action@v2.9.4');
-      expect(repoSyncStep?.uses).toBe('postman-cs/postman-repo-sync-action@v2.1.5');
+      expect(bootstrapStep?.uses).toBe('postman-cs/postman-bootstrap-action@8eb76d9f6aed69bb458b884c161cc9be5815dc06');
+      expect(repoSyncStep?.uses).toBe('postman-cs/postman-repo-sync-action@902d62246f4a53c6ba0abceb958868e610c84ffb');
       expect(junitStep?.shell).toBe('bash');
       expect(uploadStep?.uses).toBe('actions/upload-artifact@v7.0.1');
       expect(insightsStep?.uses).toBe('postman-cs/postman-insights-onboarding-action@v2.1.2');
@@ -402,6 +403,9 @@ describe('postman-api-onboarding-action composite contract', () => {
       );
       expect(bootstrapStep?.with?.['contract-collection-id']).toBe(
         '${{ inputs.contract-collection-id }}'
+      );
+      expect(bootstrapStep?.with?.['preserve-oas30-type-null']).toBe(
+        '${{ inputs.preserve-oas30-type-null }}'
       );
       expect(bootstrapStep?.with?.['breaking-change-mode']).toBe(
         '${{ inputs.breaking-change-mode }}'
