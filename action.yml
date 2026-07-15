@@ -324,7 +324,7 @@ runs:
         fi
     - id: bootstrap
       name: Bootstrap Postman Assets
-      uses: postman-cs/postman-bootstrap-action@8eb76d9f6aed69bb458b884c161cc9be5815dc06
+      uses: postman-cs/postman-bootstrap-action@e0647bb15e601ad2702771eaf508137061f2a0e3
       env:
         POSTMAN_TEAM_ID: ${{ inputs.postman-team-id }}
       with:
