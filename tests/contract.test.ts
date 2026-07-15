@@ -320,8 +320,8 @@ describe('postman-api-onboarding-action composite contract', () => {
       const insightsStep = steps.find((step) => step.id === 'insights_onboarding');
 
       expect(validateStep?.shell).toBe('bash');
-      expect(bootstrapStep?.uses).toBe('postman-cs/postman-bootstrap-action@e0647bb15e601ad2702771eaf508137061f2a0e3');
-      expect(repoSyncStep?.uses).toBe('postman-cs/postman-repo-sync-action@902d62246f4a53c6ba0abceb958868e610c84ffb');
+      expect(bootstrapStep?.uses).toBe('postman-cs/postman-bootstrap-action@3c9de4c247c9c2b99551c60189baf12a5bc05f0f');
+      expect(repoSyncStep?.uses).toBe('postman-cs/postman-repo-sync-action@1354f19d17ea63e9929c794e7a47df49666b2c71');
       expect(junitStep?.shell).toBe('bash');
       expect(uploadStep?.uses).toBe('actions/upload-artifact@v7.0.1');
       expect(insightsStep?.uses).toBe('postman-cs/postman-insights-onboarding-action@v2.1.2');
