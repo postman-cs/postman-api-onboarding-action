@@ -20,7 +20,7 @@ jobs:
         with:
           # Full history so commitlint can lint the PR commit range.
           fetch-depth: 0
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: '24'
           cache: npm
