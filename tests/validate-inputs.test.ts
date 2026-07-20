@@ -59,6 +59,17 @@ function runValidation(env: Record<string, string>): { status: number; stderr: s
   }
 }
 
+function combinedOutput(result: { stdout: string; stderr: string }): string {
+  return `${result.stdout}${result.stderr}`;
+}
+
+function errorAnnotations(output: string): string[] {
+  return output
+    .split(/\r?\n/)
+    .map((line) => line.trimEnd())
+    .filter((line) => line.startsWith('::error::'));
+}
+
 describe('composite first-step input validation', () => {
   it('declares postman-api-key and postman-access-token individually optional', () => {
     const manifest = loadManifest();
@@ -95,9 +106,10 @@ describe('composite first-step input validation', () => {
     const result = runValidation(env);
     expect(result.status).toBe(status);
     if (status !== 0) {
-      expect(`${result.stdout}${result.stderr}`).toContain(
-        'One of postman-api-key or postman-access-token is required'
-      );
+      const output = combinedOutput(result);
+      expect(output).toContain('Attempted onboarding credential validation failed');
+      expect(output).toContain('neither postman-api-key nor postman-access-token was supplied');
+      expect(output).toContain('Provide one of those inputs and rerun');
     }
   });
 
@@ -106,12 +118,82 @@ describe('composite first-step input validation', () => {
     expect(result.status).toBe(0);
   });
 
+  it.each([
+    {
+      envKey: 'POSTMAN_STACK',
+      value: 'staging',
+      attempted: 'Attempted postman-stack validation failed',
+      accepted: 'Accepted values: prod, beta',
+      remediation: 'Set the postman-stack input to one of those values'
+    },
+    {
+      envKey: 'POSTMAN_REGION',
+      value: 'apac',
+      attempted: 'Attempted postman-region validation failed',
+      accepted: 'Accepted values: us, eu',
+      remediation: 'Set the postman-region input to one of those values'
+    },
+    {
+      envKey: 'CREDENTIAL_PREFLIGHT',
+      value: 'disabled',
+      attempted: 'Attempted credential-preflight validation failed',
+      accepted: 'Accepted values: warn, enforce',
+      remediation: 'Set the credential-preflight input to one of those values'
+    },
+    {
+      envKey: 'REPO_WRITE_MODE',
+      value: 'push-only',
+      attempted: 'Attempted repo-write-mode validation failed',
+      accepted: 'Accepted values: none, commit-only, commit-and-push',
+      remediation: 'Set the repo-write-mode input to one of those values'
+    }
+  ])('rejects invalid $envKey with actionable context and no value interpolation', ({
+    envKey,
+    value,
+    attempted,
+    accepted,
+    remediation
+  }) => {
+    const result = runValidation({ [envKey]: value });
+    const output = combinedOutput(result);
+    expect(result.status).toBe(1);
+    expect(output).toContain(attempted);
+    expect(output).toContain('the provided value is unsupported');
+    expect(output).toContain(accepted);
+    expect(output).toContain(remediation);
+    expect(output).not.toContain(value);
+    expect(errorAnnotations(output)).toHaveLength(1);
+  });
+
   it.each(['push-only', 'commit', 'invalid', ''])('rejects invalid repo-write-mode=%s before children run', (mode) => {
     const result = runValidation({ REPO_WRITE_MODE: mode });
     expect(result.status).toBe(1);
-    expect(`${result.stdout}${result.stderr}`).toContain(
-      'repo-write-mode must be one of: none, commit-only, commit-and-push'
-    );
+    const output = combinedOutput(result);
+    expect(output).toContain('Attempted repo-write-mode validation failed');
+    expect(output).toContain('Accepted values: none, commit-only, commit-and-push');
+    expect(output).toContain('Set the repo-write-mode input to one of those values');
+    // Rejected values that are substrings of accepted tokens (e.g. "commit") cannot
+    // be asserted absent; for distinct tokens, prove the raw value is not echoed.
+    if (mode !== '' && !'none, commit-only, commit-and-push'.includes(mode)) {
+      expect(output).not.toContain(`got: ${mode}`);
+      expect(output).not.toContain(mode);
+    }
+  });
+
+  it('rejects newline/workflow-command-shaped invalid values without forging annotations', () => {
+    const forgedPayload = 'evil\n::error::forged-annotation\n%0A::warning::injected';
+    const result = runValidation({ POSTMAN_STACK: forgedPayload });
+    const output = combinedOutput(result);
+    expect(result.status).toBe(1);
+    expect(output).toContain('Attempted postman-stack validation failed');
+    expect(output).toContain('Accepted values: prod, beta');
+    expect(output).toContain('Set the postman-stack input to one of those values');
+    expect(output).not.toContain(forgedPayload);
+    expect(output).not.toContain('::error::forged-annotation');
+    expect(output).not.toContain('::warning::injected');
+    expect(output).not.toContain('evil');
+    expect(errorAnnotations(output)).toHaveLength(1);
+    expect(errorAnnotations(output)[0]?.includes('\n')).toBe(false);
   });
 });
 

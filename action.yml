@@ -285,14 +285,14 @@ runs:
         case "$POSTMAN_STACK" in
           prod|beta) ;;
           *)
-            echo "::error::postman-stack must be one of: prod, beta; got: $POSTMAN_STACK"
+            echo "::error::Attempted postman-stack validation failed: the provided value is unsupported. Accepted values: prod, beta. Set the postman-stack input to one of those values."
             exit 1
             ;;
         esac
         case "$POSTMAN_REGION" in
           us|eu) ;;
           *)
-            echo "::error::postman-region must be one of: us, eu; got: $POSTMAN_REGION"
+            echo "::error::Attempted postman-region validation failed: the provided value is unsupported. Accepted values: us, eu. Set the postman-region input to one of those values."
             exit 1
             ;;
         esac
@@ -303,19 +303,19 @@ runs:
         case "$CREDENTIAL_PREFLIGHT" in
           warn|enforce) ;;
           *)
-            echo "::error::credential-preflight must be one of: warn, enforce; got: $CREDENTIAL_PREFLIGHT"
+            echo "::error::Attempted credential-preflight validation failed: the provided value is unsupported. Accepted values: warn, enforce. Set the credential-preflight input to one of those values."
             exit 1
             ;;
         esac
         case "$REPO_WRITE_MODE" in
           none|commit-only|commit-and-push) ;;
           *)
-            echo "::error::repo-write-mode must be one of: none, commit-only, commit-and-push; got: $REPO_WRITE_MODE"
+            echo "::error::Attempted repo-write-mode validation failed: the provided value is unsupported. Accepted values: none, commit-only, commit-and-push. Set the repo-write-mode input to one of those values."
             exit 1
             ;;
         esac
         if [ -z "$POSTMAN_API_KEY" ] && [ -z "$POSTMAN_ACCESS_TOKEN" ]; then
-          echo "::error::One of postman-api-key or postman-access-token is required."
+          echo "::error::Attempted onboarding credential validation failed: neither postman-api-key nor postman-access-token was supplied. Provide one of those inputs and rerun."
           exit 1
         fi
     - id: bootstrap
@@ -424,12 +424,23 @@ runs:
         POSTMAN_TEAM_ID: ${{ inputs.postman-team-id }}
         POSTMAN_API_KEY: ${{ inputs.postman-api-key }}
         POSTMAN_REGION: ${{ inputs.postman-region }}
+        PROJECT_NAME: ${{ inputs.project-name }}
         COLLECTIONS_JSON: ${{ steps.bootstrap.outputs.collections-json }}
         ENVIRONMENT_UIDS_JSON: ${{ steps.repo_sync.outputs.environment-uids-json }}
         POSTMAN_CLI_INSTALL_URL: ${{ inputs.postman-stack == 'beta' && 'https://dl-cli.pstmn-beta.io/install/unix.sh' || 'https://dl-cli.pstmn.io/install/unix.sh' }}
       run: |
         set +e
         mkdir -p "$RUNNER_TEMP/postman-junit"
+
+        escape_annotation() {
+          local value="$1"
+          value=${value//'%'/%25}
+          value=${value//$'\r'/%0D}
+          value=${value//$'\n'/%0A}
+          printf '%s' "$value"
+        }
+        PROJECT_ESCAPED=$(escape_annotation "${PROJECT_NAME:-}")
+        REGION_ESCAPED=$(escape_annotation "${POSTMAN_REGION:-}")
 
         if ! command -v postman >/dev/null 2>&1; then
           curl -fsSL "$POSTMAN_CLI_INSTALL_URL" | sh
@@ -441,31 +452,65 @@ runs:
           exit 1
         fi
 
+        if [ -n "$POSTMAN_API_KEY" ]; then
+          echo "::add-mask::$(escape_annotation "$POSTMAN_API_KEY")"
+        fi
+
         if [ "$POSTMAN_REGION" = "eu" ]; then
-          postman login --with-api-key "$POSTMAN_API_KEY" --region eu >/dev/null 2>&1 || true
+          postman login --with-api-key "$POSTMAN_API_KEY" --region eu >/dev/null
         else
-          postman login --with-api-key "$POSTMAN_API_KEY" >/dev/null 2>&1 || true
+          postman login --with-api-key "$POSTMAN_API_KEY" >/dev/null
+        fi
+        LOGIN_STATUS=$?
+        if [ "$LOGIN_STATUS" -ne 0 ]; then
+          echo "::warning::Postman CLI login failed for project=${PROJECT_ESCAPED} region=${REGION_ESCAPED}: exit status ${LOGIN_STATUS} (see preceding CLI stderr for cause). Verify postman-api-key and postman-region, then rerun."
         fi
 
         SMOKE=$(printf '%s' "$COLLECTIONS_JSON"    | jq -r '.smoke // empty')
+        SMOKE_JQ_STATUS=$?
         CONTRACT=$(printf '%s' "$COLLECTIONS_JSON" | jq -r '.contract // empty')
+        CONTRACT_JQ_STATUS=$?
+        if [ "$SMOKE_JQ_STATUS" -ne 0 ]; then
+          echo "::warning::Failed to parse collections-json for project=${PROJECT_ESCAPED}: exit status ${SMOKE_JQ_STATUS} (see preceding jq stderr for cause). Inspect the collections-json upstream step output and rerun."
+        elif [ "$CONTRACT_JQ_STATUS" -ne 0 ]; then
+          echo "::warning::Failed to parse collections-json for project=${PROJECT_ESCAPED}: exit status ${CONTRACT_JQ_STATUS} (see preceding jq stderr for cause). Inspect the collections-json upstream step output and rerun."
+        fi
         ENV_UID=$(printf '%s' "$ENVIRONMENT_UIDS_JSON" | jq -r 'to_entries | (.[0].value // empty)')
+        ENV_JQ_STATUS=$?
+        if [ "$ENV_JQ_STATUS" -ne 0 ]; then
+          echo "::warning::Failed to parse environment-uids-json for project=${PROJECT_ESCAPED}: exit status ${ENV_JQ_STATUS} (see preceding jq stderr for cause). Inspect the environment-uids-json upstream step output and rerun."
+        fi
 
         ENV_FLAG=()
         if [ -n "$ENV_UID" ]; then
           ENV_FLAG=(-e "$ENV_UID")
         fi
+        if [ -n "$ENV_UID" ]; then
+          ENV_LABEL=$(escape_annotation "$ENV_UID")
+        else
+          ENV_LABEL=none
+        fi
 
         if [ -n "$SMOKE" ]; then
           postman collection run "$SMOKE" "${ENV_FLAG[@]}" \
             --reporters cli,junit \
-            --reporter-junit-export "$RUNNER_TEMP/postman-junit/smoke.xml" || true
+            --reporter-junit-export "$RUNNER_TEMP/postman-junit/smoke.xml"
+          SMOKE_RUN_STATUS=$?
+          if [ "$SMOKE_RUN_STATUS" -ne 0 ]; then
+            SMOKE_ESCAPED=$(escape_annotation "$SMOKE")
+            echo "::warning::Smoke collection run failed for collection=${SMOKE_ESCAPED} project=${PROJECT_ESCAPED} environment=${ENV_LABEL}: exit status ${SMOKE_RUN_STATUS} (see preceding CLI output for cause). Fix auth, environment, or request failures, then rerun."
+          fi
         fi
 
         if [ -n "$CONTRACT" ]; then
           postman collection run "$CONTRACT" "${ENV_FLAG[@]}" \
             --reporters cli,junit \
-            --reporter-junit-export "$RUNNER_TEMP/postman-junit/contract.xml" || true
+            --reporter-junit-export "$RUNNER_TEMP/postman-junit/contract.xml"
+          CONTRACT_RUN_STATUS=$?
+          if [ "$CONTRACT_RUN_STATUS" -ne 0 ]; then
+            CONTRACT_ESCAPED=$(escape_annotation "$CONTRACT")
+            echo "::warning::Contract collection run failed for collection=${CONTRACT_ESCAPED} project=${PROJECT_ESCAPED} environment=${ENV_LABEL}: exit status ${CONTRACT_RUN_STATUS} (see preceding CLI output for cause). Fix auth, environment, or request failures, then rerun."
+          fi
         fi
     - id: upload_junit_artifact
       name: Upload Postman JUnit results

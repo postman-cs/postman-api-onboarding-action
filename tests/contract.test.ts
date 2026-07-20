@@ -1,5 +1,6 @@
-import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 import { parse } from 'yaml';
@@ -16,6 +17,7 @@ type Step = {
   run?: string;
   env?: Record<string, string>;
   with?: Record<string, string>;
+  'continue-on-error'?: boolean;
 };
 
 type ActionManifest = {
@@ -237,7 +239,8 @@ describe('postman-api-onboarding-action composite contract', () => {
       expect(manifest.inputs['postman-api-key']?.required).toBe(false);
       expect(manifest.inputs['postman-access-token']?.required).toBe(false);
       const validateStep = manifest.runs.steps.find((step) => step.id === 'validate_postman_stack');
-      expect(validateStep?.run).toContain('One of postman-api-key or postman-access-token is required');
+      expect(validateStep?.run).toContain('Attempted onboarding credential validation failed');
+      expect(validateStep?.run).toContain('neither postman-api-key nor postman-access-token was supplied');
     });
 
     it('postman-team-id remains an optional explicit override', () => {
@@ -338,9 +341,11 @@ describe('postman-api-onboarding-action composite contract', () => {
       expect(validateStep?.env?.POSTMAN_REGION).toBe('${{ inputs.postman-region }}');
       expect(validateStep?.env?.POSTMAN_STACK).toBe('${{ inputs.postman-stack }}');
       expect(validateStep?.run).toContain('prod|beta');
-      expect(validateStep?.run).toContain('postman-stack must be one of: prod, beta');
+      expect(validateStep?.run).toContain('Attempted postman-stack validation failed');
+      expect(validateStep?.run).toContain('Accepted values: prod, beta');
       expect(validateStep?.run).toContain('us|eu');
-      expect(validateStep?.run).toContain('postman-region must be one of: us, eu');
+      expect(validateStep?.run).toContain('Attempted postman-region validation failed');
+      expect(validateStep?.run).toContain('Accepted values: us, eu');
     });
 
     it('validates repo-write-mode in the first composite step before any child runs', () => {
@@ -351,9 +356,8 @@ describe('postman-api-onboarding-action composite contract', () => {
       expect(validateStep?.id).toBe('validate_postman_stack');
       expect(validateStep?.env?.REPO_WRITE_MODE).toBe('${{ inputs.repo-write-mode }}');
       expect(validateStep?.run).toContain('none|commit-only|commit-and-push');
-      expect(validateStep?.run).toContain(
-        'repo-write-mode must be one of: none, commit-only, commit-and-push'
-      );
+      expect(validateStep?.run).toContain('Attempted repo-write-mode validation failed');
+      expect(validateStep?.run).toContain('Accepted values: none, commit-only, commit-and-push');
       expect(manifest.inputs['repo-write-mode']?.default).toBe('commit-and-push');
       expect(steps.findIndex((step) => step.uses?.includes('postman-bootstrap-action'))).toBeGreaterThan(
         0
@@ -517,7 +521,8 @@ describe('postman-api-onboarding-action composite contract', () => {
 
       expect(validateStep?.env?.CREDENTIAL_PREFLIGHT).toBe('${{ inputs.credential-preflight }}');
       expect(preflightCase).toContain('warn|enforce');
-      expect(preflightCase).toContain('credential-preflight must be one of: warn, enforce');
+      expect(preflightCase).toContain('Attempted credential-preflight validation failed');
+      expect(preflightCase).toContain('Accepted values: warn, enforce');
       expect(preflightCase).not.toMatch(/\b(disabled|false|none|off|skip)\b/);
     });
 
@@ -654,6 +659,200 @@ describe('postman-api-onboarding-action composite contract', () => {
       expect((junitStep?.run ?? '').indexOf('command -v jq')).toBeLessThan(
         (junitStep?.run ?? '').indexOf('SMOKE=')
       );
+    });
+
+    it('run_tests_junit keeps nonfatal control flow, conditions, and output contracts', () => {
+      const manifest = loadManifest();
+      const junitStep = manifest.runs.steps.find((s) => s.id === 'run_tests_junit');
+      const script = junitStep?.run ?? '';
+
+      expect(junitStep?.['continue-on-error']).toBe(true);
+      expect(junitStep?.if).toContain("steps.bootstrap.outputs.collections-json != ''");
+      expect(junitStep?.if).toContain("inputs.skip-built-in-tests != 'true'");
+      expect(junitStep?.if).toContain("inputs.postman-api-key != ''");
+      expect(junitStep?.env?.PROJECT_NAME).toBe('${{ inputs.project-name }}');
+      expect(junitStep?.env?.COLLECTIONS_JSON).toBe('${{ steps.bootstrap.outputs.collections-json }}');
+      expect(junitStep?.env?.ENVIRONMENT_UIDS_JSON).toBe(
+        '${{ steps.repo_sync.outputs.environment-uids-json }}'
+      );
+      expect(script).toContain('set +e');
+      expect(script).toContain('escape_annotation()');
+      expect(script).toContain('::add-mask::$(escape_annotation "$POSTMAN_API_KEY")');
+      expect(script).not.toContain('::add-mask::$POSTMAN_API_KEY');
+      expect(script).not.toContain('2>&1 || true');
+      expect(script).not.toContain('|| true');
+      expect(script.indexOf('SMOKE_RUN_STATUS')).toBeLessThan(script.indexOf('CONTRACT_RUN_STATUS'));
+      expect(manifest.outputs['collections-json']?.value).toBe(
+        '${{ steps.bootstrap.outputs.collections-json }}'
+      );
+      expect(manifest.outputs['environment-uids-json']?.value).toBe(
+        '${{ steps.repo_sync.outputs.environment-uids-json }}'
+      );
+    });
+
+    it('run_tests_junit emits actionable nonfatal warnings under stubbed login/parse/smoke failure', () => {
+      const manifest = loadManifest();
+      const junitStep = manifest.runs.steps.find((s) => s.id === 'run_tests_junit');
+      const script = junitStep?.run;
+      expect(script).toBeTruthy();
+
+      const harnessRoot = mkdtempSync(path.join(tmpdir(), 'run-tests-junit-'));
+      const binDir = path.join(harnessRoot, 'bin');
+      const runnerTemp = path.join(harnessRoot, 'runner-temp');
+      const testApiKey = 'PMAK-secret%val\n::warning::forged-from-key';
+      const encodedApiKey = 'PMAK-secret%25val%0A::warning::forged-from-key';
+      const projectName = 'demo%proj\nname';
+      const encodedProjectName = 'demo%25proj%0Aname';
+      const smokeId = 'col-smoke-123';
+      const contractId = 'col-contract-456';
+      const contractMarker = path.join(harnessRoot, 'contract-ran.marker');
+
+      try {
+        mkdirSync(binDir, { recursive: true });
+        mkdirSync(runnerTemp, { recursive: true });
+
+        writeFileSync(
+          path.join(binDir, 'postman'),
+          [
+            '#!/usr/bin/env bash',
+            'set -euo pipefail',
+            'if [ "${1:-}" = "login" ]; then',
+            '  echo "Error: authentication failed for provided API key" >&2',
+            '  exit 2',
+            'fi',
+            'if [ "${1:-}" = "collection" ] && [ "${2:-}" = "run" ]; then',
+            '  collection_id="${3:-}"',
+            '  out=""',
+            '  prev=""',
+            '  for arg in "$@"; do',
+            '    if [ "$prev" = "--reporter-junit-export" ]; then',
+            '      out="$arg"',
+            '    fi',
+            '    prev="$arg"',
+            '  done',
+            '  if [ -n "$out" ]; then',
+            '    mkdir -p "$(dirname "$out")"',
+            "    printf '%s\\n' '<?xml version=\"1.0\"?><testsuites></testsuites>' > \"$out\"",
+            '  fi',
+            `  if [ "$collection_id" = "${smokeId}" ]; then`,
+            '    echo "Error: smoke collection request failed" >&2',
+            '    exit 4',
+            '  fi',
+            `  if [ "$collection_id" = "${contractId}" ]; then`,
+            `    printf 'contract-ok\\n' > "${contractMarker}"`,
+            '    exit 0',
+            '  fi',
+            '  echo "unexpected collection id: $collection_id" >&2',
+            '  exit 99',
+            'fi',
+            'echo "unexpected postman invocation: $*" >&2',
+            'exit 99',
+            ''
+          ].join('\n'),
+          { mode: 0o755 }
+        );
+        chmodSync(path.join(binDir, 'postman'), 0o755);
+
+        writeFileSync(
+          path.join(binDir, 'jq'),
+          [
+            '#!/usr/bin/env bash',
+            'set -euo pipefail',
+            'filter=""',
+            'while [ "$#" -gt 0 ]; do',
+            '  case "$1" in',
+            '    -r) shift ;;',
+            '    *) filter="$1"; shift ;;',
+            '  esac',
+            'done',
+            'input=$(cat || true)',
+            'if [[ "$filter" == *to_entries* ]]; then',
+            '  echo "jq: parse error: Invalid numeric literal at line 1, column 1" >&2',
+            '  exit 5',
+            'fi',
+            'if [[ "$filter" == *smoke* ]]; then',
+            `  printf '%s\\n' '${smokeId}'`,
+            '  exit 0',
+            'fi',
+            'if [[ "$filter" == *contract* ]]; then',
+            `  printf '%s\\n' '${contractId}'`,
+            '  exit 0',
+            'fi',
+            'echo "unexpected jq filter: $filter input=$input" >&2',
+            'exit 99',
+            ''
+          ].join('\n'),
+          { mode: 0o755 }
+        );
+        chmodSync(path.join(binDir, 'jq'), 0o755);
+
+        const result = spawnSync('bash', ['--noprofile', '--norc', '-c', script as string], {
+          env: {
+            PATH: `${binDir}:/bin:/usr/bin`,
+            HOME: harnessRoot,
+            BASH_ENV: '',
+            ENV: '',
+            RUNNER_TEMP: runnerTemp,
+            POSTMAN_API_KEY: testApiKey,
+            POSTMAN_REGION: 'us',
+            PROJECT_NAME: projectName,
+            COLLECTIONS_JSON: JSON.stringify({ smoke: smokeId, contract: contractId }),
+            ENVIRONMENT_UIDS_JSON: 'not-json{{{',
+            POSTMAN_CLI_INSTALL_URL: 'https://example.invalid/install.sh',
+            POSTMAN_TEAM_ID: ''
+          },
+          encoding: 'utf8'
+        });
+        const status = result.status ?? 1;
+        const combined = `${result.stdout ?? ''}${result.stderr ?? ''}`;
+        const outputLines = combined.split(/\r?\n/);
+        const maskLines = outputLines.filter((line) => line.startsWith('::add-mask::'));
+        const withoutMaskProtocol = outputLines
+          .filter((line) => !line.startsWith('::add-mask::'))
+          .join('\n');
+
+        expect(status).toBe(0);
+        expect(maskLines).toHaveLength(1);
+        expect(maskLines[0]).toBe(`::add-mask::${encodedApiKey}`);
+        expect(maskLines[0]?.includes('\n')).toBe(false);
+        expect(maskLines[0]).toContain('%25');
+        expect(maskLines[0]).toContain('%0A');
+        expect(outputLines).not.toContain('::warning::forged-from-key');
+        expect(outputLines.some((line) => line === '::error::forged-from-key')).toBe(false);
+        expect(withoutMaskProtocol).not.toContain(testApiKey);
+        expect(withoutMaskProtocol).not.toContain('::warning::forged-from-key');
+        expect(withoutMaskProtocol).not.toContain(encodedApiKey);
+
+        expect(combined).toContain('Error: authentication failed for provided API key');
+        expect(combined).toContain(
+          `::warning::Postman CLI login failed for project=${encodedProjectName} region=us: exit status 2`
+        );
+        expect(combined).toContain('Verify postman-api-key and postman-region, then rerun');
+        expect(combined).toContain('jq: parse error: Invalid numeric literal');
+        expect(combined).toContain(
+          `::warning::Failed to parse environment-uids-json for project=${encodedProjectName}: exit status 5`
+        );
+        expect(combined).toContain(
+          'Inspect the environment-uids-json upstream step output and rerun'
+        );
+        expect(combined).toContain(
+          `::warning::Smoke collection run failed for collection=${smokeId} project=${encodedProjectName} environment=none: exit status 4`
+        );
+        expect(combined).toContain(
+          'Fix auth, environment, or request failures, then rerun'
+        );
+        const loginWarning = outputLines.find((line) =>
+          line.startsWith('::warning::Postman CLI login failed')
+        );
+        expect(loginWarning).toBeTruthy();
+        expect(loginWarning?.includes('\n')).toBe(false);
+        expect(loginWarning).toContain('%25');
+        expect(loginWarning).toContain('%0A');
+        expect(withoutMaskProtocol).not.toContain(projectName);
+        expect(readFileSync(contractMarker, 'utf8')).toContain('contract-ok');
+      } finally {
+        rmSync(harnessRoot, { recursive: true, force: true });
+      }
     });
 
     it('insights step receives workspace-id from bootstrap output', () => {
