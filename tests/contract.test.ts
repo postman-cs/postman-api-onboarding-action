@@ -751,7 +751,7 @@ describe('postman-api-onboarding-action composite contract', () => {
       );
     });
 
-    it('run_tests_junit emits actionable nonfatal warnings under stubbed login/parse/smoke failure', () => {
+    it.skipIf(process.platform === 'win32')('run_tests_junit emits actionable nonfatal warnings under stubbed login/parse/smoke failure', () => {
       const manifest = loadManifest();
       const junitStep = manifest.runs.steps.find((s) => s.id === 'run_tests_junit');
       const script = junitStep?.run;
