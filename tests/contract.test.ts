@@ -199,6 +199,7 @@ describe('postman-api-onboarding-action composite contract', () => {
         'workspace-team-id',
         'spec-url',
         'spec-path',
+        'spec-files-json',
         'breaking-change-mode',
         'breaking-baseline-spec-path',
         'breaking-rules-path',
@@ -255,6 +256,28 @@ describe('postman-api-onboarding-action composite contract', () => {
       expect(manifest.inputs['project-name']?.required).toBe(true);
       expect(manifest.inputs['spec-url']?.required).toBe(false);
       expect(manifest.inputs['spec-path']?.required).toBe(false);
+    });
+
+    it('places optional content-free spec-files-json immediately after spec-path with empty default', () => {
+      const manifest = loadManifest();
+      const inputNames = Object.keys(manifest.inputs);
+      const inventory = manifest.inputs['spec-files-json'];
+
+      expect(inputNames.indexOf('spec-files-json')).toBe(inputNames.indexOf('spec-path') + 1);
+      expect(inventory?.required).toBe(false);
+      expect(inventory?.default).toBe('');
+      expect(inventory?.description).toMatch(/content-free/i);
+      expect(inventory?.description).toMatch(/root must equal spec-path/i);
+      expect(inventory?.description).toMatch(/not a directory mode/i);
+      expect(inventory?.description).toMatch(/never embedded/i);
+      expect(inventory?.description).not.toMatch(/\bcontent\s*[:=]/i);
+      expect(Object.keys(manifest.outputs)).not.toContain('spec-files-json');
+      for (const [name, output] of Object.entries(manifest.outputs)) {
+        expect(output.description, `output "${name}" must not claim embedded source content`).not.toMatch(
+          /source content|file content|embedded content/i
+        );
+        expect(output.value).not.toMatch(/spec-files-json/);
+      }
     });
 
     it('keeps integration-backend internal with no visible manifest default', () => {
@@ -322,8 +345,8 @@ describe('postman-api-onboarding-action composite contract', () => {
       const insightsStep = steps.find((step) => step.id === 'insights_onboarding');
 
       expect(validateStep?.shell).toBe('bash');
-      expect(bootstrapStep?.uses).toBe('postman-cs/postman-bootstrap-action@v2.9.9');
-      expect(repoSyncStep?.uses).toBe('postman-cs/postman-repo-sync-action@v2.1.7');
+      expect(bootstrapStep?.uses).toBe('postman-cs/postman-bootstrap-action@v2.10.1');
+      expect(repoSyncStep?.uses).toBe('postman-cs/postman-repo-sync-action@v2.1.8');
       expect(junitStep?.shell).toBe('bash');
       expect(uploadStep?.uses).toBe('actions/upload-artifact@v7.0.1');
       expect(insightsStep?.uses).toBe('postman-cs/postman-insights-onboarding-action@v2.1.2');
@@ -443,6 +466,7 @@ describe('postman-api-onboarding-action composite contract', () => {
       expect(repoSyncStep?.with?.['spec-path']).toBe(
         '${{ inputs.spec-path }}'
       );
+      expect(repoSyncStep?.with?.['spec-files-json']).toBeUndefined();
       expect(repoSyncStep?.with?.['releases-json']).toBeUndefined();
       expect(repoSyncStep?.with?.['generate-ci-workflow']).toBe(
         '${{ inputs.generate-ci-workflow }}'
@@ -450,6 +474,27 @@ describe('postman-api-onboarding-action composite contract', () => {
       expect(repoSyncStep?.with?.['ci-workflow-path']).toBe(
         '${{ inputs.ci-workflow-path }}'
       );
+    });
+
+    it('forwards local spec-path and spec-files-json to bootstrap only when spec-url is empty', () => {
+      const manifest = loadManifest();
+      const bootstrapStep = manifest.runs.steps.find((step) => step.id === 'bootstrap');
+
+      expect(bootstrapStep?.with?.['spec-url']).toBe('${{ inputs.spec-url }}');
+      expect(bootstrapStep?.with?.['spec-path']).toBe(
+        "${{ inputs.spec-url == '' && inputs.spec-path || '' }}"
+      );
+      expect(bootstrapStep?.with?.['spec-files-json']).toBe(
+        "${{ inputs.spec-url == '' && inputs.spec-files-json || '' }}"
+      );
+      // Sibling pins stay on the current immutable tags.
+      expect(bootstrapStep?.uses).toBe('postman-cs/postman-bootstrap-action@v2.10.1');
+      expect(
+        manifest.runs.steps.find((step) => step.id === 'repo_sync')?.uses
+      ).toBe('postman-cs/postman-repo-sync-action@v2.1.8');
+      expect(
+        manifest.runs.steps.find((step) => step.id === 'insights_onboarding')?.uses
+      ).toBe('postman-cs/postman-insights-onboarding-action@v2.1.2');
     });
 
     it('surfaces final outputs from phase steps', () => {
