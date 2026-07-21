@@ -19,7 +19,7 @@ describe('README input/output tables', () => {
     }
   });
 
-  it.skipIf(process.platform === 'win32')('matches action.yml (run npm run docs:tables to regenerate)', () => {
+  it('matches action.yml (run npm run docs:tables to regenerate)', () => {
     expect(() =>
       execFileSync(process.execPath, ['scripts/render-action-tables.mjs', '--check'], {
         cwd: repoRoot,
