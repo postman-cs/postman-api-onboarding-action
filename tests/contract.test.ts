@@ -190,6 +190,7 @@ describe('postman-api-onboarding-action composite contract', () => {
         'monitor-cron',
         'generate-ci-workflow',
         'ci-workflow-path',
+        'ci-runner-os',
         'project-name',
         'domain',
         'domain-code',
@@ -329,9 +330,9 @@ describe('postman-api-onboarding-action composite contract', () => {
     it('is a composite action with the expected step count', () => {
       const manifest = loadManifest();
       expect(manifest.runs.using).toBe('composite');
-      // bootstrap, repo-sync, warn-no-api-key (D2 skip+warn), junit-runner,
-      // junit-uploader, insights.
-      expect(manifest.runs.steps).toHaveLength(7);
+      // bootstrap, repo-sync, warn-no-api-key, Windows CLI install, junit-runner,
+      // junit-uploader, and insights plus validation.
+      expect(manifest.runs.steps).toHaveLength(8);
     });
 
     it('uses pinned bootstrap, repo-sync, junit-runner, junit-uploader, and insights actions', () => {
@@ -345,11 +346,11 @@ describe('postman-api-onboarding-action composite contract', () => {
       const insightsStep = steps.find((step) => step.id === 'insights_onboarding');
 
       expect(validateStep?.shell).toBe('bash');
-      expect(bootstrapStep?.uses).toBe('postman-cs/postman-bootstrap-action@v2.10.1');
-      expect(repoSyncStep?.uses).toBe('postman-cs/postman-repo-sync-action@v2.1.8');
+      expect(bootstrapStep?.uses).toBe('postman-cs/postman-bootstrap-action@v2.10.2');
+      expect(repoSyncStep?.uses).toBe('postman-cs/postman-repo-sync-action@v2.1.9');
       expect(junitStep?.shell).toBe('bash');
       expect(uploadStep?.uses).toBe('actions/upload-artifact@v7.0.1');
-      expect(insightsStep?.uses).toBe('postman-cs/postman-insights-onboarding-action@v2.1.2');
+      expect(insightsStep?.uses).toBe('postman-cs/postman-insights-onboarding-action@v2.1.3');
       for (const step of [bootstrapStep, repoSyncStep, insightsStep]) {
         expect(step?.uses).not.toMatch(/@(main|v0)$/);
       }
@@ -474,6 +475,7 @@ describe('postman-api-onboarding-action composite contract', () => {
       expect(repoSyncStep?.with?.['ci-workflow-path']).toBe(
         '${{ inputs.ci-workflow-path }}'
       );
+      expect(repoSyncStep?.with?.['ci-runner-os']).toBe('${{ inputs.ci-runner-os }}');
     });
 
     it('forwards local spec-path and spec-files-json to bootstrap only when spec-url is empty', () => {
@@ -488,13 +490,13 @@ describe('postman-api-onboarding-action composite contract', () => {
         "${{ inputs.spec-url == '' && inputs.spec-files-json || '' }}"
       );
       // Sibling pins stay on the current immutable tags.
-      expect(bootstrapStep?.uses).toBe('postman-cs/postman-bootstrap-action@v2.10.1');
+      expect(bootstrapStep?.uses).toBe('postman-cs/postman-bootstrap-action@v2.10.2');
       expect(
         manifest.runs.steps.find((step) => step.id === 'repo_sync')?.uses
-      ).toBe('postman-cs/postman-repo-sync-action@v2.1.8');
+      ).toBe('postman-cs/postman-repo-sync-action@v2.1.9');
       expect(
         manifest.runs.steps.find((step) => step.id === 'insights_onboarding')?.uses
-      ).toBe('postman-cs/postman-insights-onboarding-action@v2.1.2');
+      ).toBe('postman-cs/postman-insights-onboarding-action@v2.1.3');
     });
 
     it('surfaces final outputs from phase steps', () => {
@@ -676,6 +678,20 @@ describe('postman-api-onboarding-action composite contract', () => {
       );
       expect(junitStep?.run).toContain('$POSTMAN_CLI_INSTALL_URL');
       expect(junitStep?.run).not.toContain('"${{ inputs.postman-cli-install-url }}"');
+    });
+
+    it('preinstalls the native Postman CLI before the Bash test adapter on Windows', () => {
+      const manifest = loadManifest();
+      const installStep = manifest.runs.steps.find(
+        (step) => step.id === 'install_postman_cli_windows'
+      );
+      const junitStep = manifest.runs.steps.find((step) => step.id === 'run_tests_junit');
+
+      expect(installStep?.shell).toBe('pwsh');
+      expect(installStep?.if).toContain("runner.os == 'Windows'");
+      expect(installStep?.env?.POSTMAN_CLI_INSTALL_URL).toContain('win64.ps1');
+      expect(installStep?.run).toContain('DownloadString($env:POSTMAN_CLI_INSTALL_URL)');
+      expect(junitStep?.run).toContain('Postman CLI was not installed by the Windows setup step');
     });
 
     it('run_tests_junit script remains valid Bash', () => {
@@ -946,6 +962,11 @@ describe('postman-api-onboarding-action composite contract', () => {
     it('ci-workflow-path defaults to .github/workflows/ci.yml', () => {
       const manifest = loadManifest();
       expect(manifest.inputs['ci-workflow-path']?.default).toBe('.github/workflows/ci.yml');
+    });
+
+    it('ci-runner-os defaults to linux', () => {
+      const manifest = loadManifest();
+      expect(manifest.inputs['ci-runner-os']?.default).toBe('linux');
     });
 
     it('environments-json defaults to ["prod"]', () => {

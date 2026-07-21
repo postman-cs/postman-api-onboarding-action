@@ -235,6 +235,7 @@ Set `skip-built-in-tests: 'true'` when the caller workflow must perform post-onb
 | `monitor-cron` | Cron expression for monitor scheduling (e.g. '0 */6 * * *'). When empty, the monitor is created disabled and triggered to run once per workflow invocation (and once on every subsequent run). | no |  |
 | `generate-ci-workflow` | Whether to generate the CI workflow file. | no | `true` |
 | `ci-workflow-path` | Path to write the generated CI workflow file. | no | `.github/workflows/ci.yml` |
+| `ci-runner-os` | Runner operating system for the generated CI workflow. Use windows for native PowerShell Azure DevOps CI. | no | `linux` |
 | `project-name` | Service project name used across bootstrap and repo sync phases. | yes |  |
 | `domain` | Business domain used for governance assignment. | no |  |
 | `domain-code` | Short domain code used in workspace naming. | no |  |
