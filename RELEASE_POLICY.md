@@ -56,7 +56,7 @@ Do not duplicate full input and output tables across repositories. Link to the a
 
 The composite action currently depends on:
 
-- `postman-cs/postman-bootstrap-action@v2.10.2`
+- `postman-cs/postman-bootstrap-action@v2.10.3`
 - `postman-cs/postman-repo-sync-action@v2.1.9`
 - `postman-cs/postman-insights-onboarding-action@v2.1.3` when Insights is enabled
 
