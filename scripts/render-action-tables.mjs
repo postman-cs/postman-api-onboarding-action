@@ -55,9 +55,10 @@ function replaceBetween(content, [start, end], table) {
 }
 
 export function renderReadme(readme, manifest) {
-  let next = replaceBetween(readme, MARKERS.inputs, renderInputsTable(manifest));
+  const lineEnding = readme.includes('\r\n') ? '\r\n' : '\n';
+  let next = replaceBetween(readme.replace(/\r\n/g, '\n'), MARKERS.inputs, renderInputsTable(manifest));
   next = replaceBetween(next, MARKERS.outputs, renderOutputsTable(manifest));
-  return next;
+  return lineEnding === '\r\n' ? next.replace(/\n/g, '\r\n') : next;
 }
 
 function main() {

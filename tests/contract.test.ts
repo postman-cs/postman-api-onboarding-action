@@ -1,5 +1,5 @@
 import { execFileSync, spawnSync } from 'node:child_process';
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
@@ -7,6 +7,23 @@ import { parse } from 'yaml';
 import { describe, expect, it } from 'vitest';
 
 const repoRoot = path.resolve(__dirname, '..');
+
+function bashPath(filePath: string): string {
+  if (process.platform !== 'win32') return filePath;
+  return filePath.replace(/^([A-Za-z]):[\\/]/, (_, drive: string) => `/${drive.toLowerCase()}/`).replace(/\\/g, '/');
+}
+
+function bashExecutable(): string {
+  if (process.platform !== 'win32') return 'bash';
+  const candidates = [
+    process.env.GIT_INSTALL_ROOT && path.join(process.env.GIT_INSTALL_ROOT, 'bin', 'bash.exe'),
+    process.env.ProgramFiles && path.join(process.env.ProgramFiles, 'Git', 'bin', 'bash.exe'),
+    'C:\\Program Files\\Git\\bin\\bash.exe'
+  ].filter((candidate): candidate is string => Boolean(candidate));
+  const executable = candidates.find((candidate) => existsSync(candidate));
+  if (!executable) throw new Error('Git Bash is required to test composite bash steps on Windows');
+  return executable;
+}
 
 type Step = {
   id?: string;
@@ -346,7 +363,7 @@ describe('postman-api-onboarding-action composite contract', () => {
       const insightsStep = steps.find((step) => step.id === 'insights_onboarding');
 
       expect(validateStep?.shell).toBe('bash');
-      expect(bootstrapStep?.uses).toBe('postman-cs/postman-bootstrap-action@v2.10.3');
+      expect(bootstrapStep?.uses).toBe('postman-cs/postman-bootstrap-action@v2.10.4');
       expect(repoSyncStep?.uses).toBe('postman-cs/postman-repo-sync-action@v2.1.9');
       expect(junitStep?.shell).toBe('bash');
       expect(uploadStep?.uses).toBe('actions/upload-artifact@v7.0.1');
@@ -490,7 +507,7 @@ describe('postman-api-onboarding-action composite contract', () => {
         "${{ inputs.spec-url == '' && inputs.spec-files-json || '' }}"
       );
       // Sibling pins stay on the current immutable tags.
-      expect(bootstrapStep?.uses).toBe('postman-cs/postman-bootstrap-action@v2.10.3');
+      expect(bootstrapStep?.uses).toBe('postman-cs/postman-bootstrap-action@v2.10.4');
       expect(
         manifest.runs.steps.find((step) => step.id === 'repo_sync')?.uses
       ).toBe('postman-cs/postman-repo-sync-action@v2.1.9');
@@ -751,7 +768,7 @@ describe('postman-api-onboarding-action composite contract', () => {
       );
     });
 
-    it.skipIf(process.platform === 'win32')('run_tests_junit emits actionable nonfatal warnings under stubbed login/parse/smoke failure', () => {
+    it('run_tests_junit emits actionable nonfatal warnings under stubbed login/parse/smoke failure', () => {
       const manifest = loadManifest();
       const junitStep = manifest.runs.steps.find((s) => s.id === 'run_tests_junit');
       const script = junitStep?.run;
@@ -800,7 +817,7 @@ describe('postman-api-onboarding-action composite contract', () => {
             '    exit 4',
             '  fi',
             `  if [ "$collection_id" = "${contractId}" ]; then`,
-            `    printf 'contract-ok\\n' > "${contractMarker}"`,
+            `    printf 'contract-ok\\n' > "${bashPath(contractMarker)}"`,
             '    exit 0',
             '  fi',
             '  echo "unexpected collection id: $collection_id" >&2',
@@ -847,13 +864,13 @@ describe('postman-api-onboarding-action composite contract', () => {
         );
         chmodSync(path.join(binDir, 'jq'), 0o755);
 
-        const result = spawnSync('bash', ['--noprofile', '--norc', '-c', script as string], {
+        const result = spawnSync(bashExecutable(), ['--noprofile', '--norc', '-c', script as string], {
           env: {
-            PATH: `${binDir}:/bin:/usr/bin`,
-            HOME: harnessRoot,
+            PATH: `${bashPath(binDir)}:/usr/local/bin:/usr/bin:/bin`,
+            HOME: bashPath(harnessRoot),
             BASH_ENV: '',
             ENV: '',
-            RUNNER_TEMP: runnerTemp,
+            RUNNER_TEMP: bashPath(runnerTemp),
             POSTMAN_API_KEY: testApiKey,
             POSTMAN_REGION: 'us',
             PROJECT_NAME: projectName,
