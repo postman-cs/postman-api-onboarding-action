@@ -81,6 +81,14 @@ inputs:
   spec-path:
     description: Repo-root-relative path to the local spec file. Used for repo metadata generation and, when spec-url is not provided, as the spec source for bootstrap (read directly from the checked-out workspace).
     required: false
+  spec-files-json:
+    description: >-
+      Optional content-free JSON inventory of multi-file definition members from discovery
+      (schemaVersion 1). Empty by default. When set, inventory root must equal spec-path.
+      Cannot be combined with spec-url. Not a directory mode — companions are listed explicitly;
+      file content is never embedded. Forwarded to bootstrap only when spec-url is empty.
+    required: false
+    default: ''
   breaking-change-mode:
     description: OpenAPI breaking-change comparison mode passed through to bootstrap (off, pr-native, baseline-only, or previous-spec).
     required: false
@@ -346,6 +354,9 @@ runs:
         # repo metadata) keep working under the bootstrap action's one-of
         # contract.
         spec-path: ${{ inputs.spec-url == '' && inputs.spec-path || '' }}
+        # Same URL precedence for inventory: local path only; blank when
+        # spec-url is non-empty so legacy dual callers remain unchanged.
+        spec-files-json: ${{ inputs.spec-url == '' && inputs.spec-files-json || '' }}
         breaking-change-mode: ${{ inputs.breaking-change-mode }}
         breaking-baseline-spec-path: ${{ inputs.breaking-baseline-spec-path }}
         breaking-rules-path: ${{ inputs.breaking-rules-path }}
