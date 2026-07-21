@@ -54,6 +54,10 @@ inputs:
     description: Path to write the generated CI workflow file.
     required: false
     default: .github/workflows/ci.yml
+  ci-runner-os:
+    description: Runner operating system for the generated CI workflow. Use windows for native PowerShell Azure DevOps CI.
+    required: false
+    default: linux
   project-name:
     description: Service project name used across bootstrap and repo sync phases.
     required: true
@@ -328,7 +332,7 @@ runs:
         fi
     - id: bootstrap
       name: Bootstrap Postman Assets
-      uses: postman-cs/postman-bootstrap-action@v2.10.1
+      uses: postman-cs/postman-bootstrap-action@v2.10.2
       env:
         POSTMAN_TEAM_ID: ${{ inputs.postman-team-id }}
       with:
@@ -374,7 +378,7 @@ runs:
         postman-stack: ${{ inputs.postman-stack }}
     - id: repo_sync
       name: Sync Repository and Workspace
-      uses: postman-cs/postman-repo-sync-action@v2.1.8
+      uses: postman-cs/postman-repo-sync-action@v2.1.9
       env:
         POSTMAN_TEAM_ID: ${{ inputs.postman-team-id }}
       with:
@@ -388,6 +392,7 @@ runs:
         release-label: ${{ inputs.release-label }}
         generate-ci-workflow: ${{ inputs.generate-ci-workflow }}
         ci-workflow-path: ${{ inputs.ci-workflow-path }}
+        ci-runner-os: ${{ inputs.ci-runner-os }}
         environments-json: ${{ inputs.environments-json }}
         system-env-map-json: ${{ inputs.system-env-map-json }}
         environment-uids-json: ${{ inputs.environment-uids-json }}
@@ -426,6 +431,22 @@ runs:
         POSTMAN_TEAM_ID: ${{ inputs.postman-team-id }}
       run: |
         echo "::warning::Skipping built-in smoke and contract tests: no postman-api-key was provided. The Postman CLI (postman login --with-api-key, then postman collection run) has no access-token login, so these tests require a PMAK. Provide postman-api-key to enable them, or set skip-built-in-tests: true to silence this warning."
+    - id: install_postman_cli_windows
+      name: Install Postman CLI on Windows
+      if: ${{ runner.os == 'Windows' && steps.bootstrap.outputs.collections-json != '' && inputs.skip-built-in-tests != 'true' && inputs.postman-api-key != '' }}
+      shell: pwsh
+      env:
+        POSTMAN_TEAM_ID: ${{ inputs.postman-team-id }}
+        POSTMAN_CLI_INSTALL_URL: ${{ inputs.postman-stack == 'beta' && 'https://dl-cli.pstmn-beta.io/install/win64.ps1' || 'https://dl-cli.pstmn.io/install/win64.ps1' }}
+      run: |
+        $ErrorActionPreference = 'Stop'
+        if (-not (Get-Command postman -ErrorAction SilentlyContinue)) {
+          [System.Net.ServicePointManager]::SecurityProtocol = 3072
+          Invoke-Expression ((New-Object System.Net.WebClient).DownloadString($env:POSTMAN_CLI_INSTALL_URL))
+        }
+        if (-not (Get-Command postman -ErrorAction SilentlyContinue)) {
+          throw 'Postman CLI installation completed but the postman command is unavailable.'
+        }
     - id: run_tests_junit
       name: Run smoke and contract collections with JUnit output
       if: ${{ steps.bootstrap.outputs.collections-json != '' && inputs.skip-built-in-tests != 'true' && inputs.postman-api-key != '' }}
@@ -454,6 +475,10 @@ runs:
         REGION_ESCAPED=$(escape_annotation "${POSTMAN_REGION:-}")
 
         if ! command -v postman >/dev/null 2>&1; then
+          if [ "${RUNNER_OS:-}" = "Windows" ]; then
+            echo "::error::Postman CLI was not installed by the Windows setup step"
+            exit 1
+          fi
           curl -fsSL "$POSTMAN_CLI_INSTALL_URL" | sh
           export PATH="$HOME/.postman/cli:$PATH"
         fi
@@ -536,7 +561,7 @@ runs:
     - id: insights_onboarding
       if: inputs.enable-insights == 'true'
       name: Onboard Postman Insights
-      uses: postman-cs/postman-insights-onboarding-action@v2.1.2
+      uses: postman-cs/postman-insights-onboarding-action@v2.1.3
       env:
         POSTMAN_TEAM_ID: ${{ inputs.postman-team-id }}
       with:

@@ -1,0 +1,273 @@
+parameters:
+  - name: projectName
+    type: string
+  - name: specPath
+    type: string
+    default: ''
+  - name: specUrl
+    type: string
+    default: ''
+  - name: flowPath
+    type: string
+    default: ''
+  - name: environmentsJson
+    type: string
+    default: '["prod"]'
+  - name: environmentRuntimeUrlsJson
+    type: string
+    default: '{}'
+  - name: canonicalBranch
+    type: string
+    default: main
+  - name: repoWriteMode
+    type: string
+    default: none
+  - name: generateCiWorkflow
+    type: boolean
+    default: true
+  - name: ciWorkflowPath
+    type: string
+    default: postman-ci.yml
+  - name: enableSmokeFlow
+    type: boolean
+    default: false
+  - name: enableInsights
+    type: boolean
+    default: false
+  - name: insightsClusterName
+    type: string
+    default: ''
+  - name: postmanRegion
+    type: string
+    default: us
+  - name: postmanStack
+    type: string
+    default: prod
+  - name: resolveVersion
+    type: string
+    default: 2.0.2
+  - name: bootstrapVersion
+    type: string
+    default: 2.10.2
+  - name: smokeFlowVersion
+    type: string
+    default: 2.1.5
+  - name: repoSyncVersion
+    type: string
+    default: 2.1.9
+  - name: insightsVersion
+    type: string
+    default: 2.1.3
+
+jobs:
+  - job: postman_onboarding
+    displayName: Postman API onboarding
+    pool:
+      vmImage: windows-latest
+    steps:
+      - checkout: self
+        persistCredentials: true
+        fetchDepth: 0
+
+      - task: UseNode@1
+        displayName: Use Node.js 24
+        inputs:
+          version: 24.x
+
+      - pwsh: |
+          $ErrorActionPreference = 'Stop'
+          $packages = @(
+            '@postman-cse/onboarding-resolve-service-token@${{ parameters.resolveVersion }}',
+            '@postman-cse/onboarding-bootstrap@${{ parameters.bootstrapVersion }}',
+            '@postman-cse/onboarding-smoke-flow@${{ parameters.smokeFlowVersion }}',
+            '@postman-cse/onboarding-repo-sync@${{ parameters.repoSyncVersion }}',
+            '@postman-cse/onboarding-insights@${{ parameters.insightsVersion }}'
+          )
+          & npm install --global @packages --no-audit --no-fund
+          if ($LASTEXITCODE -ne 0) { throw "Onboarding CLI install failed with exit code $LASTEXITCODE" }
+        displayName: Install pinned Postman onboarding CLIs
+
+      - pwsh: |
+          $ErrorActionPreference = 'Stop'
+          $arguments = @(
+            '--postman-api-key', $env:POSTMAN_API_KEY,
+            '--postman-region', $env:POSTMAN_REGION,
+            '--postman-stack', $env:POSTMAN_STACK
+          )
+          $output = & postman-resolve-service-token @arguments | Out-String
+          if ($LASTEXITCODE -ne 0) { throw "Token resolution failed with exit code $LASTEXITCODE" }
+          $result = $output | ConvertFrom-Json
+          Write-Host "##vso[task.setsecret]$($result.token)"
+          Write-Host "##vso[task.setvariable variable=POSTMAN_ACCESS_TOKEN;issecret=true]$($result.token)"
+          Write-Host "##vso[task.setvariable variable=POSTMAN_TEAM_ID]$($result.'team-id')"
+        displayName: Resolve Postman service token
+        env:
+          POSTMAN_API_KEY: $(POSTMAN_API_KEY)
+          POSTMAN_REGION: ${{ parameters.postmanRegion }}
+          POSTMAN_STACK: ${{ parameters.postmanStack }}
+
+      - pwsh: |
+          $ErrorActionPreference = 'Stop'
+          $resultPath = Join-Path $env:AGENT_TEMPDIRECTORY 'postman-bootstrap-result.json'
+          $arguments = @(
+            '--project-name', $env:PROJECT_NAME,
+            '--postman-api-key', $env:POSTMAN_API_KEY,
+            '--postman-access-token', $env:POSTMAN_ACCESS_TOKEN,
+            '--postman-region', $env:POSTMAN_REGION,
+            '--postman-stack', $env:POSTMAN_STACK,
+            '--repo-url', $env:BUILD_REPOSITORY_URI,
+            '--canonical-branch', $env:CANONICAL_BRANCH,
+            '--result-json', $resultPath
+          )
+          if (-not [string]::IsNullOrWhiteSpace($env:SPEC_PATH)) {
+            $arguments += @('--spec-path', $env:SPEC_PATH)
+          } elseif (-not [string]::IsNullOrWhiteSpace($env:SPEC_URL)) {
+            $arguments += @('--spec-url', $env:SPEC_URL)
+          } else {
+            throw 'One of specPath or specUrl is required.'
+          }
+          & postman-bootstrap @arguments | Out-Null
+          if ($LASTEXITCODE -ne 0) { throw "Bootstrap failed with exit code $LASTEXITCODE" }
+          $result = Get-Content -Raw -LiteralPath $resultPath | ConvertFrom-Json
+          Write-Host "##vso[task.setvariable variable=POSTMAN_WORKSPACE_ID]$($result.'workspace-id')"
+          Write-Host "##vso[task.setvariable variable=POSTMAN_SPEC_ID]$($result.'spec-id')"
+          Write-Host "##vso[task.setvariable variable=POSTMAN_BASELINE_COLLECTION_ID]$($result.'baseline-collection-id')"
+          Write-Host "##vso[task.setvariable variable=POSTMAN_SMOKE_COLLECTION_ID]$($result.'smoke-collection-id')"
+          Write-Host "##vso[task.setvariable variable=POSTMAN_CONTRACT_COLLECTION_ID]$($result.'contract-collection-id')"
+        displayName: Bootstrap Postman assets
+        env:
+          PROJECT_NAME: ${{ parameters.projectName }}
+          SPEC_PATH: ${{ parameters.specPath }}
+          SPEC_URL: ${{ parameters.specUrl }}
+          CANONICAL_BRANCH: ${{ parameters.canonicalBranch }}
+          POSTMAN_API_KEY: $(POSTMAN_API_KEY)
+          POSTMAN_ACCESS_TOKEN: $(POSTMAN_ACCESS_TOKEN)
+          POSTMAN_TEAM_ID: $(POSTMAN_TEAM_ID)
+          POSTMAN_REGION: ${{ parameters.postmanRegion }}
+          POSTMAN_STACK: ${{ parameters.postmanStack }}
+
+      - pwsh: |
+          $ErrorActionPreference = 'Stop'
+          if ([string]::IsNullOrWhiteSpace($env:FLOW_PATH)) {
+            throw 'flowPath is required when enableSmokeFlow is true.'
+          }
+          $arguments = @(
+            '--project-name', $env:PROJECT_NAME,
+            '--workspace-id', $env:POSTMAN_WORKSPACE_ID,
+            '--spec-id', $env:POSTMAN_SPEC_ID,
+            '--smoke-collection-id', $env:POSTMAN_SMOKE_COLLECTION_ID,
+            '--flow-path', $env:FLOW_PATH,
+            '--postman-access-token', $env:POSTMAN_ACCESS_TOKEN,
+            '--postman-api-key', $env:POSTMAN_API_KEY,
+            '--postman-region', $env:POSTMAN_REGION,
+            '--postman-stack', $env:POSTMAN_STACK
+          )
+          if (-not [string]::IsNullOrWhiteSpace($env:SPEC_PATH)) {
+            $arguments += @('--spec-path', $env:SPEC_PATH)
+          }
+          & postman-smoke-flow @arguments | Out-Null
+          if ($LASTEXITCODE -ne 0) { throw "Smoke flow failed with exit code $LASTEXITCODE" }
+        condition: and(succeeded(), ${{ eq(parameters.enableSmokeFlow, true) }})
+        displayName: Apply curated smoke flow
+        env:
+          PROJECT_NAME: ${{ parameters.projectName }}
+          SPEC_PATH: ${{ parameters.specPath }}
+          FLOW_PATH: ${{ parameters.flowPath }}
+          POSTMAN_WORKSPACE_ID: $(POSTMAN_WORKSPACE_ID)
+          POSTMAN_SPEC_ID: $(POSTMAN_SPEC_ID)
+          POSTMAN_SMOKE_COLLECTION_ID: $(POSTMAN_SMOKE_COLLECTION_ID)
+          POSTMAN_API_KEY: $(POSTMAN_API_KEY)
+          POSTMAN_ACCESS_TOKEN: $(POSTMAN_ACCESS_TOKEN)
+          POSTMAN_TEAM_ID: $(POSTMAN_TEAM_ID)
+          POSTMAN_REGION: ${{ parameters.postmanRegion }}
+          POSTMAN_STACK: ${{ parameters.postmanStack }}
+
+      - pwsh: |
+          $ErrorActionPreference = 'Stop'
+          $resultPath = Join-Path $env:AGENT_TEMPDIRECTORY 'postman-repo-sync-result.json'
+          $arguments = @(
+            '--project-name', $env:PROJECT_NAME,
+            '--workspace-id', $env:POSTMAN_WORKSPACE_ID,
+            '--baseline-collection-id', $env:POSTMAN_BASELINE_COLLECTION_ID,
+            '--smoke-collection-id', $env:POSTMAN_SMOKE_COLLECTION_ID,
+            '--contract-collection-id', $env:POSTMAN_CONTRACT_COLLECTION_ID,
+            '--environments-json', $env:ENVIRONMENTS_JSON,
+            '--env-runtime-urls-json', $env:ENV_RUNTIME_URLS_JSON,
+            '--git-provider', 'azure-devops',
+            '--repo-url', $env:BUILD_REPOSITORY_URI,
+            '--repo-write-mode', $env:REPO_WRITE_MODE,
+            '--current-ref', $env:BUILD_SOURCEBRANCH,
+            '--canonical-branch', $env:CANONICAL_BRANCH,
+            '--generate-ci-workflow', $env:GENERATE_CI_WORKFLOW,
+            '--ci-workflow-path', $env:CI_WORKFLOW_PATH,
+            '--ci-runner-os', 'windows',
+            '--postman-api-key', $env:POSTMAN_API_KEY,
+            '--postman-access-token', $env:POSTMAN_ACCESS_TOKEN,
+            '--team-id', $env:POSTMAN_TEAM_ID,
+            '--postman-region', $env:POSTMAN_REGION,
+            '--postman-stack', $env:POSTMAN_STACK,
+            '--result-json', $resultPath
+          )
+          if (-not [string]::IsNullOrWhiteSpace($env:SPEC_PATH)) {
+            $arguments += @('--spec-path', $env:SPEC_PATH)
+          }
+          & postman-repo-sync @arguments | Out-Null
+          if ($LASTEXITCODE -ne 0) { throw "Repo sync failed with exit code $LASTEXITCODE" }
+          $result = Get-Content -Raw -LiteralPath $resultPath | ConvertFrom-Json
+          Write-Host "##vso[task.setvariable variable=POSTMAN_ENVIRONMENT_UIDS_JSON]$($result.'environment-uids-json')"
+        displayName: Sync Postman artifacts and CI
+        env:
+          PROJECT_NAME: ${{ parameters.projectName }}
+          SPEC_PATH: ${{ parameters.specPath }}
+          ENVIRONMENTS_JSON: ${{ parameters.environmentsJson }}
+          ENV_RUNTIME_URLS_JSON: ${{ parameters.environmentRuntimeUrlsJson }}
+          REPO_WRITE_MODE: ${{ parameters.repoWriteMode }}
+          GENERATE_CI_WORKFLOW: ${{ parameters.generateCiWorkflow }}
+          CI_WORKFLOW_PATH: ${{ parameters.ciWorkflowPath }}
+          CANONICAL_BRANCH: ${{ parameters.canonicalBranch }}
+          POSTMAN_WORKSPACE_ID: $(POSTMAN_WORKSPACE_ID)
+          POSTMAN_BASELINE_COLLECTION_ID: $(POSTMAN_BASELINE_COLLECTION_ID)
+          POSTMAN_SMOKE_COLLECTION_ID: $(POSTMAN_SMOKE_COLLECTION_ID)
+          POSTMAN_CONTRACT_COLLECTION_ID: $(POSTMAN_CONTRACT_COLLECTION_ID)
+          POSTMAN_API_KEY: $(POSTMAN_API_KEY)
+          POSTMAN_ACCESS_TOKEN: $(POSTMAN_ACCESS_TOKEN)
+          POSTMAN_TEAM_ID: $(POSTMAN_TEAM_ID)
+          POSTMAN_REGION: ${{ parameters.postmanRegion }}
+          POSTMAN_STACK: ${{ parameters.postmanStack }}
+          SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+
+      - pwsh: |
+          $ErrorActionPreference = 'Stop'
+          if ([string]::IsNullOrWhiteSpace($env:INSIGHTS_CLUSTER_NAME)) {
+            throw 'insightsClusterName is required when enableInsights is true.'
+          }
+          $environmentMap = $env:POSTMAN_ENVIRONMENT_UIDS_JSON | ConvertFrom-Json
+          $environmentId = $environmentMap.PSObject.Properties[0].Value
+          if ([string]::IsNullOrWhiteSpace($environmentId)) {
+            throw 'Repo sync did not return an environment ID for Insights onboarding.'
+          }
+          $arguments = @(
+            '--project-name', $env:PROJECT_NAME,
+            '--workspace-id', $env:POSTMAN_WORKSPACE_ID,
+            '--environment-id', $environmentId,
+            '--cluster-name', $env:INSIGHTS_CLUSTER_NAME,
+            '--repo-url', $env:BUILD_REPOSITORY_URI,
+            '--postman-api-key', $env:POSTMAN_API_KEY,
+            '--postman-access-token', $env:POSTMAN_ACCESS_TOKEN,
+            '--postman-region', $env:POSTMAN_REGION,
+            '--postman-stack', $env:POSTMAN_STACK
+          )
+          & postman-insights-onboard @arguments | Out-Null
+          if ($LASTEXITCODE -ne 0) { throw "Insights onboarding failed with exit code $LASTEXITCODE" }
+        condition: and(succeeded(), ${{ eq(parameters.enableInsights, true) }})
+        displayName: Link Postman Insights
+        env:
+          PROJECT_NAME: ${{ parameters.projectName }}
+          INSIGHTS_CLUSTER_NAME: ${{ parameters.insightsClusterName }}
+          POSTMAN_WORKSPACE_ID: $(POSTMAN_WORKSPACE_ID)
+          POSTMAN_ENVIRONMENT_UIDS_JSON: $(POSTMAN_ENVIRONMENT_UIDS_JSON)
+          POSTMAN_API_KEY: $(POSTMAN_API_KEY)
+          POSTMAN_ACCESS_TOKEN: $(POSTMAN_ACCESS_TOKEN)
+          POSTMAN_TEAM_ID: $(POSTMAN_TEAM_ID)
+          POSTMAN_REGION: ${{ parameters.postmanRegion }}
+          POSTMAN_STACK: ${{ parameters.postmanStack }}
