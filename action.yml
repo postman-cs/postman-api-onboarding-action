@@ -332,7 +332,7 @@ runs:
         fi
     - id: bootstrap
       name: Bootstrap Postman Assets
-      uses: postman-cs/postman-bootstrap-action@v2.10.5
+      uses: postman-cs/postman-bootstrap-action@codex/retry-generated-collection-readback
       env:
         POSTMAN_TEAM_ID: ${{ inputs.postman-team-id }}
       with:
