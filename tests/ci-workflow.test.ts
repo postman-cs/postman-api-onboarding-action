@@ -1,6 +1,4 @@
-import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
@@ -9,6 +7,7 @@ import { parse } from 'yaml';
 const ACTIONLINT_DOWNLOADER_COMMIT = '393031adb9afb225ee52ae2ccd7a5af5525e03e8';
 const ACTIONLINT_VERSION = '1.7.11';
 const ACTIONLINT_DOWNLOADER_URL = `https://raw.githubusercontent.com/rhysd/actionlint/${ACTIONLINT_DOWNLOADER_COMMIT}/scripts/download-actionlint.bash`;
+const WINDOWS_CACHE_PIN = 'actions/cache@1bd1e32a3bdc45362d1e726936510720a7c30a57';
 
 const ciWorkflowText = readFileSync(join(process.cwd(), '.github/workflows/ci.yml'), 'utf8').replace(/\r\n/g, '\n');
 const ciWorkflow = parse(ciWorkflowText) as {
@@ -18,15 +17,18 @@ const ciWorkflow = parse(ciWorkflowText) as {
 
 type WorkflowStep = {
   name?: string;
+  id?: string;
   uses?: string;
   with?: Record<string, unknown>;
   run?: string;
   shell?: string;
+  if?: string;
 };
 
 type WorkflowJob = {
   name?: string;
   'runs-on'?: string;
+  needs?: string | string[];
   steps?: WorkflowStep[];
 };
 
@@ -50,22 +52,6 @@ function namedStep(source: string, name: string): string {
 /** Ordered gate names launched via `run <name> ...` (excludes the `run()` helper definition). */
 function linuxQueuedGates(runGates: string): string[] {
   return [...runGates.matchAll(/^\s+run ([a-zA-Z0-9_-]+)\s+/gm)].map((m) => m[1]!);
-}
-
-/** Exact Windows `Run Windows gates` PowerShell body under `run: |`, with YAML indent stripped. */
-function extractWindowsRunGatesBody(source: string): string {
-  const windows = jobText(source, 'windows');
-  const match = windows.match(
-    /^ {6}- name: Run Windows gates\n {8}shell: pwsh\n {8}run: \|\n([\s\S]*)$/m,
-  );
-  if (!match?.[1]) {
-    throw new Error('Windows Run Windows gates pwsh body not found');
-  }
-  return match[1]
-    .replace(/\n$/, '')
-    .split('\n')
-    .map((line) => (line.startsWith('          ') ? line.slice(10) : line))
-    .join('\n');
 }
 
 function findStep(job: WorkflowJob | undefined, name: string): WorkflowStep | undefined {
@@ -135,41 +121,54 @@ describe('CI workflow contract', () => {
     expect(ciWorkflowText).not.toMatch(/\bgo install\b/);
   });
 
-  it('keeps the required Windows job with exact four gates, cap two, and native exit fail-through', () => {
+  it('keeps Windows as an independent exact-cache npm test lane without queue or Linux-owned gates', () => {
     expect(windowsJob?.name).toBe('Windows gate');
     expect(windowsJob?.['runs-on']).toBe('windows-latest');
+    expect(windowsJob?.needs).toBeUndefined();
+    expect(linuxJob?.needs).toBeUndefined();
     expect(windows).toContain('runs-on: windows-latest');
+    expect(windows).not.toMatch(/^\s*needs:/m);
     expect(windows).not.toMatch(/^\s*fetch-depth:\s*/m);
 
-    const runGates = namedStep(windows, 'Run Windows gates');
-    expect(runGates).toContain('shell: pwsh');
-    expect(runGates).toContain('$MAX_PARALLEL_GATES = 2');
-    expect(runGates).toContain('while ($jobs.Count -ge $MAX_PARALLEL_GATES) { Complete-One }');
-    expect(runGates).toContain('while ($jobs.Count -gt 0) { Complete-One }');
-    expect(runGates).toContain('Start-Job');
-    expect(runGates).toContain('function Start-Gate($name, $executable, $gateArgs)');
-    expect(runGates).toContain('& $executable @gateArgs');
-    expect(runGates).toContain('if ($LASTEXITCODE -ne 0) { throw "gate failed with exit code $LASTEXITCODE" }');
-    expect(runGates).not.toContain('Invoke-Expression');
+    const setupNode = windowsJob?.steps?.find((step) => step.uses?.startsWith('actions/setup-node@'));
+    expect(setupNode?.with?.['node-version']).toBe('24');
+    expect(setupNode?.with).not.toHaveProperty('cache');
+    expect(windows).not.toMatch(/^\s*cache:\s*npm\s*$/m);
 
-    expect(runGates).toContain("Start-Gate lint npm @('run', 'lint')");
-    expect(runGates).toContain("Start-Gate test npm @('test')");
-    expect(runGates).toContain("Start-Gate typecheck npm @('run', 'typecheck')");
-    expect(runGates).toContain("Start-Gate sibling-pins node @('scripts/check-sibling-pins.mjs')");
-    expect(runGates.match(/Start-Gate [a-zA-Z0-9_-]+ /g) ?? []).toHaveLength(4);
+    const cacheStep = windowsJob?.steps?.find((step) => step.uses?.startsWith('actions/cache@'));
+    expect(cacheStep?.uses).toBe(WINDOWS_CACHE_PIN);
+    expect(cacheStep?.id).toBe('windows-node-modules');
+    expect(cacheStep?.with?.path).toBe('node_modules');
+    expect(cacheStep?.with?.key).toBe("Windows/node-24/${{ hashFiles('package-lock.json') }}");
+    expect(cacheStep?.with).not.toHaveProperty('restore-keys');
+    expect(windows).toContain(`${WINDOWS_CACHE_PIN} # v4.2.0`);
+    expect(windows).toContain('id: windows-node-modules');
+    expect(windows).toContain('path: node_modules');
+    expect(windows).toContain("key: Windows/node-24/${{ hashFiles('package-lock.json') }}");
+    expect(windows).not.toContain('restore-keys');
 
-    // Receive-Job must retain failed-child text in per-gate logs; Out-Null hid Windows npm test failures.
-    expect(runGates).toContain('Receive-Job -Job $completed -ErrorAction Continue 2>&1 | Out-File "$($completed.Name).log"');
-    expect(runGates).not.toContain('Out-Null');
-    expect(runGates).toContain('Write-Output "::group::$name"');
-    expect(runGates).toContain('Get-Content -LiteralPath "$name.log"');
-    expect(runGates).toContain("Write-Output '::endgroup::'");
+    const install = findStep(windowsJob, 'Install dependencies');
+    expect(install?.if).toBe("steps.windows-node-modules.outputs.cache-hit != 'true'");
+    expect(install?.run).toBe('npm ci --prefer-offline --no-audit --no-fund');
+    expect(windows).toContain("if: steps.windows-node-modules.outputs.cache-hit != 'true'");
+    expect(windows).toContain('run: npm ci --prefer-offline --no-audit --no-fund');
 
-    expect(runGates).toContain("foreach ($name in @('lint', 'test', 'typecheck', 'sibling-pins'))");
-    expect(runGates).toContain("if ($results[$name] -eq 'Completed') { Write-Output \"gate:$name=pass\" } else { Write-Output \"gate:$name=fail\"; $failed = $true }");
-    expect(runGates).toContain('if ($failed) { exit 1 }');
-    expect(runGates).not.toContain('actionlint');
-    expect(runGates).not.toContain('commitlint');
+    const testSteps = windowsJob?.steps?.filter((step) => step.run === 'npm test') ?? [];
+    expect(testSteps).toHaveLength(1);
+    expect(testSteps[0]?.if).toBeUndefined();
+    expect(windows).toMatch(/^\s*- run: npm test\s*$/m);
+    expect(windows).not.toContain('npm test --');
+    expect(windows).not.toContain("npm test'");
+
+    expect(windows).not.toContain('Run Windows gates');
+    expect(windows).not.toContain('Start-Gate');
+    expect(windows).not.toContain('Start-Job');
+    expect(windows).not.toContain('MAX_PARALLEL_GATES');
+    expect(windows).not.toContain('npm run lint');
+    expect(windows).not.toContain('npm run typecheck');
+    expect(windows).not.toContain('check-sibling-pins.mjs');
+    expect(windows).not.toContain('actionlint');
+    expect(windows).not.toContain('commitlint');
   });
 
   it('keeps imported release helpers free of Windows-incompatible shebangs', () => {
@@ -178,64 +177,4 @@ describe('CI workflow contract', () => {
       expect(source, helper).not.toMatch(/^#!/u);
     }
   });
-
-  it(
-    'executes the Windows gate runner and fails aggregate status when a native gate exits nonzero',
-    () => {
-      const script = extractWindowsRunGatesBody(ciWorkflowText);
-      expect(script).toContain('& $executable @gateArgs');
-      expect(script).toContain('if ($LASTEXITCODE -ne 0) { throw "gate failed with exit code $LASTEXITCODE" }');
-      expect(script).toContain('Receive-Job -Job $completed -ErrorAction Continue 2>&1 | Out-File');
-      expect(script).toContain('::group::$name');
-      expect(script).not.toContain('Out-Null');
-      expect(script).not.toContain('Invoke-Expression');
-
-      const mutated = script
-        .replace(/^[ \t]*Start-Gate lint .+\n/mu, '')
-        .replace(/Start-Gate test .+/u, "Start-Gate test node @('-e', 'process.exit(7)')")
-        .replace(/^[ \t]*Start-Gate typecheck .+\n/mu, '')
-        .replace(/^[ \t]*Start-Gate sibling-pins .+\n/mu, '')
-        .replace(
-          /foreach \(\$name in @\('lint', 'test', 'typecheck', 'sibling-pins'\)\)/u,
-          "foreach ($name in @('test'))",
-        );
-
-      expect(mutated).toContain("Start-Gate test node @('-e', 'process.exit(7)')");
-      expect(mutated).toContain("foreach ($name in @('test'))");
-      expect(mutated).not.toContain("Start-Gate test npm @('test')");
-      expect(mutated).not.toMatch(/^[ \t]*Start-Gate lint /mu);
-      expect(mutated).not.toMatch(/^[ \t]*Start-Gate typecheck /mu);
-      expect(mutated).not.toMatch(/^[ \t]*Start-Gate sibling-pins /mu);
-      expect(mutated.match(/^[ \t]*Start-Gate /gmu) ?? []).toHaveLength(1);
-
-      const probe = spawnSync('pwsh', ['-NoProfile', '-Command', 'exit 0'], { encoding: 'utf8' });
-      const probeError = probe.error as NodeJS.ErrnoException | undefined;
-      if (probeError?.code === 'ENOENT') {
-        return;
-      }
-      expect(probeError, `${probe.stderr ?? ''}`).toBeUndefined();
-
-      const fixture = mkdtempSync(join(tmpdir(), 'api-ci-windows-gates-'));
-      try {
-        writeFileSync(join(fixture, 'run-gates.ps1'), `${mutated}\n`);
-        const result = spawnSync('pwsh', ['-NoProfile', '-File', 'run-gates.ps1'], {
-          cwd: fixture,
-          encoding: 'utf8',
-        });
-        const output = `${result.stdout ?? ''}${result.stderr ?? ''}`;
-
-        expect(result.status, output).not.toBe(0);
-        expect(output).toContain('gate:test=fail');
-        expect(output).toContain('::group::test');
-        expect(output).toContain('::endgroup::');
-        expect(output).toMatch(/gate failed with exit code 7|exit code 7/i);
-        expect(output).not.toContain('gate:lint=');
-        expect(output).not.toContain('gate:typecheck=');
-        expect(output).not.toContain('gate:sibling-pins=');
-      } finally {
-        rmSync(fixture, { recursive: true, force: true });
-      }
-    },
-    60_000,
-  );
 });
