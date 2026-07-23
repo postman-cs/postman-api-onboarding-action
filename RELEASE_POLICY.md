@@ -26,6 +26,7 @@ It applies to these repositories:
 - Immutable release identity is derived from the repository `package.json` version at the tagged commit:
   exact `vX.Y.Z`, plus `vX.Y` when the patch component is `0`.
 - The current consumer rolling channel for this composite is `v2`.
+- Every v2 release keeps `branch-strategy` defaulted to `legacy`. The next default-flip major is v3.
 - The public release contract is the git tag and GitHub release. Do not treat `package.json` version fields as the authoritative public release identifier by themselves.
 
 ## Source of truth
@@ -58,11 +59,28 @@ Do not duplicate full input and output tables across repositories. Link to the a
 
 ## Composite dependency policy
 
+### Branch-aware v2 contract and v3 rollout
+
+The v2 composite exposes `branch-strategy`, `canonical-branch`, `channels`, and
+`preview-ttl`, resolves one `POSTMAN_BRANCH_DECISION` before every child, and
+surfaces `sync-status` and `spec-version-url`. Gated bootstrap receives empty
+credentials; repo-sync and Insights are skipped. There are no public migration knobs.
+
+The forward-only v3 contract is executable only after every branch-aware E2E
+gate in the PRD passes for org and non-org runs, including zero-mint/zero-write.
+Then release child v3 majors bottom-up; verify their immutable tags, releases,
+and CI; update this composite to major 3, pin those released immutable child
+tags, and flip only `branch-strategy` to `publish-gate`. After Linux, Windows,
+sibling-pin, actionlint, release, and security checks pass and the PR merges,
+create immutable v3 through the release workflow, verify npm/GitHub assets and
+checksums, and advance the new v3 alias forward. Never move v2, rewrite an
+immutable tag, or force-push. Until these prerequisites close, do not publish v3.
+
 ### Current rule
 
 The composite action currently depends on:
 
-- `postman-cs/postman-bootstrap-action@v2.10.9`
+- `postman-cs/postman-bootstrap-action@v2.10.10`
 - `postman-cs/postman-repo-sync-action@v2.1.14`
 - `postman-cs/postman-insights-onboarding-action@v2.1.6` when Insights is enabled
 

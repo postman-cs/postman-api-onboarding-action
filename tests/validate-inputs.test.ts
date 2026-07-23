@@ -9,6 +9,7 @@ const repoRoot = path.resolve(__dirname, '..');
 
 type Step = {
   id?: string;
+  if?: string;
   run?: string;
   env?: Record<string, string>;
   uses?: string;
@@ -86,9 +87,10 @@ describe('composite first-step input validation', () => {
     expect(manifest.inputs['repo-write-mode']?.default).toBe('commit-and-push');
   });
 
-  it('wires credential and repo-write-mode env into the first validation step before any child', () => {
+  it('resolves branch decision first, then validates before any child', () => {
     const steps = loadManifest().runs.steps;
-    const validateStep = steps[0];
+    expect(steps[0]?.id).toBe('branch_decision');
+    const validateStep = steps[1];
     expect(validateStep?.id).toBe('validate_postman_stack');
     expect(validateStep?.env?.REPO_WRITE_MODE).toBe('${{ inputs.repo-write-mode }}');
     expect(validateStep?.env?.POSTMAN_API_KEY).toBe('${{ inputs.postman-api-key }}');
@@ -96,6 +98,7 @@ describe('composite first-step input validation', () => {
     expect(validateStep?.env?.ENABLE_INSIGHTS).toBe('${{ inputs.enable-insights }}');
     expect(validateStep?.env?.INSIGHTS_POSTMAN_API_KEY).toBe('${{ inputs.insights-postman-api-key }}');
     expect(validateStep?.env?.INSIGHTS_POSTMAN_ACCESS_TOKEN).toBe('${{ inputs.insights-postman-access-token }}');
+    expect(validateStep?.env?.BRANCH_TIER).toBe('${{ steps.branch_decision.outputs.tier }}');
     expect(steps.findIndex((step) => step.id === 'bootstrap')).toBeGreaterThan(0);
   });
 
@@ -148,6 +151,11 @@ describe('composite first-step input validation', () => {
       expect(output).toContain('neither postman-api-key nor postman-access-token was supplied');
       expect(output).toContain('Provide one of those inputs and rerun');
     }
+  });
+
+  it('permits a gated decision without onboarding credentials', () => {
+    const result = runValidation({ BRANCH_TIER: 'gated', POSTMAN_API_KEY: '', POSTMAN_ACCESS_TOKEN: '' });
+    expect(result.status).toBe(0);
   });
 
   it.each(['none', 'commit-only', 'commit-and-push'])('accepts valid repo-write-mode=%s', (mode) => {
@@ -247,17 +255,15 @@ describe('child invocation order and credential forwarding', () => {
     expect(steps.filter((step) => step.id === 'insights_onboarding')).toHaveLength(1);
   });
 
-  it('forwards suite credentials completely to bootstrap and repo-sync', () => {
+  it('forwards canonical credentials and omits them from gated bootstrap', () => {
     const steps = loadManifest().runs.steps;
-    for (const stepId of ['bootstrap', 'repo_sync'] as const) {
-      const step = steps.find((candidate) => candidate.id === stepId);
-      expect(step?.with?.['postman-api-key'], `${stepId} postman-api-key`).toBe(
-        '${{ inputs.postman-api-key }}'
-      );
-      expect(step?.with?.['postman-access-token'], `${stepId} postman-access-token`).toBe(
-        '${{ inputs.postman-access-token }}'
-      );
-    }
+    const bootstrap = steps.find((candidate) => candidate.id === 'bootstrap');
+    const repoSync = steps.find((candidate) => candidate.id === 'repo_sync');
+    expect(bootstrap?.with?.['postman-api-key']).toBe("${{ steps.branch_decision.outputs.tier != 'gated' && inputs.postman-api-key || '' }}");
+    expect(bootstrap?.with?.['postman-access-token']).toBe("${{ steps.branch_decision.outputs.tier != 'gated' && inputs.postman-access-token || '' }}");
+    expect(repoSync?.with?.['postman-api-key']).toBe('${{ inputs.postman-api-key }}');
+    expect(repoSync?.with?.['postman-access-token']).toBe('${{ inputs.postman-access-token }}');
+    expect(repoSync?.if).toContain("tier != 'gated'");
   });
 
   it('forwards only dedicated human-user credentials to Insights', () => {

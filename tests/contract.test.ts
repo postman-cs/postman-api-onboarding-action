@@ -219,6 +219,10 @@ describe('postman-api-onboarding-action composite contract', () => {
         'insights-postman-api-key',
         'insights-postman-access-token',
         'credential-preflight',
+        'branch-strategy',
+        'canonical-branch',
+        'channels',
+        'preview-ttl',
         'postman-team-id',
         'postman-region',
         'postman-stack',
@@ -317,6 +321,8 @@ describe('postman-api-onboarding-action composite contract', () => {
         'monitor-id',
         'repo-sync-summary-json',
         'commit-sha',
+        'sync-status',
+        'spec-version-url',
         'bootstrap-outcome',
         'repo-sync-outcome',
         'insights-outcome',
@@ -334,9 +340,7 @@ describe('postman-api-onboarding-action composite contract', () => {
     it('is a composite action with the expected step count', () => {
       const manifest = loadManifest();
       expect(manifest.runs.using).toBe('composite');
-      // bootstrap, repo-sync, warn-no-api-key, Windows CLI install, junit-runner,
-      // junit-uploader, and insights plus validation.
-      expect(manifest.runs.steps).toHaveLength(8);
+      expect(manifest.runs.steps).toHaveLength(9);
     });
 
     it('uses pinned bootstrap, repo-sync, junit-runner, junit-uploader, and insights actions', () => {
@@ -350,7 +354,7 @@ describe('postman-api-onboarding-action composite contract', () => {
       const insightsStep = steps.find((step) => step.id === 'insights_onboarding');
 
       expect(validateStep?.shell).toBe('bash');
-      expect(bootstrapStep?.uses).toBe('postman-cs/postman-bootstrap-action@v2.10.9');
+      expect(bootstrapStep?.uses).toBe('postman-cs/postman-bootstrap-action@v2.10.10');
       expect(repoSyncStep?.uses).toBe('postman-cs/postman-repo-sync-action@v2.1.14');
       expect(junitStep?.shell).toBe('bash');
       expect(uploadStep?.uses).toBe('actions/upload-artifact@v7.0.1');
@@ -379,7 +383,7 @@ describe('postman-api-onboarding-action composite contract', () => {
     it('validates repo-write-mode in the first composite step before any child runs', () => {
       const manifest = loadManifest();
       const steps = manifest.runs.steps;
-      const validateStep = steps[0];
+      const validateStep = steps[1];
 
       expect(validateStep?.id).toBe('validate_postman_stack');
       expect(validateStep?.env?.REPO_WRITE_MODE).toBe('${{ inputs.repo-write-mode }}');
@@ -390,6 +394,41 @@ describe('postman-api-onboarding-action composite contract', () => {
       expect(steps.findIndex((step) => step.uses?.includes('postman-bootstrap-action'))).toBeGreaterThan(
         0
       );
+    });
+
+    it('resolves one branch decision before validation and every child invocation', () => {
+      const manifest = loadManifest();
+      expect(manifest.runs.steps[0]?.id).toBe('branch_decision');
+      for (const id of ['bootstrap', 'repo_sync', 'insights_onboarding']) {
+        expect(manifest.runs.steps.find((step) => step.id === id)?.env?.POSTMAN_BRANCH_DECISION).toBe('${{ steps.branch_decision.outputs.branch-decision }}');
+      }
+    });
+
+    it('keeps v2 legacy and forwards the released branch-aware surface', () => {
+      const manifest = loadManifest();
+      expect(manifest.inputs['branch-strategy']?.default).toBe('legacy');
+      const bootstrap = manifest.runs.steps.find((step) => step.id === 'bootstrap');
+      const repoSync = manifest.runs.steps.find((step) => step.id === 'repo_sync');
+      const insights = manifest.runs.steps.find((step) => step.id === 'insights_onboarding');
+      for (const child of [bootstrap, repoSync, insights]) {
+        expect(child?.with?.['branch-strategy']).toBe('${{ inputs.branch-strategy }}');
+        expect(child?.with?.['canonical-branch']).toBe('${{ inputs.canonical-branch }}');
+        expect(child?.with?.channels).toBe('${{ inputs.channels }}');
+      }
+      expect(repoSync?.with?.['preview-ttl']).toBe('${{ inputs.preview-ttl }}');
+      expect(manifest.outputs['sync-status']?.value).toContain('sync-status');
+      expect(manifest.outputs['spec-version-url']?.value).toBe('${{ steps.repo_sync.outputs.spec-version-url }}');
+    });
+
+    it('runs gated bootstrap without credentials and skips credentialed children', () => {
+      const manifest = loadManifest();
+      const bootstrap = manifest.runs.steps.find((step) => step.id === 'bootstrap');
+      const repoSync = manifest.runs.steps.find((step) => step.id === 'repo_sync');
+      const insights = manifest.runs.steps.find((step) => step.id === 'insights_onboarding');
+      expect(bootstrap?.with?.['postman-api-key']).toContain("tier != 'gated'");
+      expect(bootstrap?.with?.['postman-access-token']).toContain("tier != 'gated'");
+      expect(repoSync?.if).toContain("tier != 'gated'");
+      expect(insights?.if).toContain("tier != 'gated'");
     });
 
     it('invokes bootstrap, repo-sync, and insights exactly once in that order', () => {
@@ -519,7 +558,7 @@ describe('postman-api-onboarding-action composite contract', () => {
         "${{ inputs.spec-url == '' && inputs.spec-files-json || '' }}"
       );
       // Sibling pins stay on the current immutable tags.
-      expect(bootstrapStep?.uses).toBe('postman-cs/postman-bootstrap-action@v2.10.9');
+      expect(bootstrapStep?.uses).toBe('postman-cs/postman-bootstrap-action@v2.10.10');
       expect(
         manifest.runs.steps.find((step) => step.id === 'repo_sync')?.uses
       ).toBe('postman-cs/postman-repo-sync-action@v2.1.14');
@@ -575,11 +614,12 @@ describe('postman-api-onboarding-action composite contract', () => {
 
     it('isolates dedicated human-user Insights credentials from suite credentials', () => {
       const manifest = loadManifest();
-      for (const stepId of ['bootstrap', 'repo_sync'] as const) {
-        const step = manifest.runs.steps.find((s) => s.id === stepId);
-        expect(step?.with?.['postman-api-key']).toBe('${{ inputs.postman-api-key }}');
-        expect(step?.with?.['postman-access-token']).toBe('${{ inputs.postman-access-token }}');
-      }
+      const bootstrap = manifest.runs.steps.find((s) => s.id === 'bootstrap');
+      const repoSync = manifest.runs.steps.find((s) => s.id === 'repo_sync');
+      expect(bootstrap?.with?.['postman-api-key']).toContain('inputs.postman-api-key');
+      expect(bootstrap?.with?.['postman-access-token']).toContain('inputs.postman-access-token');
+      expect(repoSync?.with?.['postman-api-key']).toBe('${{ inputs.postman-api-key }}');
+      expect(repoSync?.with?.['postman-access-token']).toBe('${{ inputs.postman-access-token }}');
       const insights = manifest.runs.steps.find((step) => step.id === 'insights_onboarding');
       expect(insights?.with?.['postman-api-key']).toBe('${{ inputs.insights-postman-api-key }}');
       expect(insights?.with?.['postman-access-token']).toBe('${{ inputs.insights-postman-access-token }}');
