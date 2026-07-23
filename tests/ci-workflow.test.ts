@@ -172,6 +172,13 @@ describe('CI workflow contract', () => {
     expect(runGates).not.toContain('commitlint');
   });
 
+  it('keeps imported release helpers free of Windows-incompatible shebangs', () => {
+    for (const helper of ['check-release-alias.mjs', 'verify-release-artifacts.mjs']) {
+      const source = readFileSync(join(process.cwd(), 'scripts', helper), 'utf8');
+      expect(source, helper).not.toMatch(/^#!/u);
+    }
+  });
+
   it(
     'executes the Windows gate runner and fails aggregate status when a native gate exits nonzero',
     () => {
