@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /* global console, process */
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
