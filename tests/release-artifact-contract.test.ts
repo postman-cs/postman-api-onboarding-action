@@ -42,8 +42,9 @@ function bashExecutable(): string {
   return executable;
 }
 
-function npmExecutable(platform: NodeJS.Platform = process.platform): string {
-  return platform === 'win32' ? 'npm.cmd' : 'npm';
+function npmCliPath(npmExecPath: string | undefined): string {
+  if (!npmExecPath) throw new Error('npm_execpath is required to create release fixtures');
+  return npmExecPath;
 }
 
 type WorkflowStep = {
@@ -94,7 +95,10 @@ function ensurePacked(packageVersion: string): string {
     }, null, 2)}\n`
   );
   writeFileSync(join(source, 'scripts/verify-release-artifacts.mjs'), TRAP_VERIFIER);
-  execFileSync(npmExecutable(), ['pack', '--pack-destination', root], { cwd: source, stdio: 'ignore' });
+  execFileSync(process.execPath, [npmCliPath(process.env.npm_execpath), 'pack', '--pack-destination', root], {
+    cwd: source,
+    stdio: 'ignore'
+  });
   npmPackCount += 1;
   const packed = readdirSync(root).find((name) => name.endsWith('.tgz'));
   if (!packed) throw new Error(`npm pack did not produce a tarball for ${packageVersion}`);
@@ -150,9 +154,9 @@ afterAll(() => {
 });
 
 describe('release workflow artifact handoff', () => {
-  it('selects the Windows npm command shim', () => {
-    expect(npmExecutable('win32')).toBe('npm.cmd');
-    expect(npmExecutable('darwin')).toBe('npm');
+  it('executes npm through its JavaScript CLI without a platform shell shim', () => {
+    expect(npmCliPath('/npm/bin/npm-cli.js')).toBe('/npm/bin/npm-cli.js');
+    expect(() => npmCliPath(undefined)).toThrow(/npm_execpath/);
   });
 
   it('parses verify-package and publish permissions, allowlist, and artifact handoff', () => {
