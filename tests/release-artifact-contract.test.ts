@@ -11,7 +11,7 @@ import {
   writeFileSync
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -43,8 +43,8 @@ function bashExecutable(): string {
 }
 
 function npmCliPath(npmExecPath: string | undefined): string {
-  if (!npmExecPath) throw new Error('npm_execpath is required to create release fixtures');
-  return npmExecPath;
+  if (npmExecPath) return npmExecPath;
+  return join(dirname(process.execPath), 'node_modules', 'npm', 'bin', 'npm-cli.js');
 }
 
 type WorkflowStep = {
@@ -156,7 +156,9 @@ afterAll(() => {
 describe('release workflow artifact handoff', () => {
   it('executes npm through its JavaScript CLI without a platform shell shim', () => {
     expect(npmCliPath('/npm/bin/npm-cli.js')).toBe('/npm/bin/npm-cli.js');
-    expect(() => npmCliPath(undefined)).toThrow(/npm_execpath/);
+    const fallback = npmCliPath(undefined);
+    expect(fallback).toBe(join(dirname(process.execPath), 'node_modules', 'npm', 'bin', 'npm-cli.js'));
+    expect(fallback.length).toBeGreaterThan(0);
   });
 
   it('parses verify-package and publish permissions, allowlist, and artifact handoff', () => {
