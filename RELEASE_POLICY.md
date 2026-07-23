@@ -80,8 +80,8 @@ immutable tag, or force-push. Until these prerequisites close, do not publish v3
 
 The composite action currently depends on:
 
-- `postman-cs/postman-bootstrap-action@v2.10.12`
-- `postman-cs/postman-repo-sync-action@v2.1.14`
+- `postman-cs/postman-bootstrap-action@v2.10.19`
+- `postman-cs/postman-repo-sync-action@v2.1.15`
 - `postman-cs/postman-insights-onboarding-action@v2.1.8` when Insights is enabled
 
 Because these are immutable sibling pins, a consumer who pins `postman-api-onboarding-action` to an immutable tag gets a reproducible lower-level action set at runtime.
@@ -93,7 +93,9 @@ The composite action references immutable sibling tags inside `action.yml`. Ther
 - Every composite release must record the exact sibling tags it uses.
 - Any change to a pinned sibling version requires a new composite release.
 - The compatibility matrix in this document and the README must be updated in the same change.
-- The release workflow must run `scripts/check-sibling-pins.mjs` so the composite cannot ship stale sibling refs.
+- The release workflow must run `scripts/check-sibling-pins.mjs` so every
+  committed sibling ref is an existing immutable tag and every forwarded input
+  remains declared by that exact sibling release.
 
 ## Release order
 
