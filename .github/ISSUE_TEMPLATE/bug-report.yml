@@ -13,7 +13,7 @@ body:
     id: version
     attributes:
       label: Action Version
-      description: "The version tag you are using (e.g., v1.0.0 or v1)."
+      description: "The version tag you are using (e.g., v2.1.2 or v2)."
     validations:
       required: true
   - type: dropdown

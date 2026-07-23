@@ -13,7 +13,7 @@ Caller pattern when `skip-built-in-tests: true`:
 
 ```yaml
 - id: onboard
-  uses: postman-cs/postman-api-onboarding-action@v1
+  uses: postman-cs/postman-api-onboarding-action@v2
   with:
     # ...standard inputs...
     skip-built-in-tests: 'true'

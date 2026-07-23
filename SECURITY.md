@@ -2,7 +2,7 @@
 
 ## Supported Versions
 
-Only the latest `v1.x.y` release (tracked by the rolling `v1` alias) receives security fixes. Older tags remain published for reproducibility and are never retroactively modified.
+Only the latest `v2.x.y` release (tracked by the rolling `v2` alias) receives security fixes. Older tags remain published for reproducibility and are never retroactively modified.
 
 ## Credential Handling
 
@@ -11,11 +11,13 @@ This composite action accepts credentials and forwards them to the lower-level o
 | Credential | Purpose | Guidance |
 | --- | --- | --- |
 | `postman-api-key` | Standard Postman API operations, including workspace, spec, collection, environment, mock, and monitor management. | Store it as a GitHub secret. Never echo it in caller workflow steps. |
-| `postman-access-token` | Governance, workspace linking, and Insights operations. | Prefer `postman-resolve-service-token-action` and pass its `token` output into this action. |
+| `postman-access-token` | Governance and workspace linking for bootstrap and repo sync. | Prefer `postman-resolve-service-token-action` and pass its `token` output into this action. |
+| `insights-postman-api-key` | Human-user PMAK for optional Insights linking. | Required with `insights-postman-access-token` only when `enable-insights: true`; store as a separate secret and never substitute the suite service-account key. |
+| `insights-postman-access-token` | Human-user session access token for optional Insights linking. | Required with `insights-postman-api-key` only when `enable-insights: true`; store as a separate secret and never use a minted service token. |
 | `postman-team-id` | Explicit team context for org-mode integration calls. | Prefer `postman-resolve-service-token-action` and pass its `team-id` output into this action. |
 | `postman-region` | Data residency region for Postman API and Postman CLI calls. | Use `us` or `eu`; keep the same region on service-token and onboarding steps. |
 
-The Postman CLI credential store created by `postman login` is a legacy fallback for `postman-access-token`. Service-token minting remains the primary CI path. Do not use copied web-session credentials in shared workflows.
+Service-token minting remains the primary CI path for bootstrap and repo sync. Insights is the exception: it requires a dedicated human-user PMAK and session access token for the same workspace-admin identity. Do not reuse copied web-session credentials for suite operations.
 
 ## Reporting a Vulnerability
 

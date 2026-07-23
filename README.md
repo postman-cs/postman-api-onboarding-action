@@ -79,7 +79,8 @@ Run `postman-resolve-service-token-action` first and pass its `token` and `team-
 | Credential or permission | Where it appears | Required for | Source and permissions | Expiration behavior |
 | --- | --- | --- | --- | --- |
 | Service-account PMAK | `POSTMAN_API_KEY`, or `POSTMAN_SERVICE_ACCOUNT_API_KEY` in AWS examples | Access-token minting and the Postman CLI logins inside the wrapped actions (bootstrap spec lint, repo-sync generated-CI collection run) | GitHub secret backed by a [Postman service account](https://learning.postman.com/docs/administration/service-accounts/) API key | Long-lived until rotated in Postman and updated in CI |
-| Generated access token | `steps.postman-token.outputs.token`, passed as `postman-access-token` | Every Postman asset operation in the wrapped actions, routed through the access-token gateway (workspace, spec, collection, environment, mock, monitor, tagging, identity) | Minted by `postman-resolve-service-token-action` from the service-account PMAK | Fresh per workflow run; avoid storing unless a scheduled refresh workflow intentionally writes `POSTMAN_ACCESS_TOKEN` |
+| Generated access token | `steps.postman-token.outputs.token`, passed as `postman-access-token` | Every Postman asset operation in bootstrap and repo sync, routed through the access-token gateway (workspace, spec, collection, environment, mock, monitor, tagging, identity) | Minted by `postman-resolve-service-token-action` from the service-account PMAK | Fresh per workflow run; avoid storing unless a scheduled refresh workflow intentionally writes `POSTMAN_ACCESS_TOKEN` |
+| Human-user Insights credentials | `insights-postman-api-key`, `insights-postman-access-token` | Optional Insights linking only | A human workspace-admin user's PMAK and session access token, stored as separate GitHub secrets | Required together only when `enable-insights: true`; never substitute the service-account suite credentials |
 | Team ID | `steps.postman-token.outputs.team-id`, passed as `postman-team-id`; direct bootstrap workflows may use `workspace-team-id` | Org-mode integration headers and sub-team workspace creation | Emitted by `postman-resolve-service-token-action`, or stored as a repository/org variable when the sub-team is fixed | Not a secret and does not expire, but update it if the target Postman team changes |
 | GitHub token | `github-token`, `gh-fallback-token`, or `${{ github.token }}` | Artifact commits, repository variables, generated workflow files, and optional secret writes | `GITHUB_TOKEN` needs `contents: write`; generated workflow updates need `actions: write`; repository secret writes need a PAT or GitHub App token with secrets write permission | `GITHUB_TOKEN` is job-scoped; PAT/App token lifetime follows its issuer policy |
 | AWS OIDC | `permissions: id-token: write` plus `aws-actions/configure-aws-credentials` | AWS Spec Discovery before onboarding | GitHub OIDC role assumption with least-privilege read permissions for API Gateway, AppSync, EventBridge, Lambda, or the providers you enable | Temporary AWS credentials for the job; no static AWS key is stored |
@@ -164,7 +165,7 @@ The full pattern, including sync-branch creation and programmatic PR opening, is
 
 ### Insights linking
 
-When `enable-insights: true`, the action chains `postman-cs/postman-insights-onboarding-action@v2` after bootstrap and repo sync, using the workspace from bootstrap plus the first environment from `environments-json`.
+When `enable-insights: true`, the action chains `postman-cs/postman-insights-onboarding-action@v2` after bootstrap and repo sync, using the workspace from bootstrap plus the first environment from `environments-json`. Insights requires a separate human-user PMAK and human-user session access token; do not pass the service-account credentials used by bootstrap and repo sync.
 
 ```yaml
 - uses: actions/checkout@v5
@@ -183,6 +184,8 @@ When `enable-insights: true`, the action chains `postman-cs/postman-insights-onb
     cluster-name: my-cluster
     postman-api-key: ${{ secrets.POSTMAN_API_KEY }}
     postman-access-token: ${{ steps.postman-token.outputs.token }}
+    insights-postman-api-key: ${{ secrets.POSTMAN_INSIGHTS_USER_API_KEY }}
+    insights-postman-access-token: ${{ secrets.POSTMAN_INSIGHTS_USER_ACCESS_TOKEN }}
     postman-team-id: ${{ steps.postman-token.outputs.team-id }}
 ```
 
@@ -259,7 +262,9 @@ Set `skip-built-in-tests: 'true'` when the caller workflow must perform post-onb
 | `env-runtime-urls-json` | JSON map of environment slug to runtime base URL. | no | `{}` |
 | `postman-api-key` | Postman API key (PMAK). Threaded to the wrapped actions to mint and re-mint the access token and to authenticate the Postman CLI logins (bootstrap spec lint, repo-sync generated-CI collection run). Individually optional; at least one of postman-api-key or postman-access-token is required. | no |  |
 | `postman-access-token` | Postman access token (x-access-token). Primary credential threaded to the wrapped actions; every Postman asset operation runs through the access-token gateway. Mint it with postman-resolve-service-token-action. Individually optional; at least one of postman-api-key or postman-access-token is required. | no |  |
-| `credential-preflight` | Credential identity preflight policy forwarded to bootstrap, repo sync, and insights. warn (default) logs a note and continues when postman-api-key and postman-access-token resolve to different parent orgs; enforce fails the run on that condition before any workspace is created. | no | `warn` |
+| `insights-postman-api-key` | Human-user Postman API key (PMAK) for Insights. Required with insights-postman-access-token only when enable-insights is true; do not use the service-account suite key. | no |  |
+| `insights-postman-access-token` | Human-user session access token for Insights. Required with insights-postman-api-key only when enable-insights is true; do not use a service-token mint. | no |  |
+| `credential-preflight` | Credential identity preflight policy forwarded to bootstrap and repo sync. warn (default) logs a note and continues when postman-api-key and postman-access-token resolve to different parent orgs; enforce fails the run on that condition before any workspace is created. | no | `warn` |
 | `postman-team-id` | Explicit Postman team ID override for org-mode integration calls. | no |  |
 | `postman-region` | Postman data residency region for public API and Postman CLI calls. One of us or eu. | no | `us` |
 | `github-token` | GitHub token used for repo variables and generated commits. | no |  |
@@ -334,7 +339,7 @@ Between repo sync and Insights, the action runs the generated smoke and contract
 
 Running outside GitHub Actions (GitLab CI, Bitbucket Pipelines, Azure DevOps)? The bootstrap and repo-sync CLIs cover that: see [docs/non-github-ci.md](docs/non-github-ci.md).
 
-Releases use immutable `v1.x.y` tags with `v1` as the rolling release channel; pin an immutable tag for reproducibility. See [RELEASE_POLICY.md](RELEASE_POLICY.md).
+Releases use immutable `v2.x.y` tags with `v2` as the rolling release channel; pin an immutable tag for reproducibility. See [RELEASE_POLICY.md](RELEASE_POLICY.md).
 
 ## Resources
 

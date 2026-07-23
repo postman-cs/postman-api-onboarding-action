@@ -50,9 +50,11 @@ type ActionManifest = {
 
 type WorkflowManifest = {
   jobs: {
-    release: {
+    classify: {
       steps: Step[];
     };
+    'verify-package': { if: string };
+    publish: { if: string; steps: Step[] };
   };
 };
 
@@ -122,38 +124,21 @@ describe('postman-api-onboarding-action composite contract', () => {
 
     it('publishes immutable release tags while skipping npm for the rolling alias', () => {
       const workflow = loadReleaseWorkflow();
-      const steps = workflow.jobs.release.steps;
-      const verifyStep = steps.find((step) => step.name === 'Verify release tag matches package version');
-      const releaseStep = steps.find((step) => step.name === 'Publish GitHub release');
-      const npmSetupStep = steps.find(
-        (step) =>
-          step.uses?.startsWith('actions/setup-node@') &&
-          step.with?.['registry-url'] &&
-          step.if === "steps.release_tag.outputs.npm_publish == 'true'"
-      );
-      const npmPackageStep = steps.find((step) => step.name === 'Check npm package version');
-      const publishStep = steps.find((step) => step.name === 'Publish to npm');
-      const attachStep = steps.find((step) => step.name === 'Attach npm tarball to release');
-      const uploadStep = steps.find((step) => step.name === 'Upload tarball');
+      const classifier = workflow.jobs.classify.steps.find((step) => step.name === 'Classify release tag');
+      const verify = workflow.jobs['verify-package'];
+      const publish = workflow.jobs.publish;
 
-      expect(verifyStep?.id).toBe('release_tag');
-      expect(verifyStep?.run).toContain('PUBLISH_TAGS=("$PKG_VERSION")');
-      expect(verifyStep?.run).toContain('PUBLISH_TAGS+=("$MAJOR.$MINOR")');
-      expect(verifyStep?.run).toContain('if [ "$TAG_VERSION" = "$MAJOR" ]; then');
-      expect(verifyStep?.run).not.toContain('if [ "$TAG_VERSION" = "0" ]; then');
-      expect(verifyStep?.run).toContain('or v$MAJOR');
-      expect(verifyStep?.run).toContain('npm_publish=true');
-      expect(verifyStep?.run).toContain('npm_publish=false');
-      expect(verifyStep?.run).toContain('skipping npm publish');
-      expect(verifyStep?.run).not.toContain('ALIAS_TAGS');
-      expect(verifyStep?.run).not.toContain('publish_tag');
-      expect(releaseStep?.if).toBeUndefined();
-      expect(npmSetupStep?.if).toBe("steps.release_tag.outputs.npm_publish == 'true'");
-      expect(npmPackageStep?.id).toBe('npm_package');
-      expect(npmPackageStep?.run).toContain('npm view "$PKG_NAME@$PKG_VERSION" version');
-      expect(publishStep?.if).toBe("steps.release_tag.outputs.npm_publish == 'true' && steps.npm_package.outputs.already_published != 'true'");
-      expect(attachStep?.if).toBeUndefined();
-      expect(uploadStep?.if).toBeUndefined();
+      expect(classifier?.id).toBe('release_tag');
+      expect(classifier?.run).toContain('IMMUTABLE=("v$PKG_VERSION")');
+      expect(classifier?.run).toContain('IMMUTABLE+=("v$MAJOR.$MINOR")');
+      expect(classifier?.run).toContain("release_kind=immutable");
+      expect(classifier?.run).toContain("release_kind=alias");
+      expect(verify.if).toBe("needs.classify.outputs.release_kind == 'immutable'");
+      expect(publish.if).toBe("needs.classify.outputs.release_kind == 'immutable'");
+      const publishStep = publish.steps.find((step) => step.name === 'Publish or verify npm package');
+      const releaseStep = publish.steps.find((step) => step.name === 'Publish GitHub release');
+      expect(publishStep?.run).toContain('npm publish ./release/release.tgz --provenance --access public');
+      expect(releaseStep?.uses).toContain('softprops/action-gh-release');
     });
 
     it('README documents all inputs from action.yml', () => {
@@ -231,6 +216,8 @@ describe('postman-api-onboarding-action composite contract', () => {
         'env-runtime-urls-json',
         'postman-api-key',
         'postman-access-token',
+        'insights-postman-api-key',
+        'insights-postman-access-token',
         'credential-preflight',
         'postman-team-id',
         'postman-region',
@@ -363,7 +350,7 @@ describe('postman-api-onboarding-action composite contract', () => {
       const insightsStep = steps.find((step) => step.id === 'insights_onboarding');
 
       expect(validateStep?.shell).toBe('bash');
-      expect(bootstrapStep?.uses).toBe('postman-cs/postman-bootstrap-action@v2.10.5');
+      expect(bootstrapStep?.uses).toBe('postman-cs/postman-bootstrap-action@v2.10.7');
       expect(repoSyncStep?.uses).toBe('postman-cs/postman-repo-sync-action@v2.1.10');
       expect(junitStep?.shell).toBe('bash');
       expect(uploadStep?.uses).toBe('actions/upload-artifact@v7.0.1');
@@ -507,7 +494,7 @@ describe('postman-api-onboarding-action composite contract', () => {
         "${{ inputs.spec-url == '' && inputs.spec-files-json || '' }}"
       );
       // Sibling pins stay on the current immutable tags.
-      expect(bootstrapStep?.uses).toBe('postman-cs/postman-bootstrap-action@v2.10.5');
+      expect(bootstrapStep?.uses).toBe('postman-cs/postman-bootstrap-action@v2.10.7');
       expect(
         manifest.runs.steps.find((step) => step.id === 'repo_sync')?.uses
       ).toBe('postman-cs/postman-repo-sync-action@v2.1.10');
@@ -561,13 +548,16 @@ describe('postman-api-onboarding-action composite contract', () => {
       }
     });
 
-    it('passes postman-api-key and postman-access-token to bootstrap, repo-sync, and insights', () => {
+    it('isolates dedicated human-user Insights credentials from suite credentials', () => {
       const manifest = loadManifest();
-      for (const stepId of ['bootstrap', 'repo_sync', 'insights_onboarding'] as const) {
+      for (const stepId of ['bootstrap', 'repo_sync'] as const) {
         const step = manifest.runs.steps.find((s) => s.id === stepId);
         expect(step?.with?.['postman-api-key']).toBe('${{ inputs.postman-api-key }}');
         expect(step?.with?.['postman-access-token']).toBe('${{ inputs.postman-access-token }}');
       }
+      const insights = manifest.runs.steps.find((step) => step.id === 'insights_onboarding');
+      expect(insights?.with?.['postman-api-key']).toBe('${{ inputs.insights-postman-api-key }}');
+      expect(insights?.with?.['postman-access-token']).toBe('${{ inputs.insights-postman-access-token }}');
     });
 
     it('credential-preflight defaults to warn and is optional', () => {

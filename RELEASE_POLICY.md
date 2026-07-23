@@ -23,7 +23,10 @@ It applies to these repositories:
 
 - Each repository owns its own CI workflow and its own `v*` tag-triggered GitHub release workflow.
 - The composite action references sibling actions through immutable release tags in `action.yml`.
-- The public release contract is the git tag and GitHub release. Do not treat `package.json` version fields as the authoritative public release identifier.
+- Immutable release identity is derived from the repository `package.json` version at the tagged commit:
+  exact `vX.Y.Z`, plus `vX.Y` when the patch component is `0`.
+- The current consumer rolling channel for this composite is `v2`.
+- The public release contract is the git tag and GitHub release. Do not treat `package.json` version fields as the authoritative public release identifier by themselves.
 
 ## Source of truth
 
@@ -38,16 +41,19 @@ Do not duplicate full input and output tables across repositories. Link to the a
 
 ## Tag policy
 
-- Immutable release tags use the public `v1.x.y` pattern.
-- The moving `v1` tag is the rolling release channel.
-- Never rewrite or force-push an existing release tag.
-- Every public tag should have a corresponding GitHub release with generated notes.
+- Immutable release tags are version-derived (`vX.Y.Z`, and `vX.Y` only when patch is `0`).
+  These tags are never rewritten or force-pushed.
+- The moving `v2` tag is the current rolling consumer channel for this composite.
+  Rolling aliases are deliberately movable and may be force-updated forward only;
+  they must never regress to an older immutable version.
+- Immutable release tags have a corresponding GitHub release with generated notes;
+  a direct rolling-alias invocation is a successful no-op.
 
 ## Consumer guidance
 
-- Use `@v1` in quick-start examples when the goal is a short marketplace install path.
-- Recommend immutable tags such as `@v1.x.y` for reproducible production workflows.
-- Treat `@v1` as a convenience channel; pin an immutable `@v1.x.y` tag or commit SHA when you need a reproducible reference.
+- Use `@v2` in quick-start examples when the goal is a short marketplace install path.
+- Recommend immutable tags such as `@v2.x.y` for reproducible production workflows.
+- Treat `@v2` as a convenience channel; pin an immutable `@v2.x.y` tag or commit SHA when you need a reproducible reference.
 - For security-sensitive environments, document that SHA pinning is the strongest option.
 
 ## Composite dependency policy
@@ -56,7 +62,7 @@ Do not duplicate full input and output tables across repositories. Link to the a
 
 The composite action currently depends on:
 
-- `postman-cs/postman-bootstrap-action@v2.10.5`
+- `postman-cs/postman-bootstrap-action@v2.10.7`
 - `postman-cs/postman-repo-sync-action@v2.1.10`
 - `postman-cs/postman-insights-onboarding-action@v2.1.4` when Insights is enabled
 
@@ -84,37 +90,22 @@ Release from the bottom up:
 6. Update `README.md`, this file, and any compatibility notes affected by the release.
 7. Release `postman-api-onboarding-action` last.
 
-## Live E2E Release Gate
+## Verification and live monitors
 
-Phase 1 of the live release gate covers only the actions currently exercised by
-`postman-cs/postman-actions-e2e` as released CLI artifacts:
+Pull requests and immutable releases run deterministic repository-local checks.
+The composite release verifies immutable sibling pins before packaging. Its
+release workflow classifies a tag before installing dependencies, validates and
+packs in an unprivileged job, then publishes only checksummed staged artifacts in
+the privileged job. Trusted envelope verification establishes artifact identity
+and checksums before any packaged verifier code is extracted. npm publication
+(or SRI identity verification on retry) precedes the GitHub Release; the rolling
+`v2` alias advances only after that work and never regresses to an older
+immutable version.
 
-- `postman-resolve-service-token-action`
-- `postman-bootstrap-action`
-- `postman-repo-sync-action`
-- `postman-smoke-flow-action`
-
-For those repos, pull requests targeting `main` must pass the central live e2e
-gate before approval or merge. The PR workflow dispatches
-`postman-cs/postman-actions-e2e` with the PR head SHA pinned for the changed
-action and waits for the correlated run to succeed. Branches must live in the
-target repository so GitHub can provide the central e2e dispatch secret; forked
-PRs cannot satisfy the required merge gate until moved to an in-repo branch.
-
-For those repos, immutable publishing tags must pass the central live e2e gate
-before any GitHub release, npm package, or release tarball is published. The
-release workflow validates locally, dispatches the central e2e workflow with the
-exact action tag pinned, waits for the correlated workflow run to conclude
-successfully, and only then publishes. The release log must include the e2e run
-URL, correlation id, and conclusion.
-
-The rolling `v1` alias validates locally but skips npm publish
-and the live e2e gate.
-
-The composite action, Insights onboarding, and AWS spec discovery are not
-directly live-e2e-gated in Phase 1. Do not describe releases in those repos as
-live-e2e-gated until the harness adds real coverage for the released artifact and
-the repo's release workflow blocks on that gate.
+Live sandbox E2E is not a PR or publication gate. The `onboarding-e2e` harness
+runs a nightly `full` monitor and receives asynchronous post-release `smoke`
+monitor dispatches for covered actions. Monitor failures remain observable but do
+not block merge, npm publication, GitHub Release creation, or rolling aliases.
 
 ## Compatibility matrix
 
@@ -122,7 +113,7 @@ This matrix describes the current release model.
 
 | Composite reference used by consumers | Composite repository content | Lower-level dependency references | Result |
 | --- | --- | --- | --- |
-| `postman-api-onboarding-action@v1` | Rolling composite alias | Immutable sibling tags in the current composite content | Rolling composite channel with pinned siblings per composite revision |
+| `postman-api-onboarding-action@v2` | Rolling composite alias | Immutable sibling tags in the current composite content | Rolling composite channel with pinned siblings per composite revision |
 | Immutable composite release | Immutable composite repo tag | Immutable sibling tags | Fully reproducible |
 
 ## Marketplace documentation surface
@@ -144,10 +135,10 @@ Before pushing a new release tag:
 4. Confirm `README.md` and `RELEASE_POLICY.md` still match the actual composite wiring.
 5. Confirm `SUPPORT.md` and `SECURITY.md` still match the current support and vulnerability-reporting paths.
 6. If lower-level actions changed behavior, verify whether the composite repo needs a coordinated release.
-7. For a live-e2e-gated repo, confirm `E2E_DISPATCH_TOKEN` is configured and the
-   release workflow records a successful central e2e run before publish.
-8. Push the immutable release tag.
-9. Confirm that the matching GitHub release was published with generated notes.
+7. Push the immutable release tag.
+8. Confirm npm publication or matching SRI retry identity, then the matching
+   GitHub release and rolling alias update.
+9. Review asynchronous post-release monitor results when the action is covered.
 
 ## What changes the policy
 

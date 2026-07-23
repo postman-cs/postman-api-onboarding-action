@@ -4,7 +4,7 @@
 
 The `postman-api-key` is a [Postman API key](https://learning.postman.com/docs/reference/postman-api/authentication/) (PMAK) used for all standard Postman API operations: creating workspaces, uploading specs, generating collections, exporting artifacts, and managing environments.
 
-For CI, use a service-account PMAK. The same key can run the standard Postman API calls and mint the short-lived access token used by integration steps. See the [service accounts documentation](https://learning.postman.com/docs/administration/service-accounts/) for setup and assignment guidance.
+For bootstrap and repo-sync CI operations, use a service-account PMAK. The same key can run the standard Postman API calls and mint the short-lived access token used by integration steps. See the [service accounts documentation](https://learning.postman.com/docs/administration/service-accounts/) for setup and assignment guidance. Insights is an exception: it requires separate human-user credentials described below.
 
 To generate one:
 
@@ -25,12 +25,12 @@ Primary path: mint the token with [postman-resolve-service-token-action](https:/
 
 ```yaml
 - id: postman_token
-  uses: postman-cs/postman-resolve-service-token-action@v1
+  uses: postman-cs/postman-resolve-service-token-action@v2
   with:
     postman-api-key: ${{ secrets.POSTMAN_API_KEY }}
     postman-region: us
 
-- uses: postman-cs/postman-api-onboarding-action@v1
+- uses: postman-cs/postman-api-onboarding-action@v2
   with:
     project-name: core-payments
     spec-url: https://raw.githubusercontent.com/postman-cs/postman-api-onboarding-action/main/examples/core-payments-openapi.yaml
@@ -87,6 +87,12 @@ The [roles and permissions](https://learning.postman.com/docs/administration/rol
 
 ## API key auto-creation
 
-`postman-api-key` and `postman-access-token` are individually optional, but at least one is required. Access-token-only runs match the wrapped bootstrap/repo-sync contract: the composite fails in the first validation step when neither credential is present. Built-in Postman CLI smoke/contract tests still need a PMAK (they use `postman login --with-api-key`); without one the composite skips those tests with a warning. `postman-repo-sync-action` and `postman-insights-onboarding-action` can create or rotate a PMAK from `postman-access-token` when they encounter a clear auth failure.
+`postman-api-key` and `postman-access-token` are individually optional, but at least one is required. Access-token-only runs match the wrapped bootstrap/repo-sync contract: the composite fails in the first validation step when neither credential is present. Built-in Postman CLI smoke/contract tests still need a PMAK (they use `postman login --with-api-key`); without one the composite skips those tests with a warning. Repo sync can create or rotate a PMAK from `postman-access-token` when it encounters a clear auth failure.
+
+## Insights credentials
+
+When `enable-insights: true`, provide both `insights-postman-api-key` and `insights-postman-access-token`. They must be a human workspace-admin user's PMAK and session access token for the same identity. Store them as separate CI secrets, such as `POSTMAN_INSIGHTS_USER_API_KEY` and `POSTMAN_INSIGHTS_USER_ACCESS_TOKEN`.
+
+Do not use `postman-resolve-service-token-action` outputs, a service-account PMAK, or the suite `postman-api-key` / `postman-access-token` for Insights. When Insights is disabled, both dedicated inputs may be empty.
 
 For org-wide API key expiration, revocation, and exposed-key handling, see the [managing API keys](https://learning.postman.com/docs/administration/managing-your-team/managing-api-keys/) guide.

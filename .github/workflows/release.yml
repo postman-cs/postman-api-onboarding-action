@@ -2,120 +2,213 @@ name: Release
 
 on:
   push:
-    tags:
-      - 'v*'
+    tags: ['v*']
   workflow_dispatch:
 
 permissions:
-  contents: write
-  id-token: write
+  contents: read
+
+concurrency:
+  group: release-${{ github.repository }}
+  cancel-in-progress: false
 
 jobs:
-  release:
+  classify:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     outputs:
+      release_kind: ${{ steps.release_tag.outputs.release_kind }}
       npm_publish: ${{ steps.release_tag.outputs.npm_publish }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
-          cache: npm
-          registry-url: 'https://registry.npmjs.org'
-      - uses: actions/setup-go@v6
-        with:
-          go-version: '1.24'
-      - run: npm ci
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-      - run: npm test
-      - name: Verify composite sibling pins
-        run: node scripts/check-sibling-pins.mjs
-      - name: Install actionlint
-        run: go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.11
-      - name: Run actionlint
-        run: |
-          ACTIONLINT_BIN="$(go env GOPATH)/bin/actionlint"
-          "$ACTIONLINT_BIN"
-      - name: Verify release tag matches package version
+      - name: Classify release tag
         id: release_tag
         run: |
-          if [[ "$GITHUB_REF" != refs/tags/v* ]]; then
-            echo "::error::Release workflow must run from a v* tag; got $GITHUB_REF"
-            exit 1
-          fi
-          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          set -euo pipefail
           PKG_VERSION=$(node -p "require('./package.json').version")
           IFS='.' read -r MAJOR MINOR PATCH _ <<< "$PKG_VERSION"
-          PUBLISH_TAGS=("$PKG_VERSION")
-          if [ "${PATCH:-}" = "0" ] && [ -n "${MINOR:-}" ]; then
-            PUBLISH_TAGS+=("$MAJOR.$MINOR")
+          IMMUTABLE=("v$PKG_VERSION")
+          if [ "$PATCH" = "0" ]; then IMMUTABLE+=("v$MAJOR.$MINOR"); fi
+          if [[ "$GITHUB_REF" != refs/tags/* ]]; then
+            echo "::error::Release workflow must run from an accepted immutable tag; got $GITHUB_REF; expected ${IMMUTABLE[*]} or v$MAJOR"
+            exit 1
           fi
-          for PUBLISH_TAG in "${PUBLISH_TAGS[@]}"; do
-            if [ "$TAG_VERSION" = "$PUBLISH_TAG" ]; then
-              echo "npm_publish=true" >> "$GITHUB_OUTPUT"
-              exit 0
-            fi
-          done
-          if [ "$TAG_VERSION" = "$MAJOR" ]; then
-            echo "npm_publish=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::Tag v$TAG_VERSION is the rolling alias for package version $PKG_VERSION; skipping npm publish."
-            exit 0
-          fi
-          if [ "${#PUBLISH_TAGS[@]}" -eq 2 ]; then
-            EXPECTED="v${PUBLISH_TAGS[0]}, v${PUBLISH_TAGS[1]}, or v$MAJOR"
+          if [[ " ${IMMUTABLE[*]} " == *" $GITHUB_REF_NAME "* ]]; then
+            echo 'release_kind=immutable' >> "$GITHUB_OUTPUT"
+            echo 'npm_publish=true' >> "$GITHUB_OUTPUT"
+          elif [ "$GITHUB_REF_NAME" = "v$MAJOR" ]; then
+            echo 'release_kind=alias' >> "$GITHUB_OUTPUT"
+            echo 'npm_publish=false' >> "$GITHUB_OUTPUT"
+            echo "::notice::$GITHUB_REF_NAME is a rolling alias; no release work will run."
           else
-            EXPECTED="v${PUBLISH_TAGS[0]} or v$MAJOR"
+            echo "::error::Release workflow must run from an accepted immutable tag; got $GITHUB_REF; expected ${IMMUTABLE[*]} or v$MAJOR"
+            exit 1
           fi
-          echo "::error::Tag v$TAG_VERSION does not match package.json version $PKG_VERSION; expected $EXPECTED"
-          exit 1
+
+  verify-package:
+    needs: classify
+    if: needs.classify.outputs.release_kind == 'immutable'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+          registry-url: 'https://registry.npmjs.org'
+      - run: npm ci
+      - name: Install actionlint
+        run: |
+          bash <(curl -sSfL https://raw.githubusercontent.com/rhysd/actionlint/393031adb9afb225ee52ae2ccd7a5af5525e03e8/scripts/download-actionlint.bash) 1.7.11 "$RUNNER_TEMP"
+          echo "ACTIONLINT_BIN=$RUNNER_TEMP/actionlint" >> "$GITHUB_ENV"
+      - name: Run gates
+        run: |
+          set -uo pipefail
+          declare -A pid=() result=(); declare -a names=(); MAX_PARALLEL_GATES=2
+          finish_one() { local finished_pid status n; if wait -n -p finished_pid "${pid[@]}"; then status=0; else status=$?; fi; for n in "${!pid[@]}"; do if [ "${pid[$n]}" = "$finished_pid" ]; then result[$n]=$status; unset 'pid[$n]'; return; fi; done; }
+          run() { while [ "${#pid[@]}" -ge "$MAX_PARALLEL_GATES" ]; do finish_one; done; local n=$1; shift; names+=("$n"); ( "$@" ) >"$n.log" 2>&1 & pid[$n]=$!; }
+          run lint npm run lint
+          run typecheck npm run typecheck
+          run test npm test
+          run sibling-pins node scripts/check-sibling-pins.mjs
+          run actionlint "$ACTIONLINT_BIN"
+          while [ "${#pid[@]}" -gt 0 ]; do finish_one; done
+          fail=0; for n in "${names[@]}"; do if [ "${result[$n]}" -eq 0 ]; then echo "gate:$n=pass"; else echo "gate:$n=fail"; fail=1; fi; done; for n in "${names[@]}"; do echo "::group::$n"; cat "$n.log"; echo '::endgroup::'; done; exit $fail
+      - name: Package release artifact
+        run: |
+          set -euo pipefail
+          npm pack --pack-destination .
+          mv ./*.tgz release.tgz
+          SHA256=$(shasum -a 256 release.tgz | awk '{print $1}')
+          SHA256="$SHA256" node -e "const fs=require('fs');const p=require('./package.json');fs.writeFileSync('release-manifest.json',JSON.stringify({schema_version:1,repository:process.env.GITHUB_REPOSITORY,commit_sha:process.env.GITHUB_SHA,tag:process.env.GITHUB_REF_NAME,package_name:p.name,package_version:p.version,artifacts:[{path:'release.tgz',sha256:process.env.SHA256}]},null,2))"
+          node scripts/verify-release-artifacts.mjs .
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-artifacts-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            release.tgz
+            release-manifest.json
+          if-no-files-found: error
+
+  publish:
+    needs: [classify, verify-package]
+    if: needs.classify.outputs.release_kind == 'immutable'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+      - uses: actions/download-artifact@v7
+        with:
+          name: release-artifacts-${{ github.run_id }}-${{ github.run_attempt }}
+          path: release
+      - name: Verify release artifact envelope
+        run: |
+          node --input-type=module <<'NODE'
+          import { createHash } from 'node:crypto';
+          import { execFileSync } from 'node:child_process';
+          import { readFileSync } from 'node:fs';
+          import { join } from 'node:path';
+
+          const directory = 'release';
+          const tarballPath = join(directory, 'release.tgz');
+          const manifest = JSON.parse(readFileSync(join(directory, 'release-manifest.json'), 'utf8'));
+          if (manifest.schema_version !== 1) throw new Error('unsupported manifest schema');
+          for (const key of ['repository', 'commit_sha', 'tag', 'package_name', 'package_version']) {
+            if (typeof manifest[key] !== 'string' || manifest[key].length === 0) {
+              throw new Error(`manifest ${key} must be a non-empty string`);
+            }
+          }
+          for (const [key, expected] of Object.entries({
+            repository: process.env.GITHUB_REPOSITORY,
+            commit_sha: process.env.GITHUB_SHA,
+            tag: process.env.GITHUB_REF_NAME
+          })) {
+            if (manifest[key] !== expected) throw new Error(`${key} does not match this release`);
+          }
+          if (!Array.isArray(manifest.artifacts) || manifest.artifacts.length !== 1) {
+            throw new Error('manifest artifact allowlist is invalid');
+          }
+          const artifact = manifest.artifacts[0];
+          if (artifact.path !== 'release.tgz' || typeof artifact.sha256 !== 'string' || !/^[a-f0-9]{64}$/.test(artifact.sha256)) {
+            throw new Error('manifest artifact is invalid');
+          }
+          const actual = createHash('sha256').update(readFileSync(tarballPath)).digest('hex');
+          if (actual !== artifact.sha256) throw new Error('checksum mismatch for release.tgz');
+          const packageJson = JSON.parse(execFileSync('tar', ['-xOf', tarballPath, 'package/package.json'], { encoding: 'utf8' }));
+          if (packageJson.name !== manifest.package_name) throw new Error('tarball package name does not match manifest');
+          if (packageJson.version !== manifest.package_version) throw new Error('tarball package version does not match manifest');
+          const [major, minor, patch] = String(packageJson.version).split('.');
+          const allowed = [`v${packageJson.version}`];
+          if (patch === '0') allowed.push(`v${major}.${minor}`);
+          if (!allowed.includes(process.env.GITHUB_REF_NAME)) {
+            throw new Error(`tag ${process.env.GITHUB_REF_NAME} does not match package version ${packageJson.version}`);
+          }
+          NODE
+      - name: Publish or verify npm package
+        run: |
+          set -euo pipefail
+          PKG_NAME=$(tar -xOf release/release.tgz package/package.json | node -p "JSON.parse(require('fs').readFileSync(0, 'utf8')).name")
+          PKG_VERSION=$(tar -xOf release/release.tgz package/package.json | node -p "JSON.parse(require('fs').readFileSync(0, 'utf8')).version")
+          SRI="sha512-$(openssl dgst -sha512 -binary release/release.tgz | openssl base64 -A)"
+          if EXISTING=$(npm view "$PKG_NAME@$PKG_VERSION" dist.integrity 2>/dev/null); then
+            [ "$EXISTING" = "$SRI" ] || { echo '::error::Published npm integrity differs from staged tarball'; exit 1; }
+          else
+            npm publish ./release/release.tgz --provenance --access public
+          fi
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       - name: Publish GitHub release
         uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
         with:
           generate_release_notes: true
-      - uses: actions/setup-node@v7
-        if: steps.release_tag.outputs.npm_publish == 'true'
-        with:
-          node-version: '24'
-          registry-url: 'https://registry.npmjs.org'
-      - name: Check npm package version
-        id: npm_package
-        if: steps.release_tag.outputs.npm_publish == 'true'
-        run: |
-          PKG_NAME=$(node -p "require('./package.json').name")
-          PKG_VERSION=$(node -p "require('./package.json').version")
-          if npm view "$PKG_NAME@$PKG_VERSION" version >/dev/null 2>&1; then
-            echo "already_published=true" >> "$GITHUB_OUTPUT"
-            echo "::notice::$PKG_NAME@$PKG_VERSION is already published; skipping npm publish."
-          else
-            echo "already_published=false" >> "$GITHUB_OUTPUT"
-          fi
-      - name: Publish to npm
-        if: steps.release_tag.outputs.npm_publish == 'true' && steps.npm_package.outputs.already_published != 'true'
-        run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-      - name: Attach npm tarball to release
-        run: |
-          npm pack
-          mv ./*.tgz release.tgz
-      - name: Upload tarball
-        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
-        with:
-          files: release.tgz
+          files: |
+            release/release.tgz
+            release/release-manifest.json
 
   advance-major-alias:
-    needs: release
-    if: ${{ needs.release.outputs.npm_publish == 'true' }}
+    needs: [classify, publish]
+    if: needs.classify.outputs.release_kind == 'immutable'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v7
-      - name: Force-move rolling major alias tag
+        with:
+          fetch-depth: 1
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - name: Advance rolling major alias
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
-          MAJOR="v${VERSION%%.*}"
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          COMMIT="$(git rev-parse "HEAD^{commit}")"
-          git tag -fa "$MAJOR" -m "Rolling $MAJOR alias -> $GITHUB_REF_NAME" "$COMMIT"
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"; MAJOR="v${VERSION%%.*}"
+          set +e
+          ROWS=$(git ls-remote --tags origin "refs/tags/$MAJOR" "refs/tags/$MAJOR^{}" "refs/tags/$MAJOR.*")
+          LS_STATUS=$?
+          set -e
+          [ "$LS_STATUS" -eq 0 ] || exit "$LS_STATUS"
+          set +e
+          CURRENT=$(printf '%s\n' "$ROWS" | node scripts/check-release-alias.mjs "$MAJOR" "$GITHUB_REF_NAME")
+          STATUS=$?
+          set -e
+          if [ "$STATUS" -eq 10 ]; then
+            echo "::notice::Keeping newer $MAJOR alias at v$CURRENT"
+            exit 0
+          fi
+          [ "$STATUS" -eq 0 ] || exit "$STATUS"
+          git config user.name 'github-actions[bot]'; git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git tag -fa "$MAJOR" -m "Rolling $MAJOR alias -> $GITHUB_REF_NAME" "$GITHUB_SHA"
           git push origin "$MAJOR" --force
