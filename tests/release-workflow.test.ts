@@ -18,26 +18,32 @@ function namedStep(name: string): string {
   return match?.[0] ?? '';
 }
 
+let cachedClassifierScript: string | undefined;
+
 function classifierScript(): string {
+  if (cachedClassifierScript !== undefined) return cachedClassifierScript;
   const match = releaseWorkflow.match(/ {6}- name: Classify release tag\n(?:.*\n)*? {8}run: \|\n([\s\S]*?)(?=\n\n {2}[a-z]|\n {2}[a-z])/);
   expect(match?.[1]).toBeTruthy();
-  return (match?.[1] ?? '')
+  cachedClassifierScript = (match?.[1] ?? '')
     .split('\n')
     .map((line) => (line.startsWith('          ') ? line.slice(10) : line))
     .join('\n');
+  return cachedClassifierScript;
 }
 
 function runClassifier(options: { ref: string; refName: string; packageVersion: string }) {
   const directory = mkdtempSync(join(tmpdir(), 'release-classify-'));
   const output = join(directory, 'github-output');
+  const scriptPath = join(directory, 'classify.sh');
   writeFileSync(join(directory, 'package.json'), JSON.stringify({ version: options.packageVersion }));
   writeFileSync(output, '');
-  writeFileSync(join(directory, 'classify.sh'), classifierScript());
-  const result = spawnSync('bash', [join(directory, 'classify.sh')], {
+  writeFileSync(scriptPath, classifierScript());
+  // Lean env: avoid copying a large process.env into five nested bash→node spawns.
+  const result = spawnSync('bash', [scriptPath], {
     cwd: directory,
     encoding: 'utf8',
     env: {
-      ...process.env,
+      PATH: process.env.PATH ?? '',
       GITHUB_REF: options.ref,
       GITHUB_REF_NAME: options.refName,
       GITHUB_OUTPUT: output
@@ -66,7 +72,7 @@ function launchedGates(body: string): Array<{ name: string; command: string }> {
 }
 
 describe('release workflow publishing contract', () => {
-  it('keeps existing classifier forms and executes immutable, alias, invalid, mismatched, and zero-patch cases', () => {
+  it('keeps existing classifier forms for immutable, alias, and npm_publish outputs', () => {
     expect(releaseWorkflow).toContain('IMMUTABLE=("v$PKG_VERSION")');
     expect(releaseWorkflow).toContain('IMMUTABLE+=("v$MAJOR.$MINOR")');
     expect(releaseWorkflow).toContain('elif [ "$GITHUB_REF_NAME" = "v$MAJOR" ]; then');
@@ -79,33 +85,84 @@ describe('release workflow publishing contract', () => {
     expect(releaseWorkflow).not.toContain('ALIAS_TAGS');
     expect(releaseWorkflow).not.toContain('publish_tag');
     expect(releaseWorkflow).not.toContain('needs.classify.outputs.npm_publish');
+  });
 
-    const immutable = runClassifier({ ref: 'refs/tags/v2.1.2', refName: 'v2.1.2', packageVersion: '2.1.2' });
-    expect(immutable.status).toBe(0);
-    expect(immutable.githubOutput).toContain('release_kind=immutable');
-    expect(immutable.githubOutput).toContain('npm_publish=true');
-
-    const alias = runClassifier({ ref: 'refs/tags/v2', refName: 'v2', packageVersion: '2.1.2' });
-    expect(alias.status).toBe(0);
-    expect(alias.githubOutput).toContain('release_kind=alias');
-    expect(alias.githubOutput).toContain('npm_publish=false');
-    expect(`${alias.stdout}${alias.stderr}`).toMatch(/rolling alias|no release work will run/i);
-
-    const branch = runClassifier({ ref: 'refs/heads/main', refName: 'main', packageVersion: '2.1.2' });
-    expect(branch.status).not.toBe(0);
-    expect(`${branch.stdout}${branch.stderr}`).toContain('::error::');
-    expect(branch.githubOutput).not.toContain('release_kind=');
-    expect(branch.githubOutput).not.toContain('npm_publish=');
-
-    const mismatched = runClassifier({ ref: 'refs/tags/v2.1.1', refName: 'v2.1.1', packageVersion: '2.1.2' });
-    expect(mismatched.status).not.toBe(0);
-    expect(mismatched.githubOutput).not.toContain('release_kind=');
-    expect(mismatched.githubOutput).not.toContain('npm_publish=');
-
-    const zeroPatch = runClassifier({ ref: 'refs/tags/v2.2', refName: 'v2.2', packageVersion: '2.2.0' });
-    expect(zeroPatch.status).toBe(0);
-    expect(zeroPatch.githubOutput).toContain('release_kind=immutable');
-    expect(zeroPatch.githubOutput).toContain('npm_publish=true');
+  it.each([
+    {
+      label: 'immutable',
+      ref: 'refs/tags/v2.1.2',
+      refName: 'v2.1.2',
+      packageVersion: '2.1.2',
+      status: 0,
+      githubOutput: ['release_kind=immutable', 'npm_publish=true'],
+      diagIncludes: [] as string[],
+      diagExcludesOutput: [] as string[]
+    },
+    {
+      label: 'alias',
+      ref: 'refs/tags/v2',
+      refName: 'v2',
+      packageVersion: '2.1.2',
+      status: 0,
+      githubOutput: ['release_kind=alias', 'npm_publish=false'],
+      diagIncludes: ['rolling alias|no release work will run'],
+      diagExcludesOutput: [] as string[]
+    },
+    {
+      label: 'non-tag branch',
+      ref: 'refs/heads/main',
+      refName: 'main',
+      packageVersion: '2.1.2',
+      status: 1,
+      githubOutput: [],
+      diagIncludes: ['::error::', 'refs/heads/main', 'v2.1.2', 'v2'],
+      diagExcludesOutput: ['release_kind=', 'npm_publish=']
+    },
+    {
+      label: 'mismatched tag',
+      ref: 'refs/tags/v2.1.1',
+      refName: 'v2.1.1',
+      packageVersion: '2.1.2',
+      status: 1,
+      githubOutput: [],
+      diagIncludes: ['::error::', 'refs/tags/v2.1.1', 'v2.1.2', 'v2'],
+      diagExcludesOutput: ['release_kind=', 'npm_publish=']
+    },
+    {
+      label: 'zero-patch minor',
+      ref: 'refs/tags/v2.2',
+      refName: 'v2.2',
+      packageVersion: '2.2.0',
+      status: 0,
+      githubOutput: ['release_kind=immutable', 'npm_publish=true'],
+      diagIncludes: [] as string[],
+      diagExcludesOutput: [] as string[]
+    }
+  ])('executes classifier for $label', (testcase) => {
+    const result = runClassifier({
+      ref: testcase.ref,
+      refName: testcase.refName,
+      packageVersion: testcase.packageVersion
+    });
+    if (testcase.status === 0) {
+      expect(result.status).toBe(0);
+    } else {
+      expect(result.status).not.toBe(0);
+    }
+    for (const fragment of testcase.githubOutput) {
+      expect(result.githubOutput).toContain(fragment);
+    }
+    for (const fragment of testcase.diagExcludesOutput) {
+      expect(result.githubOutput).not.toContain(fragment);
+    }
+    const diag = `${result.stdout}${result.stderr}`;
+    for (const fragment of testcase.diagIncludes) {
+      if (fragment.includes('|')) {
+        expect(diag).toMatch(new RegExp(fragment, 'i'));
+      } else {
+        expect(diag).toContain(fragment);
+      }
+    }
   });
 
   it('classifies before dependency installation and guards every downstream job on immutable', () => {
@@ -158,12 +215,13 @@ describe('release workflow publishing contract', () => {
     expect(verify).toContain('node scripts/verify-release-artifacts.mjs .');
     expect(verify).toContain('if-no-files-found: error');
     expect(verify).toContain('release-artifacts-${{ github.run_id }}-${{ github.run_attempt }}');
-    expect(verify).not.toContain('actions/setup-go');
-    expect(verify).not.toContain('go install github.com/rhysd/actionlint');
     expect(releaseWorkflow).not.toContain('rhysd/actionlint/main/scripts/download-actionlint.bash');
+    expect(releaseWorkflow).not.toContain('actions/setup-go');
+    expect(releaseWorkflow).not.toContain('go install github.com/rhysd/actionlint');
+    expect(releaseWorkflow).not.toContain('go install');
   });
 
-  it('uses artifact-only publish with trusted envelope verification before any tarball code', () => {
+  it('uses one trusted inline publish verifier before NODE_AUTH_TOKEN without executing package code', () => {
     const publish = job('publish');
     expect(publish).toMatch(/permissions:\n\s+contents: write\n\s+id-token: write/);
     expect(publish).not.toContain('actions/checkout');
@@ -173,23 +231,21 @@ describe('release workflow publishing contract', () => {
     expect(publish).not.toContain('npm test');
     expect(publish).not.toMatch(/npm pack(?:\s|$)/);
     expect(publish).toContain('name: Verify release artifact envelope');
-    expect(publish).toContain('name: Verify package identity from staged artifacts');
+    expect(publish).not.toContain('Verify package identity from staged artifacts');
+    expect(publish).not.toContain('package/scripts/verify-release-artifacts.mjs');
+    expect(publish).not.toContain('RUNNER_TEMP/verify-release-artifacts.mjs');
+    expect(publish).not.toContain('$RUNNER_TEMP/verify-release-artifacts.mjs');
     const envelope = namedStep('Verify release artifact envelope');
-    const identity = namedStep('Verify package identity from staged artifacts');
     const npm = namedStep('Publish or verify npm package');
     expect(envelope).toContain("artifact.path !== 'release.tgz'");
     expect(envelope).toContain('/^[a-f0-9]{64}$/');
-    expect(envelope).not.toContain('tar -xOf');
+    expect(envelope).toContain("execFileSync('tar', ['-xOf', tarballPath, 'package/package.json']");
+    expect(envelope).not.toContain('package/scripts/verify-release-artifacts.mjs');
     expect(envelope).not.toContain('NPM_TOKEN');
     expect(envelope).not.toContain('NODE_AUTH_TOKEN');
-    expect(identity).toContain('tar -xOf release/release.tgz package/scripts/verify-release-artifacts.mjs');
-    expect(identity).not.toContain('NPM_TOKEN');
-    expect(identity).not.toContain('NODE_AUTH_TOKEN');
     expect(npm).toContain('NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}');
-    expect(publish.indexOf('Verify release artifact envelope')).toBeLessThan(
-      publish.indexOf('tar -xOf release/release.tgz package/scripts/verify-release-artifacts.mjs')
-    );
-    expect(publish.indexOf('tar -xOf release/release.tgz package/scripts/verify-release-artifacts.mjs')).toBeLessThan(
+    expect(publish.indexOf('Verify release artifact envelope')).toBeLessThan(publish.indexOf('NODE_AUTH_TOKEN'));
+    expect(publish.indexOf("execFileSync('tar', ['-xOf', tarballPath, 'package/package.json']")).toBeLessThan(
       publish.indexOf('NODE_AUTH_TOKEN')
     );
   });

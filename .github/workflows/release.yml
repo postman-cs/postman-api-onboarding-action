@@ -118,10 +118,12 @@ jobs:
         run: |
           node --input-type=module <<'NODE'
           import { createHash } from 'node:crypto';
+          import { execFileSync } from 'node:child_process';
           import { readFileSync } from 'node:fs';
           import { join } from 'node:path';
 
           const directory = 'release';
+          const tarballPath = join(directory, 'release.tgz');
           const manifest = JSON.parse(readFileSync(join(directory, 'release-manifest.json'), 'utf8'));
           if (manifest.schema_version !== 1) throw new Error('unsupported manifest schema');
           for (const key of ['repository', 'commit_sha', 'tag', 'package_name', 'package_version']) {
@@ -143,13 +145,18 @@ jobs:
           if (artifact.path !== 'release.tgz' || typeof artifact.sha256 !== 'string' || !/^[a-f0-9]{64}$/.test(artifact.sha256)) {
             throw new Error('manifest artifact is invalid');
           }
-          const actual = createHash('sha256').update(readFileSync(join(directory, 'release.tgz'))).digest('hex');
+          const actual = createHash('sha256').update(readFileSync(tarballPath)).digest('hex');
           if (actual !== artifact.sha256) throw new Error('checksum mismatch for release.tgz');
+          const packageJson = JSON.parse(execFileSync('tar', ['-xOf', tarballPath, 'package/package.json'], { encoding: 'utf8' }));
+          if (packageJson.name !== manifest.package_name) throw new Error('tarball package name does not match manifest');
+          if (packageJson.version !== manifest.package_version) throw new Error('tarball package version does not match manifest');
+          const [major, minor, patch] = String(packageJson.version).split('.');
+          const allowed = [`v${packageJson.version}`];
+          if (patch === '0') allowed.push(`v${major}.${minor}`);
+          if (!allowed.includes(process.env.GITHUB_REF_NAME)) {
+            throw new Error(`tag ${process.env.GITHUB_REF_NAME} does not match package version ${packageJson.version}`);
+          }
           NODE
-      - name: Verify package identity from staged artifacts
-        run: |
-          tar -xOf release/release.tgz package/scripts/verify-release-artifacts.mjs > "$RUNNER_TEMP/verify-release-artifacts.mjs"
-          node "$RUNNER_TEMP/verify-release-artifacts.mjs" release
       - name: Publish or verify npm package
         run: |
           set -euo pipefail

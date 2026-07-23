@@ -1,5 +1,15 @@
 import { createHash } from 'node:crypto';
-import { cpSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  cpSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  writeFileSync
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
@@ -37,6 +47,12 @@ const cleanupRoots: string[] = [];
 const packedByVersion = new Map<string, string>();
 let npmPackCount = 0;
 
+const TRAP_VERIFIER = `import { writeFileSync } from 'node:fs';
+if (process.env.OIDC_MARKER) {
+  writeFileSync(process.env.OIDC_MARKER, 'package-code-executed');
+}
+`;
+
 function track(directory: string): string {
   cleanupRoots.push(directory);
   return directory;
@@ -47,14 +63,16 @@ function ensurePacked(packageVersion: string): string {
   if (cached) return cached;
   const root = track(mkdtempSync(join(tmpdir(), `release-pack-${packageVersion}-`)));
   const source = join(root, 'src');
-  mkdirSync(source, { recursive: true });
+  mkdirSync(join(source, 'scripts'), { recursive: true });
   writeFileSync(
     join(source, 'package.json'),
     `${JSON.stringify({
       name: '@postman-cse/onboarding-api',
-      version: packageVersion
+      version: packageVersion,
+      files: ['scripts/verify-release-artifacts.mjs']
     }, null, 2)}\n`
   );
+  writeFileSync(join(source, 'scripts/verify-release-artifacts.mjs'), TRAP_VERIFIER);
   execFileSync('npm', ['pack', '--pack-destination', root], { cwd: source, stdio: 'ignore' });
   npmPackCount += 1;
   const packed = readdirSync(root).find((name) => name.endsWith('.tgz'));
@@ -137,25 +155,29 @@ describe('release workflow artifact handoff', () => {
     expect(JSON.stringify(publish)).not.toContain('npm run build');
     expect(JSON.stringify(publish)).not.toContain('"npm test"');
     expect(JSON.stringify(publish)).not.toMatch(/npm pack(?:\\s|$|")/);
+    expect(JSON.stringify(publish)).not.toContain('package/scripts/verify-release-artifacts.mjs');
     const tokenSteps = (publish?.steps ?? []).filter((step) => JSON.stringify(step).includes('NODE_AUTH_TOKEN'));
     expect(tokenSteps).toHaveLength(1);
     expect(tokenSteps[0]?.name).toBe('Publish or verify npm package');
     expect(tokenSteps[0]?.env?.NODE_AUTH_TOKEN).toBe('${{ secrets.NPM_TOKEN }}');
   });
 
-  it('executes the trusted envelope verifier successfully and fails on tampered bytes before tar extract', () => {
+  it('executes the trusted inline verifier on a real tarball without running package code under OIDC env', () => {
     const publish = releaseWorkflow.jobs.publish;
     const envelope = stepByName(publish, 'Verify release artifact envelope');
     expect(envelope.run).toBeTruthy();
-    expect(envelope.run).not.toContain('tar -xOf');
+    expect(envelope.run).toContain("execFileSync('tar', ['-xOf', tarballPath, 'package/package.json']");
+    expect(envelope.run).not.toContain('package/scripts/verify-release-artifacts.mjs');
     expect(envelope.run).not.toContain('NODE_AUTH_TOKEN');
 
     const directory = track(mkdtempSync(join(tmpdir(), 'release-envelope-')));
     mkdirSync(join(directory, 'release'), { recursive: true });
     const tarballPath = join(directory, 'release', 'release.tgz');
-    const bytes = Buffer.from('trusted-release-bytes');
-    writeFileSync(tarballPath, bytes);
-    const digest = createHash('sha256').update(bytes).digest('hex');
+    cpSync(ensurePacked('2.1.2'), tarballPath);
+    const trapMember = execFileSync('tar', ['-xOf', tarballPath, 'package/scripts/verify-release-artifacts.mjs'], {
+      encoding: 'utf8'
+    });
+    expect(trapMember).toContain('OIDC_MARKER');
     writeFileSync(
       join(directory, 'release', 'release-manifest.json'),
       JSON.stringify({
@@ -165,25 +187,30 @@ describe('release workflow artifact handoff', () => {
         tag: 'v2.1.2',
         package_name: '@postman-cse/onboarding-api',
         package_version: '2.1.2',
-        artifacts: [{ path: 'release.tgz', sha256: digest }]
+        artifacts: [{ path: 'release.tgz', sha256: sha256(tarballPath) }]
       })
     );
+    const marker = join(directory, 'oidc-marker');
     const scriptPath = join(directory, 'envelope.sh');
     writeFileSync(scriptPath, String(envelope.run));
     const env = {
       ...process.env,
       GITHUB_REPOSITORY: 'postman-cs/postman-api-onboarding-action',
       GITHUB_SHA: 'a'.repeat(40),
-      GITHUB_REF_NAME: 'v2.1.2'
+      GITHUB_REF_NAME: 'v2.1.2',
+      ACTIONS_ID_TOKEN_REQUEST_URL: 'https://example.invalid/oidc',
+      ACTIONS_ID_TOKEN_REQUEST_TOKEN: 'fake-oidc-token',
+      OIDC_MARKER: marker
     };
     const ok = spawnSync('bash', [scriptPath], { cwd: directory, encoding: 'utf8', env });
     expect(ok.status, ok.stderr || ok.stdout).toBe(0);
+    expect(existsSync(marker)).toBe(false);
 
-    writeFileSync(tarballPath, Buffer.from('tampered-release-bytes'));
+    writeFileSync(tarballPath, Buffer.from(`tampered-${createHash('sha256').update('x').digest('hex')}`));
     const bad = spawnSync('bash', [scriptPath], { cwd: directory, encoding: 'utf8', env });
     expect(bad.status).not.toBe(0);
     expect(`${bad.stdout}${bad.stderr}`).toMatch(/checksum mismatch|does not match/i);
-    expect(String(envelope.run)).not.toContain('tar -xOf');
+    expect(existsSync(marker)).toBe(false);
   });
 });
 
