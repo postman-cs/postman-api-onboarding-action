@@ -103,7 +103,8 @@ jobs:
           function Complete-One {
             $completed = Wait-Job -Job $jobs -Any
             $results[$completed.Name] = $completed.State
-            Receive-Job -Job $completed -ErrorAction SilentlyContinue | Out-Null
+            # Continue + 2>&1: keep failed-child text in a per-gate log without aborting aggregation.
+            Receive-Job -Job $completed -ErrorAction Continue 2>&1 | Out-File "$($completed.Name).log"
             Remove-Job -Job $completed
             $script:jobs = @($jobs | Where-Object Id -ne $completed.Id)
           }
@@ -123,5 +124,8 @@ jobs:
           $failed = $false
           foreach ($name in @('lint', 'test', 'typecheck', 'sibling-pins')) {
             if ($results[$name] -eq 'Completed') { Write-Output "gate:$name=pass" } else { Write-Output "gate:$name=fail"; $failed = $true }
+            Write-Output "::group::$name"
+            if (Test-Path -LiteralPath "$name.log") { Get-Content -LiteralPath "$name.log" } else { Write-Output "(no log captured for $name)" }
+            Write-Output '::endgroup::'
           }
           if ($failed) { exit 1 }

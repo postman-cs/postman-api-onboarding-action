@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -6,7 +6,40 @@ import { spawnSync } from 'node:child_process';
 import { describe, expect, it } from 'vitest';
 
 const releaseWorkflow = readFileSync(join(process.cwd(), '.github/workflows/release.yml'), 'utf8').replace(/\r\n/g, '\n');
-const releasePolicy = readFileSync(join(process.cwd(), 'RELEASE_POLICY.md'), 'utf8');
+const releasePolicy = readFileSync(join(process.cwd(), 'RELEASE_POLICY.md'), 'utf8').replace(/\r\n/g, '\n');
+
+/** Convert a native path into a Git Bash-safe absolute path on Windows. */
+function bashPath(filePath: string): string {
+  if (process.platform !== 'win32') return filePath;
+  return filePath.replace(/^([A-Za-z]):[\\/]/, (_, drive: string) => `/${drive.toLowerCase()}/`).replace(/\\/g, '/');
+}
+
+function bashExecutable(): string {
+  if (process.platform !== 'win32') return 'bash';
+  const candidates = [
+    process.env.GIT_INSTALL_ROOT && join(process.env.GIT_INSTALL_ROOT, 'bin', 'bash.exe'),
+    process.env.ProgramFiles && join(process.env.ProgramFiles, 'Git', 'bin', 'bash.exe'),
+    'C:\\Program Files\\Git\\bin\\bash.exe'
+  ].filter((candidate): candidate is string => Boolean(candidate));
+  const executable = candidates.find((candidate) => existsSync(candidate));
+  if (!executable) throw new Error('Git Bash is required to execute classifier scripts on Windows');
+  return executable;
+}
+
+/** Minimal env for bash→node classifier runs; keeps Windows process bootstrap vars. */
+function classifierEnv(overrides: Record<string, string>): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = {
+    PATH: process.env.PATH ?? '',
+    Path: process.env.Path ?? process.env.PATH ?? '',
+    PATHEXT: process.env.PATHEXT ?? '.COM;.EXE;.BAT;.CMD',
+    SYSTEMROOT: process.env.SYSTEMROOT ?? process.env.SystemRoot ?? '',
+    SystemRoot: process.env.SystemRoot ?? process.env.SYSTEMROOT ?? '',
+    COMSPEC: process.env.COMSPEC ?? process.env.ComSpec ?? '',
+    ComSpec: process.env.ComSpec ?? process.env.COMSPEC ?? '',
+    ...overrides
+  };
+  return env;
+}
 
 function job(name: string): string {
   return releaseWorkflow.match(new RegExp(`  ${name}:\\n[\\s\\S]*?(?=\\n  [a-zA-Z0-9_-]+:|$)`))?.[0] ?? '';
@@ -38,16 +71,15 @@ function runClassifier(options: { ref: string; refName: string; packageVersion: 
   writeFileSync(join(directory, 'package.json'), JSON.stringify({ version: options.packageVersion }));
   writeFileSync(output, '');
   writeFileSync(scriptPath, classifierScript());
-  // Lean env: avoid copying a large process.env into five nested bash→node spawns.
-  const result = spawnSync('bash', [scriptPath], {
+  // Lean env + bash-safe paths: avoid huge process.env copies while keeping Windows node bootstrap.
+  const result = spawnSync(bashExecutable(), [bashPath(scriptPath)], {
     cwd: directory,
     encoding: 'utf8',
-    env: {
-      PATH: process.env.PATH ?? '',
+    env: classifierEnv({
       GITHUB_REF: options.ref,
       GITHUB_REF_NAME: options.refName,
-      GITHUB_OUTPUT: output
-    }
+      GITHUB_OUTPUT: bashPath(output)
+    })
   });
   const githubOutput = readFileSync(output, 'utf8');
   rmSync(directory, { recursive: true, force: true });
@@ -70,6 +102,30 @@ function launchedGates(body: string): Array<{ name: string; command: string }> {
     command: match[2] ?? ''
   }));
 }
+
+describe('Windows-portable classifier harness', () => {
+  it('converts drive-letter paths for Git Bash and keeps Windows node bootstrap vars', () => {
+    const windowsNative = 'C:\\Users\\runner\\AppData\\Local\\Temp\\out';
+    const gitBashPath = windowsNative
+      .replace(/^([A-Za-z]):[\\/]/, (_, drive: string) => `/${drive.toLowerCase()}/`)
+      .replace(/\\/g, '/');
+    expect(gitBashPath).toBe('/c/Users/runner/AppData/Local/Temp/out');
+    if (process.platform === 'win32') {
+      expect(bashPath(windowsNative)).toBe(gitBashPath);
+    } else {
+      expect(bashPath('/tmp/out')).toBe('/tmp/out');
+    }
+    const env = classifierEnv({ GITHUB_OUTPUT: '/tmp/out', GITHUB_REF_NAME: 'v2.1.2' });
+    expect(env.PATH || env.Path).toBeTruthy();
+    expect(env).toHaveProperty('SYSTEMROOT');
+    expect(env).toHaveProperty('SystemRoot');
+    expect(env).toHaveProperty('PATHEXT');
+    expect(env.GITHUB_OUTPUT).toBe('/tmp/out');
+    expect(env.GITHUB_REF_NAME).toBe('v2.1.2');
+    // Lean copy: do not ship the full parent process environment into bash→node.
+    expect(Object.keys(env).length).toBeLessThan(Object.keys(process.env).length);
+  });
+});
 
 describe('release workflow publishing contract', () => {
   it('keeps existing classifier forms for immutable, alias, and npm_publish outputs', () => {

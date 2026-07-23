@@ -10,7 +10,7 @@ const ACTIONLINT_DOWNLOADER_COMMIT = '393031adb9afb225ee52ae2ccd7a5af5525e03e8';
 const ACTIONLINT_VERSION = '1.7.11';
 const ACTIONLINT_DOWNLOADER_URL = `https://raw.githubusercontent.com/rhysd/actionlint/${ACTIONLINT_DOWNLOADER_COMMIT}/scripts/download-actionlint.bash`;
 
-const ciWorkflowText = readFileSync(join(process.cwd(), '.github/workflows/ci.yml'), 'utf8');
+const ciWorkflowText = readFileSync(join(process.cwd(), '.github/workflows/ci.yml'), 'utf8').replace(/\r\n/g, '\n');
 const ciWorkflow = parse(ciWorkflowText) as {
   concurrency?: { group?: string; 'cancel-in-progress'?: string | boolean };
   jobs?: Record<string, WorkflowJob>;
@@ -158,6 +158,13 @@ describe('CI workflow contract', () => {
     expect(runGates).toContain("Start-Gate sibling-pins node @('scripts/check-sibling-pins.mjs')");
     expect(runGates.match(/Start-Gate [a-zA-Z0-9_-]+ /g) ?? []).toHaveLength(4);
 
+    // Receive-Job must retain failed-child text in per-gate logs; Out-Null hid Windows npm test failures.
+    expect(runGates).toContain('Receive-Job -Job $completed -ErrorAction Continue 2>&1 | Out-File "$($completed.Name).log"');
+    expect(runGates).not.toContain('Out-Null');
+    expect(runGates).toContain('Write-Output "::group::$name"');
+    expect(runGates).toContain('Get-Content -LiteralPath "$name.log"');
+    expect(runGates).toContain("Write-Output '::endgroup::'");
+
     expect(runGates).toContain("foreach ($name in @('lint', 'test', 'typecheck', 'sibling-pins'))");
     expect(runGates).toContain("if ($results[$name] -eq 'Completed') { Write-Output \"gate:$name=pass\" } else { Write-Output \"gate:$name=fail\"; $failed = $true }");
     expect(runGates).toContain('if ($failed) { exit 1 }');
@@ -171,6 +178,9 @@ describe('CI workflow contract', () => {
       const script = extractWindowsRunGatesBody(ciWorkflowText);
       expect(script).toContain('& $executable @gateArgs');
       expect(script).toContain('if ($LASTEXITCODE -ne 0) { throw "gate failed with exit code $LASTEXITCODE" }');
+      expect(script).toContain('Receive-Job -Job $completed -ErrorAction Continue 2>&1 | Out-File');
+      expect(script).toContain('::group::$name');
+      expect(script).not.toContain('Out-Null');
       expect(script).not.toContain('Invoke-Expression');
 
       const mutated = script
@@ -209,6 +219,9 @@ describe('CI workflow contract', () => {
 
         expect(result.status, output).not.toBe(0);
         expect(output).toContain('gate:test=fail');
+        expect(output).toContain('::group::test');
+        expect(output).toContain('::endgroup::');
+        expect(output).toMatch(/gate failed with exit code 7|exit code 7/i);
         expect(output).not.toContain('gate:lint=');
         expect(output).not.toContain('gate:typecheck=');
         expect(output).not.toContain('gate:sibling-pins=');

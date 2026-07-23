@@ -25,6 +25,23 @@ import {
   verifyReleaseArtifacts
 } from '../scripts/verify-release-artifacts.mjs';
 
+function bashPath(filePath: string): string {
+  if (process.platform !== 'win32') return filePath;
+  return filePath.replace(/^([A-Za-z]):[\\/]/, (_, drive: string) => `/${drive.toLowerCase()}/`).replace(/\\/g, '/');
+}
+
+function bashExecutable(): string {
+  if (process.platform !== 'win32') return 'bash';
+  const candidates = [
+    process.env.GIT_INSTALL_ROOT && join(process.env.GIT_INSTALL_ROOT, 'bin', 'bash.exe'),
+    process.env.ProgramFiles && join(process.env.ProgramFiles, 'Git', 'bin', 'bash.exe'),
+    'C:\\Program Files\\Git\\bin\\bash.exe'
+  ].filter((candidate): candidate is string => Boolean(candidate));
+  const executable = candidates.find((candidate) => existsSync(candidate));
+  if (!executable) throw new Error('Git Bash is required to execute release envelope scripts on Windows');
+  return executable;
+}
+
 type WorkflowStep = {
   name?: string;
   uses?: string;
@@ -202,12 +219,12 @@ describe('release workflow artifact handoff', () => {
       ACTIONS_ID_TOKEN_REQUEST_TOKEN: 'fake-oidc-token',
       OIDC_MARKER: marker
     };
-    const ok = spawnSync('bash', [scriptPath], { cwd: directory, encoding: 'utf8', env });
+    const ok = spawnSync(bashExecutable(), [bashPath(scriptPath)], { cwd: directory, encoding: 'utf8', env });
     expect(ok.status, ok.stderr || ok.stdout).toBe(0);
     expect(existsSync(marker)).toBe(false);
 
     writeFileSync(tarballPath, Buffer.from(`tampered-${createHash('sha256').update('x').digest('hex')}`));
-    const bad = spawnSync('bash', [scriptPath], { cwd: directory, encoding: 'utf8', env });
+    const bad = spawnSync(bashExecutable(), [bashPath(scriptPath)], { cwd: directory, encoding: 'utf8', env });
     expect(bad.status).not.toBe(0);
     expect(`${bad.stdout}${bad.stderr}`).toMatch(/checksum mismatch|does not match/i);
     expect(existsSync(marker)).toBe(false);
