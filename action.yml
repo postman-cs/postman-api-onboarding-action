@@ -400,6 +400,7 @@ runs:
         baseline-collection-id: ${{ steps.bootstrap.outputs.baseline-collection-id }}
         smoke-collection-id: ${{ steps.bootstrap.outputs.smoke-collection-id }}
         contract-collection-id: ${{ steps.bootstrap.outputs.contract-collection-id }}
+        prebuilt-collections-json: ${{ steps.bootstrap.outputs.prebuilt-collections-json }}
         collection-sync-mode: ${{ inputs.collection-sync-mode }}
         spec-sync-mode: ${{ inputs.spec-sync-mode }}
         release-label: ${{ inputs.release-label }}
