@@ -153,10 +153,10 @@ describe('CI workflow contract', () => {
     expect(windows).toContain("if: steps.windows-node-modules.outputs.cache-hit != 'true'");
     expect(windows).toContain('run: npm ci --prefer-offline --no-audit --no-fund');
 
-    const testSteps = windowsJob?.steps?.filter((step) => step.run === 'npm test') ?? [];
+    const testSteps = windowsJob?.steps?.filter((step) => step.run === 'node --run test') ?? [];
     expect(testSteps).toHaveLength(1);
     expect(testSteps[0]?.if).toBeUndefined();
-    expect(windows).toMatch(/^\s*- run: npm test\s*$/m);
+    expect(windows).toMatch(/^\s*- run: node --run test\s*$/m);
     expect(windows).not.toContain('npm test --');
     expect(windows).not.toContain("npm test'");
 
