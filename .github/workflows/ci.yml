@@ -93,14 +93,6 @@ jobs:
           cache: npm
           registry-url: 'https://registry.npmjs.org'
       - run: npm ci
-      - name: Diagnose Windows release tests
-        shell: pwsh
-        run: |
-          node --check scripts/check-release-alias.mjs
-          node --check scripts/verify-release-artifacts.mjs
-          node -e "Promise.all([import('./scripts/check-release-alias.mjs'), import('./scripts/verify-release-artifacts.mjs')])"
-          npx vitest run tests/release-alias.test.ts --reporter=verbose
-          npx vitest run tests/release-artifact-contract.test.ts --reporter=verbose
       - name: Run Windows gates
         shell: pwsh
         run: |
