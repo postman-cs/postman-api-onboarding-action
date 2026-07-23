@@ -42,6 +42,10 @@ function bashExecutable(): string {
   return executable;
 }
 
+function npmExecutable(platform: NodeJS.Platform = process.platform): string {
+  return platform === 'win32' ? 'npm.cmd' : 'npm';
+}
+
 type WorkflowStep = {
   name?: string;
   uses?: string;
@@ -90,7 +94,7 @@ function ensurePacked(packageVersion: string): string {
     }, null, 2)}\n`
   );
   writeFileSync(join(source, 'scripts/verify-release-artifacts.mjs'), TRAP_VERIFIER);
-  execFileSync('npm', ['pack', '--pack-destination', root], { cwd: source, stdio: 'ignore' });
+  execFileSync(npmExecutable(), ['pack', '--pack-destination', root], { cwd: source, stdio: 'ignore' });
   npmPackCount += 1;
   const packed = readdirSync(root).find((name) => name.endsWith('.tgz'));
   if (!packed) throw new Error(`npm pack did not produce a tarball for ${packageVersion}`);
@@ -146,6 +150,11 @@ afterAll(() => {
 });
 
 describe('release workflow artifact handoff', () => {
+  it('selects the Windows npm command shim', () => {
+    expect(npmExecutable('win32')).toBe('npm.cmd');
+    expect(npmExecutable('darwin')).toBe('npm');
+  });
+
   it('parses verify-package and publish permissions, allowlist, and artifact handoff', () => {
     const verify = releaseWorkflow.jobs['verify-package'];
     const publish = releaseWorkflow.jobs.publish;
