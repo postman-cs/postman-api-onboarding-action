@@ -99,4 +99,4 @@ jobs:
       - name: Install dependencies
         if: steps.windows-node-modules.outputs.cache-hit != 'true'
         run: npm ci --prefer-offline --no-audit --no-fund
-      - run: npm test
+      - run: node --run test
