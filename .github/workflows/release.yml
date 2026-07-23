@@ -110,7 +110,7 @@ jobs:
         with:
           node-version: '24'
           registry-url: 'https://registry.npmjs.org'
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@v8
         with:
           name: release-artifacts-${{ github.run_id }}-${{ github.run_attempt }}
           path: release
