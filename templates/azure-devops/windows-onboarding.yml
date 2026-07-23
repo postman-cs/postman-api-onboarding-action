@@ -241,6 +241,9 @@ jobs:
           if ([string]::IsNullOrWhiteSpace($env:INSIGHTS_CLUSTER_NAME)) {
             throw 'insightsClusterName is required when enableInsights is true.'
           }
+          if ([string]::IsNullOrWhiteSpace($env:INSIGHTS_POSTMAN_API_KEY) -or [string]::IsNullOrWhiteSpace($env:INSIGHTS_POSTMAN_ACCESS_TOKEN)) {
+            throw 'INSIGHTS_POSTMAN_API_KEY and INSIGHTS_POSTMAN_ACCESS_TOKEN are required human-user credentials when enableInsights is true.'
+          }
           $environmentMap = $env:POSTMAN_ENVIRONMENT_UIDS_JSON | ConvertFrom-Json
           $environmentId = $environmentMap.PSObject.Properties[0].Value
           if ([string]::IsNullOrWhiteSpace($environmentId)) {
@@ -252,8 +255,8 @@ jobs:
             '--environment-id', $environmentId,
             '--cluster-name', $env:INSIGHTS_CLUSTER_NAME,
             '--repo-url', $env:BUILD_REPOSITORY_URI,
-            '--postman-api-key', $env:POSTMAN_API_KEY,
-            '--postman-access-token', $env:POSTMAN_ACCESS_TOKEN,
+            '--postman-api-key', $env:INSIGHTS_POSTMAN_API_KEY,
+            '--postman-access-token', $env:INSIGHTS_POSTMAN_ACCESS_TOKEN,
             '--postman-region', $env:POSTMAN_REGION,
             '--postman-stack', $env:POSTMAN_STACK
           )
@@ -266,8 +269,8 @@ jobs:
           INSIGHTS_CLUSTER_NAME: ${{ parameters.insightsClusterName }}
           POSTMAN_WORKSPACE_ID: $(POSTMAN_WORKSPACE_ID)
           POSTMAN_ENVIRONMENT_UIDS_JSON: $(POSTMAN_ENVIRONMENT_UIDS_JSON)
-          POSTMAN_API_KEY: $(POSTMAN_API_KEY)
-          POSTMAN_ACCESS_TOKEN: $(POSTMAN_ACCESS_TOKEN)
+          INSIGHTS_POSTMAN_API_KEY: $(INSIGHTS_POSTMAN_API_KEY)
+          INSIGHTS_POSTMAN_ACCESS_TOKEN: $(INSIGHTS_POSTMAN_ACCESS_TOKEN)
           POSTMAN_TEAM_ID: $(POSTMAN_TEAM_ID)
           POSTMAN_REGION: ${{ parameters.postmanRegion }}
           POSTMAN_STACK: ${{ parameters.postmanStack }}

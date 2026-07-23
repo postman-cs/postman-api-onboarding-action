@@ -43,6 +43,9 @@ function runValidation(env: Record<string, string>): { status: number; stderr: s
         REPO_WRITE_MODE: 'commit-and-push',
         POSTMAN_API_KEY: 'PMAK-test',
         POSTMAN_ACCESS_TOKEN: '',
+        ENABLE_INSIGHTS: 'false',
+        INSIGHTS_POSTMAN_API_KEY: '',
+        INSIGHTS_POSTMAN_ACCESS_TOKEN: '',
         ...env
       },
       encoding: 'utf8',
@@ -90,7 +93,41 @@ describe('composite first-step input validation', () => {
     expect(validateStep?.env?.REPO_WRITE_MODE).toBe('${{ inputs.repo-write-mode }}');
     expect(validateStep?.env?.POSTMAN_API_KEY).toBe('${{ inputs.postman-api-key }}');
     expect(validateStep?.env?.POSTMAN_ACCESS_TOKEN).toBe('${{ inputs.postman-access-token }}');
+    expect(validateStep?.env?.ENABLE_INSIGHTS).toBe('${{ inputs.enable-insights }}');
+    expect(validateStep?.env?.INSIGHTS_POSTMAN_API_KEY).toBe('${{ inputs.insights-postman-api-key }}');
+    expect(validateStep?.env?.INSIGHTS_POSTMAN_ACCESS_TOKEN).toBe('${{ inputs.insights-postman-access-token }}');
     expect(steps.findIndex((step) => step.id === 'bootstrap')).toBeGreaterThan(0);
+  });
+
+  it.each([
+    {
+      label: 'Insights disabled without dedicated credentials',
+      env: { ENABLE_INSIGHTS: 'false', INSIGHTS_POSTMAN_API_KEY: '', INSIGHTS_POSTMAN_ACCESS_TOKEN: '' },
+      status: 0
+    },
+    {
+      label: 'Insights enabled with both dedicated credentials',
+      env: { ENABLE_INSIGHTS: 'true', INSIGHTS_POSTMAN_API_KEY: 'PMAK-user', INSIGHTS_POSTMAN_ACCESS_TOKEN: 'user-token' },
+      status: 0
+    },
+    {
+      label: 'Insights enabled without dedicated API key',
+      env: { ENABLE_INSIGHTS: 'true', INSIGHTS_POSTMAN_API_KEY: '', INSIGHTS_POSTMAN_ACCESS_TOKEN: 'user-token' },
+      status: 1
+    },
+    {
+      label: 'Insights enabled without dedicated access token',
+      env: { ENABLE_INSIGHTS: 'true', INSIGHTS_POSTMAN_API_KEY: 'PMAK-user', INSIGHTS_POSTMAN_ACCESS_TOKEN: '' },
+      status: 1
+    }
+  ])('$label validates dedicated Insights credentials before children run', ({ env, status }) => {
+    const result = runValidation(env);
+    expect(result.status).toBe(status);
+    if (status !== 0) {
+      const output = combinedOutput(result);
+      expect(output).toContain('Attempted Insights credential validation failed');
+      expect(output).toContain('both insights-postman-api-key and insights-postman-access-token are required');
+    }
   });
 
   it.each([
@@ -210,9 +247,9 @@ describe('child invocation order and credential forwarding', () => {
     expect(steps.filter((step) => step.id === 'insights_onboarding')).toHaveLength(1);
   });
 
-  it('forwards both credentials completely to bootstrap, repo-sync, and insights', () => {
+  it('forwards suite credentials completely to bootstrap and repo-sync', () => {
     const steps = loadManifest().runs.steps;
-    for (const stepId of ['bootstrap', 'repo_sync', 'insights_onboarding'] as const) {
+    for (const stepId of ['bootstrap', 'repo_sync'] as const) {
       const step = steps.find((candidate) => candidate.id === stepId);
       expect(step?.with?.['postman-api-key'], `${stepId} postman-api-key`).toBe(
         '${{ inputs.postman-api-key }}'
@@ -221,5 +258,13 @@ describe('child invocation order and credential forwarding', () => {
         '${{ inputs.postman-access-token }}'
       );
     }
+  });
+
+  it('forwards only dedicated human-user credentials to Insights', () => {
+    const insights = loadManifest().runs.steps.find((step) => step.id === 'insights_onboarding');
+    expect(insights?.with?.['postman-api-key']).toBe('${{ inputs.insights-postman-api-key }}');
+    expect(insights?.with?.['postman-access-token']).toBe('${{ inputs.insights-postman-access-token }}');
+    expect(insights?.with?.['postman-api-key']).not.toBe('${{ inputs.postman-api-key }}');
+    expect(insights?.with?.['postman-access-token']).not.toBe('${{ inputs.postman-access-token }}');
   });
 });

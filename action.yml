@@ -141,8 +141,14 @@ inputs:
   postman-access-token:
     description: Postman access token (x-access-token). Primary credential threaded to the wrapped actions; every Postman asset operation runs through the access-token gateway. Mint it with postman-resolve-service-token-action. Individually optional; at least one of postman-api-key or postman-access-token is required.
     required: false
+  insights-postman-api-key:
+    description: Human-user Postman API key (PMAK) for Insights. Required with insights-postman-access-token only when enable-insights is true; do not use the service-account suite key.
+    required: false
+  insights-postman-access-token:
+    description: Human-user session access token for Insights. Required with insights-postman-api-key only when enable-insights is true; do not use a service-token mint.
+    required: false
   credential-preflight:
-    description: "Credential identity preflight policy forwarded to bootstrap, repo sync, and insights. warn (default) logs a note and continues when postman-api-key and postman-access-token resolve to different parent orgs; enforce fails the run on that condition before any workspace is created."
+    description: "Credential identity preflight policy forwarded to bootstrap and repo sync. warn (default) logs a note and continues when postman-api-key and postman-access-token resolve to different parent orgs; enforce fails the run on that condition before any workspace is created."
     required: false
     default: warn
   postman-team-id:
@@ -293,6 +299,9 @@ runs:
         REPO_WRITE_MODE: ${{ inputs.repo-write-mode }}
         POSTMAN_API_KEY: ${{ inputs.postman-api-key }}
         POSTMAN_ACCESS_TOKEN: ${{ inputs.postman-access-token }}
+        ENABLE_INSIGHTS: ${{ inputs.enable-insights }}
+        INSIGHTS_POSTMAN_API_KEY: ${{ inputs.insights-postman-api-key }}
+        INSIGHTS_POSTMAN_ACCESS_TOKEN: ${{ inputs.insights-postman-access-token }}
       run: |
         case "$POSTMAN_STACK" in
           prod|beta) ;;
@@ -328,6 +337,10 @@ runs:
         esac
         if [ -z "$POSTMAN_API_KEY" ] && [ -z "$POSTMAN_ACCESS_TOKEN" ]; then
           echo "::error::Attempted onboarding credential validation failed: neither postman-api-key nor postman-access-token was supplied. Provide one of those inputs and rerun."
+          exit 1
+        fi
+        if [ "$ENABLE_INSIGHTS" = "true" ] && { [ -z "$INSIGHTS_POSTMAN_API_KEY" ] || [ -z "$INSIGHTS_POSTMAN_ACCESS_TOKEN" ]; }; then
+          echo "::error::Attempted Insights credential validation failed: both insights-postman-api-key and insights-postman-access-token are required when enable-insights=true. Provide human-user credentials and rerun."
           exit 1
         fi
     - id: bootstrap
@@ -570,8 +583,8 @@ runs:
         environment-id: ${{ fromJSON(steps.repo_sync.outputs.environment-uids-json)[fromJSON(inputs.environments-json)[0]] }}
         system-environment-id: ${{ fromJSON(inputs.system-env-map-json)[fromJSON(inputs.environments-json)[0]] }}
         cluster-name: ${{ inputs.cluster-name }}
-        postman-api-key: ${{ inputs.postman-api-key }}
-        postman-access-token: ${{ inputs.postman-access-token }}
+        postman-api-key: ${{ inputs.insights-postman-api-key }}
+        postman-access-token: ${{ inputs.insights-postman-access-token }}
         credential-preflight: ${{ inputs.credential-preflight }}
         postman-team-id: ${{ inputs.postman-team-id }}
         github-token: ${{ inputs.github-token }}

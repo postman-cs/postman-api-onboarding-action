@@ -231,6 +231,8 @@ describe('postman-api-onboarding-action composite contract', () => {
         'env-runtime-urls-json',
         'postman-api-key',
         'postman-access-token',
+        'insights-postman-api-key',
+        'insights-postman-access-token',
         'credential-preflight',
         'postman-team-id',
         'postman-region',
@@ -561,13 +563,16 @@ describe('postman-api-onboarding-action composite contract', () => {
       }
     });
 
-    it('passes postman-api-key and postman-access-token to bootstrap, repo-sync, and insights', () => {
+    it('isolates dedicated human-user Insights credentials from suite credentials', () => {
       const manifest = loadManifest();
-      for (const stepId of ['bootstrap', 'repo_sync', 'insights_onboarding'] as const) {
+      for (const stepId of ['bootstrap', 'repo_sync'] as const) {
         const step = manifest.runs.steps.find((s) => s.id === stepId);
         expect(step?.with?.['postman-api-key']).toBe('${{ inputs.postman-api-key }}');
         expect(step?.with?.['postman-access-token']).toBe('${{ inputs.postman-access-token }}');
       }
+      const insights = manifest.runs.steps.find((step) => step.id === 'insights_onboarding');
+      expect(insights?.with?.['postman-api-key']).toBe('${{ inputs.insights-postman-api-key }}');
+      expect(insights?.with?.['postman-access-token']).toBe('${{ inputs.insights-postman-access-token }}');
     });
 
     it('credential-preflight defaults to warn and is optional', () => {
