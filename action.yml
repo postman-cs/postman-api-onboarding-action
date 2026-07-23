@@ -151,6 +151,20 @@ inputs:
     description: "Credential identity preflight policy forwarded to bootstrap and repo sync. warn (default) logs a note and continues when postman-api-key and postman-access-token resolve to different parent orgs; enforce fails the run on that condition before any workspace is created."
     required: false
     default: warn
+  branch-strategy:
+    description: Branch-aware sync strategy. v2 preserves legacy by default; the future v3 major will default to publish-gate after its release gates close.
+    required: false
+    default: legacy
+  canonical-branch:
+    description: Explicit canonical branch. Defaults to the GitHub event repository default branch for non-legacy strategies.
+    required: false
+  channels:
+    description: Comma-separated channel map, for example develop=DEV, staging=STAGE, release/*=RC.
+    required: false
+  preview-ttl:
+    description: Sliding preview retention TTL in days, forwarded to repo-sync.
+    required: false
+    default: '30'
   postman-team-id:
     description: Explicit Postman team ID override for org-mode integration calls.
     required: false
@@ -258,6 +272,12 @@ outputs:
   commit-sha:
     description: Commit SHA produced by repo-write-mode.
     value: ${{ steps.repo_sync.outputs.commit-sha }}
+  sync-status:
+    description: Branch-aware sync status, including skipped-branch-gate for credential-free gated runs.
+    value: ${{ steps.repo_sync.outputs.sync-status || steps.bootstrap.outputs.sync-status }}
+  spec-version-url:
+    description: Read-only URL for the canonical Spec Hub version finalized by repo-sync.
+    value: ${{ steps.repo_sync.outputs.spec-version-url }}
   bootstrap-outcome:
     description: GitHub Actions runner outcome for the bootstrap step.
     value: ${{ steps.bootstrap.outcome }}
@@ -288,6 +308,56 @@ outputs:
 runs:
   using: composite
   steps:
+    - id: branch_decision
+      name: Resolve immutable branch decision
+      shell: bash
+      env:
+        POSTMAN_TEAM_ID: ${{ inputs.postman-team-id }}
+        BRANCH_STRATEGY: ${{ inputs.branch-strategy }}
+        CANONICAL_BRANCH: ${{ inputs.canonical-branch }}
+        CHANNELS: ${{ inputs.channels }}
+      run: |
+        node <<'NODE'
+        const fs = require('node:fs');
+        const clean = (value) => (value || '').trim() || undefined;
+        const strategy = clean(process.env.BRANCH_STRATEGY) || 'legacy';
+        if (!['legacy', 'publish-gate', 'preview'].includes(strategy)) throw new Error('CONTRACT_BRANCH_STRATEGY_INVALID: expected legacy, publish-gate, or preview');
+        let event = {};
+        try { event = JSON.parse(fs.readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8')); } catch {}
+        const rawRef = clean(process.env.GITHUB_REF) || clean(process.env.GITHUB_REF_NAME);
+        const headBranch = clean(process.env.GITHUB_HEAD_REF) || (rawRef?.startsWith('refs/heads/') ? rawRef.slice(11) : undefined);
+        const defaultBranch = clean(process.env.CANONICAL_BRANCH) || clean(event.repository?.default_branch);
+        const isPrContext = Boolean(clean(process.env.GITHUB_HEAD_REF));
+        const headRepo = event.pull_request?.head?.repo?.full_name;
+        const baseRepo = event.pull_request?.base?.repo?.full_name || event.repository?.full_name;
+        const isForkPr = Boolean(headRepo && baseRepo && headRepo !== baseRepo);
+        let refKind = rawRef?.startsWith('refs/tags/') ? 'tag' : headBranch ? 'branch' : 'unknown';
+        if (headBranch && defaultBranch && headBranch === defaultBranch) refKind = 'default-branch';
+        const identity = { provider: 'github', headBranch, rawRef, defaultBranch, refKind, isPrContext, isForkPr, headSha: clean(process.env.GITHUB_SHA) };
+        const canonicalBranch = clean(process.env.CANONICAL_BRANCH) || defaultBranch;
+        let tier = 'legacy';
+        let reason = 'branch-strategy legacy: branch-blind pre-v2 behavior';
+        let channel;
+        if (strategy !== 'legacy') {
+          if (!canonicalBranch) throw new Error('CONTRACT_DEFAULT_BRANCH_UNRESOLVED: set the canonical-branch input');
+          const rules = (clean(process.env.CHANNELS)?.split(',') || []).filter(Boolean).map((entry) => {
+            const parts = entry.split('=').map((part) => part.trim());
+            if (parts.length !== 2 || !parts[0] || !/^[A-Za-z][A-Za-z0-9_-]{0,15}$/.test(parts[1])) throw new Error(`CONTRACT_CHANNELS_INPUT_INVALID: ${entry}`);
+            return { pattern: parts[0], code: parts[1].toUpperCase() };
+          });
+          if (!rules.some((rule) => rule.pattern === 'release/*')) rules.push({ pattern: 'release/*', code: 'RC' });
+          channel = rules.find((rule) => rule.pattern.endsWith('*') ? headBranch?.startsWith(rule.pattern.slice(0, -1)) : headBranch === rule.pattern);
+          if (refKind === 'tag' || refKind === 'unknown' || !headBranch) { tier = 'gated'; reason = `ref kind ${refKind}: no-op`; }
+          else if (headBranch === canonicalBranch) { tier = 'canonical'; reason = `head branch equals canonical branch ${canonicalBranch}`; }
+          else if (channel) { tier = 'channel'; reason = `branch ${headBranch} matches channel ${channel.pattern}=${channel.code}`; }
+          else if (strategy === 'preview' && !isForkPr) { tier = 'preview'; reason = `branch ${headBranch} under branch-strategy preview`; }
+          else { tier = 'gated'; reason = isForkPr ? 'fork PR: preview-ineligible, gated instead' : `branch ${headBranch} under branch-strategy publish-gate`; }
+        }
+        const decision = { tier, strategy, identity, canonicalBranch, ...(channel && tier === 'channel' ? { channel } : {}), reason };
+        const serialized = JSON.stringify(decision);
+        fs.appendFileSync(process.env.GITHUB_OUTPUT, `tier=${tier}\nbranch-decision=${serialized}\n`);
+        fs.appendFileSync(process.env.GITHUB_ENV, `POSTMAN_BRANCH_DECISION=${serialized}\n`);
+        NODE
     - id: validate_postman_stack
       name: Validate Postman stack and region
       shell: bash
@@ -300,6 +370,7 @@ runs:
         POSTMAN_API_KEY: ${{ inputs.postman-api-key }}
         POSTMAN_ACCESS_TOKEN: ${{ inputs.postman-access-token }}
         ENABLE_INSIGHTS: ${{ inputs.enable-insights }}
+        BRANCH_TIER: ${{ steps.branch_decision.outputs.tier }}
         INSIGHTS_POSTMAN_API_KEY: ${{ inputs.insights-postman-api-key }}
         INSIGHTS_POSTMAN_ACCESS_TOKEN: ${{ inputs.insights-postman-access-token }}
       run: |
@@ -335,7 +406,7 @@ runs:
             exit 1
             ;;
         esac
-        if [ -z "$POSTMAN_API_KEY" ] && [ -z "$POSTMAN_ACCESS_TOKEN" ]; then
+        if [ "$BRANCH_TIER" != "gated" ] && [ -z "$POSTMAN_API_KEY" ] && [ -z "$POSTMAN_ACCESS_TOKEN" ]; then
           echo "::error::Attempted onboarding credential validation failed: neither postman-api-key nor postman-access-token was supplied. Provide one of those inputs and rerun."
           exit 1
         fi
@@ -345,9 +416,10 @@ runs:
         fi
     - id: bootstrap
       name: Bootstrap Postman Assets
-      uses: postman-cs/postman-bootstrap-action@v2.10.9
+      uses: postman-cs/postman-bootstrap-action@v2.10.10
       env:
         POSTMAN_TEAM_ID: ${{ inputs.postman-team-id }}
+        POSTMAN_BRANCH_DECISION: ${{ steps.branch_decision.outputs.branch-decision }}
       with:
         project-name: ${{ inputs.project-name }}
         workspace-id: ${{ inputs.workspace-id }}
@@ -383,17 +455,22 @@ runs:
         governance-mapping-json: ${{ inputs.governance-mapping-json }}
         github-token: ${{ inputs.github-token }}
         gh-fallback-token: ${{ inputs.gh-fallback-token }}
-        postman-api-key: ${{ inputs.postman-api-key }}
-        postman-access-token: ${{ inputs.postman-access-token }}
+        postman-api-key: ${{ steps.branch_decision.outputs.tier != 'gated' && inputs.postman-api-key || '' }}
+        postman-access-token: ${{ steps.branch_decision.outputs.tier != 'gated' && inputs.postman-access-token || '' }}
         credential-preflight: ${{ inputs.credential-preflight }}
+        branch-strategy: ${{ inputs.branch-strategy }}
+        canonical-branch: ${{ inputs.canonical-branch }}
+        channels: ${{ inputs.channels }}
         integration-backend: ${{ inputs.integration-backend }}
         postman-region: ${{ inputs.postman-region }}
         postman-stack: ${{ inputs.postman-stack }}
     - id: repo_sync
       name: Sync Repository and Workspace
+      if: ${{ steps.branch_decision.outputs.tier != 'gated' }}
       uses: postman-cs/postman-repo-sync-action@v2.1.14
       env:
         POSTMAN_TEAM_ID: ${{ inputs.postman-team-id }}
+        POSTMAN_BRANCH_DECISION: ${{ steps.branch_decision.outputs.branch-decision }}
       with:
         project-name: ${{ inputs.project-name }}
         workspace-id: ${{ steps.bootstrap.outputs.workspace-id }}
@@ -418,6 +495,10 @@ runs:
         postman-api-key: ${{ inputs.postman-api-key }}
         postman-access-token: ${{ inputs.postman-access-token }}
         credential-preflight: ${{ inputs.credential-preflight }}
+        branch-strategy: ${{ inputs.branch-strategy }}
+        canonical-branch: ${{ inputs.canonical-branch }}
+        channels: ${{ inputs.channels }}
+        preview-ttl: ${{ inputs.preview-ttl }}
         github-token: ${{ inputs.github-token }}
         gh-fallback-token: ${{ inputs.gh-fallback-token }}
         org-mode: ${{ inputs.org-mode }}
@@ -573,11 +654,12 @@ runs:
         path: ${{ runner.temp }}/postman-junit/*.xml
         if-no-files-found: ignore
     - id: insights_onboarding
-      if: inputs.enable-insights == 'true'
+      if: inputs.enable-insights == 'true' && steps.branch_decision.outputs.tier != 'gated'
       name: Onboard Postman Insights
       uses: postman-cs/postman-insights-onboarding-action@v2.1.6
       env:
         POSTMAN_TEAM_ID: ${{ inputs.postman-team-id }}
+        POSTMAN_BRANCH_DECISION: ${{ steps.branch_decision.outputs.branch-decision }}
       with:
         project-name: ${{ inputs.project-name }}
         workspace-id: ${{ steps.bootstrap.outputs.workspace-id }}
@@ -587,6 +669,9 @@ runs:
         postman-api-key: ${{ inputs.insights-postman-api-key }}
         postman-access-token: ${{ inputs.insights-postman-access-token }}
         credential-preflight: ${{ inputs.credential-preflight }}
+        branch-strategy: ${{ inputs.branch-strategy }}
+        canonical-branch: ${{ inputs.canonical-branch }}
+        channels: ${{ inputs.channels }}
         postman-team-id: ${{ inputs.postman-team-id }}
         github-token: ${{ inputs.github-token }}
         postman-region: ${{ inputs.postman-region }}

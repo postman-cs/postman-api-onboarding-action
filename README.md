@@ -265,6 +265,10 @@ Set `skip-built-in-tests: 'true'` when the caller workflow must perform post-onb
 | `insights-postman-api-key` | Human-user Postman API key (PMAK) for Insights. Required with insights-postman-access-token only when enable-insights is true; do not use the service-account suite key. | no |  |
 | `insights-postman-access-token` | Human-user session access token for Insights. Required with insights-postman-api-key only when enable-insights is true; do not use a service-token mint. | no |  |
 | `credential-preflight` | Credential identity preflight policy forwarded to bootstrap and repo sync. warn (default) logs a note and continues when postman-api-key and postman-access-token resolve to different parent orgs; enforce fails the run on that condition before any workspace is created. | no | `warn` |
+| `branch-strategy` | Branch-aware sync strategy. v2 preserves legacy by default; the future v3 major will default to publish-gate after its release gates close. | no | `legacy` |
+| `canonical-branch` | Explicit canonical branch. Defaults to the GitHub event repository default branch for non-legacy strategies. | no |  |
+| `channels` | Comma-separated channel map, for example develop=DEV, staging=STAGE, release/*=RC. | no |  |
+| `preview-ttl` | Sliding preview retention TTL in days, forwarded to repo-sync. | no | `30` |
 | `postman-team-id` | Explicit Postman team ID override for org-mode integration calls. | no |  |
 | `postman-region` | Postman data residency region for public API and Postman CLI calls. One of us or eu. | no | `us` |
 | `github-token` | GitHub token used for repo variables and generated commits. | no |  |
@@ -301,6 +305,8 @@ Tables are generated from `action.yml` by `npm run docs:tables`.
 | `monitor-id` | Smoke monitor ID. |
 | `repo-sync-summary-json` | JSON summary of repo materialization and workspace sync planning. |
 | `commit-sha` | Commit SHA produced by repo-write-mode. |
+| `sync-status` | Branch-aware sync status, including skipped-branch-gate for credential-free gated runs. |
+| `spec-version-url` | Read-only URL for the canonical Spec Hub version finalized by repo-sync. |
 | `bootstrap-outcome` | GitHub Actions runner outcome for the bootstrap step. |
 | `repo-sync-outcome` | GitHub Actions runner outcome for the repo sync step. |
 | `insights-outcome` | GitHub Actions runner outcome for the Insights onboarding step. |
