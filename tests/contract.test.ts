@@ -350,8 +350,8 @@ describe('postman-api-onboarding-action composite contract', () => {
       const insightsStep = steps.find((step) => step.id === 'insights_onboarding');
 
       expect(validateStep?.shell).toBe('bash');
-      expect(bootstrapStep?.uses).toBe('postman-cs/postman-bootstrap-action@v2.10.8');
-      expect(repoSyncStep?.uses).toBe('postman-cs/postman-repo-sync-action@v2.1.13');
+      expect(bootstrapStep?.uses).toBe('postman-cs/postman-bootstrap-action@v2.10.9');
+      expect(repoSyncStep?.uses).toBe('postman-cs/postman-repo-sync-action@v2.1.14');
       expect(junitStep?.shell).toBe('bash');
       expect(uploadStep?.uses).toBe('actions/upload-artifact@v7.0.1');
       expect(insightsStep?.uses).toBe('postman-cs/postman-insights-onboarding-action@v2.1.6');
@@ -465,6 +465,9 @@ describe('postman-api-onboarding-action composite contract', () => {
       expect(repoSyncStep?.with?.['contract-collection-id']).toBe(
         '${{ steps.bootstrap.outputs.contract-collection-id }}'
       );
+      expect(repoSyncStep?.with?.['prebuilt-collections-json']).toBe(
+        '${{ steps.bootstrap.outputs.prebuilt-collections-json }}'
+      );
       expect(repoSyncStep?.with?.['spec-id']).toBe(
         '${{ steps.bootstrap.outputs.spec-id }}'
       );
@@ -473,6 +476,7 @@ describe('postman-api-onboarding-action composite contract', () => {
       );
       expect(repoSyncStep?.with?.['spec-files-json']).toBeUndefined();
       expect(repoSyncStep?.with?.['releases-json']).toBeUndefined();
+      expect(manifest.inputs['prebuilt-collections-json']).toBeUndefined();
       expect(repoSyncStep?.with?.['generate-ci-workflow']).toBe(
         '${{ inputs.generate-ci-workflow }}'
       );
@@ -480,6 +484,27 @@ describe('postman-api-onboarding-action composite contract', () => {
         '${{ inputs.ci-workflow-path }}'
       );
       expect(repoSyncStep?.with?.['ci-runner-os']).toBe('${{ inputs.ci-runner-os }}');
+    });
+
+    it('verifies local OpenAPI prebuilt manifest wiring, output mapping, and absence of mode/cap inputs', () => {
+      const manifest = loadManifest();
+      const repoSyncStep = manifest.runs.steps.find((step) => step.id === 'repo_sync');
+
+      // Bootstrap output passes to repo-sync prebuilt-collections-json input
+      expect(repoSyncStep?.with?.['prebuilt-collections-json']).toBe(
+        '${{ steps.bootstrap.outputs.prebuilt-collections-json }}'
+      );
+
+      // Public collection ID outputs remain bootstrap IDs
+      expect(manifest.outputs['collections-json']?.value).toBe(
+        '${{ steps.bootstrap.outputs.collections-json }}'
+      );
+
+      // No prebuilt collections mode, kill-switch, fallback, or size/count cap inputs exposed
+      const inputNames = Object.keys(manifest.inputs);
+      expect(inputNames).not.toContain('prebuilt-collections-json');
+      expect(inputNames.some((name) => /prebuilt.*(mode|kill|switch|fallback)/i.test(name))).toBe(false);
+      expect(inputNames.some((name) => /prebuilt.*(size|count|cap|limit)/i.test(name))).toBe(false);
     });
 
     it('forwards local spec-path and spec-files-json to bootstrap only when spec-url is empty', () => {
@@ -494,10 +519,10 @@ describe('postman-api-onboarding-action composite contract', () => {
         "${{ inputs.spec-url == '' && inputs.spec-files-json || '' }}"
       );
       // Sibling pins stay on the current immutable tags.
-      expect(bootstrapStep?.uses).toBe('postman-cs/postman-bootstrap-action@v2.10.8');
+      expect(bootstrapStep?.uses).toBe('postman-cs/postman-bootstrap-action@v2.10.9');
       expect(
         manifest.runs.steps.find((step) => step.id === 'repo_sync')?.uses
-      ).toBe('postman-cs/postman-repo-sync-action@v2.1.13');
+      ).toBe('postman-cs/postman-repo-sync-action@v2.1.14');
       expect(
         manifest.runs.steps.find((step) => step.id === 'insights_onboarding')?.uses
       ).toBe('postman-cs/postman-insights-onboarding-action@v2.1.6');
