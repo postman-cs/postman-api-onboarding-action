@@ -416,7 +416,7 @@ runs:
         fi
     - id: bootstrap
       name: Bootstrap Postman Assets
-      uses: postman-cs/postman-bootstrap-action@v2.10.11
+      uses: postman-cs/postman-bootstrap-action@v2.10.12
       env:
         POSTMAN_TEAM_ID: ${{ inputs.postman-team-id }}
         POSTMAN_BRANCH_DECISION: ${{ steps.branch_decision.outputs.branch-decision }}
@@ -656,7 +656,7 @@ runs:
     - id: insights_onboarding
       if: inputs.enable-insights == 'true' && steps.branch_decision.outputs.tier != 'gated'
       name: Onboard Postman Insights
-      uses: postman-cs/postman-insights-onboarding-action@v2.1.7
+      uses: postman-cs/postman-insights-onboarding-action@v2.1.8
       env:
         POSTMAN_TEAM_ID: ${{ inputs.postman-team-id }}
         POSTMAN_BRANCH_DECISION: ${{ steps.branch_decision.outputs.branch-decision }}
