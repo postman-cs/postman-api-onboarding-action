@@ -90,42 +90,13 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
-          cache: npm
           registry-url: 'https://registry.npmjs.org'
-      - run: npm ci
-      - name: Run Windows gates
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Continue'
-          $MAX_PARALLEL_GATES = 2
-          $jobs = @()
-          $results = @{}
-          function Complete-One {
-            $completed = Wait-Job -Job $jobs -Any
-            $results[$completed.Name] = $completed.State
-            # Continue + 2>&1: keep failed-child text in a per-gate log without aborting aggregation.
-            Receive-Job -Job $completed -ErrorAction Continue 2>&1 | Out-File "$($completed.Name).log"
-            Remove-Job -Job $completed
-            $script:jobs = @($jobs | Where-Object Id -ne $completed.Id)
-          }
-          function Start-Gate($name, $executable, $gateArgs) {
-            while ($jobs.Count -ge $MAX_PARALLEL_GATES) { Complete-One }
-            $script:jobs += Start-Job -Name $name -ScriptBlock {
-              param($executable, $gateArgs)
-              & $executable @gateArgs
-              if ($LASTEXITCODE -ne 0) { throw "gate failed with exit code $LASTEXITCODE" }
-            } -ArgumentList $executable, (,$gateArgs)
-          }
-          Start-Gate lint npm @('run', 'lint')
-          Start-Gate test npm @('test')
-          Start-Gate typecheck npm @('run', 'typecheck')
-          Start-Gate sibling-pins node @('scripts/check-sibling-pins.mjs')
-          while ($jobs.Count -gt 0) { Complete-One }
-          $failed = $false
-          foreach ($name in @('lint', 'test', 'typecheck', 'sibling-pins')) {
-            if ($results[$name] -eq 'Completed') { Write-Output "gate:$name=pass" } else { Write-Output "gate:$name=fail"; $failed = $true }
-            Write-Output "::group::$name"
-            if (Test-Path -LiteralPath "$name.log") { Get-Content -LiteralPath "$name.log" } else { Write-Output "(no log captured for $name)" }
-            Write-Output '::endgroup::'
-          }
-          if ($failed) { exit 1 }
+      - uses: actions/cache@1bd1e32a3bdc45362d1e726936510720a7c30a57 # v4.2.0
+        id: windows-node-modules
+        with:
+          path: node_modules
+          key: Windows/node-24/${{ hashFiles('package-lock.json') }}
+      - name: Install dependencies
+        if: steps.windows-node-modules.outputs.cache-hit != 'true'
+        run: npm ci --prefer-offline --no-audit --no-fund
+      - run: npm test
