@@ -4,7 +4,8 @@
   "description": "Composite Postman API onboarding GitHub Action.",
   "files": [
     "action.yml",
-    "README.md"
+    "README.md",
+    "scripts/verify-release-artifacts.mjs"
   ],
   "engines": {
     "node": ">=24"

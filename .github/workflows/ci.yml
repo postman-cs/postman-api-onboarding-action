@@ -9,6 +9,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   gate:
     runs-on: ubuntu-latest
@@ -26,11 +30,9 @@ jobs:
           cache: npm
           registry-url: 'https://registry.npmjs.org'
       - run: npm ci
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       - name: Install actionlint
         run: |
-          bash <(curl -sSfL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash) 1.7.11 "$RUNNER_TEMP"
+          bash <(curl -sSfL https://raw.githubusercontent.com/rhysd/actionlint/393031adb9afb225ee52ae2ccd7a5af5525e03e8/scripts/download-actionlint.bash) 1.7.11 "$RUNNER_TEMP"
           echo "ACTIONLINT_BIN=$RUNNER_TEMP/actionlint" >> "$GITHUB_ENV"
       # Keep at most two checks active on the two-vCPU runner. Failures aggregate
       # under ::group:: logs so one pass still shows every result.
@@ -91,9 +93,35 @@ jobs:
           cache: npm
           registry-url: 'https://registry.npmjs.org'
       - run: npm ci
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-      - run: npm run lint
-      - run: npm test
-      - run: npm run typecheck
-      - run: node scripts/check-sibling-pins.mjs
+      - name: Run Windows gates
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Continue'
+          $MAX_PARALLEL_GATES = 2
+          $jobs = @()
+          $results = @{}
+          function Complete-One {
+            $completed = Wait-Job -Job $jobs -Any
+            $results[$completed.Name] = $completed.State
+            Receive-Job -Job $completed -ErrorAction SilentlyContinue | Out-Null
+            Remove-Job -Job $completed
+            $script:jobs = @($jobs | Where-Object Id -ne $completed.Id)
+          }
+          function Start-Gate($name, $executable, $gateArgs) {
+            while ($jobs.Count -ge $MAX_PARALLEL_GATES) { Complete-One }
+            $script:jobs += Start-Job -Name $name -ScriptBlock {
+              param($executable, $gateArgs)
+              & $executable @gateArgs
+              if ($LASTEXITCODE -ne 0) { throw "gate failed with exit code $LASTEXITCODE" }
+            } -ArgumentList $executable, (,$gateArgs)
+          }
+          Start-Gate lint npm @('run', 'lint')
+          Start-Gate test npm @('test')
+          Start-Gate typecheck npm @('run', 'typecheck')
+          Start-Gate sibling-pins node @('scripts/check-sibling-pins.mjs')
+          while ($jobs.Count -gt 0) { Complete-One }
+          $failed = $false
+          foreach ($name in @('lint', 'test', 'typecheck', 'sibling-pins')) {
+            if ($results[$name] -eq 'Completed') { Write-Output "gate:$name=pass" } else { Write-Output "gate:$name=fail"; $failed = $true }
+          }
+          if ($failed) { exit 1 }

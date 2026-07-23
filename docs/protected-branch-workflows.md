@@ -44,12 +44,12 @@ jobs:
           git switch -c "$BRANCH"
           echo "SYNC_BRANCH=$BRANCH" >> "$GITHUB_ENV"
       - id: postman-token
-        uses: postman-cs/postman-resolve-service-token-action@v1
+        uses: postman-cs/postman-resolve-service-token-action@v2
         with:
           postman-api-key: ${{ secrets.POSTMAN_API_KEY }}
           postman-region: us
       - id: onboard
-        uses: postman-cs/postman-api-onboarding-action@v1
+        uses: postman-cs/postman-api-onboarding-action@v2
         with:
           project-name: core-payments
           spec-url: https://raw.githubusercontent.com/postman-cs/postman-api-onboarding-action/main/examples/core-payments-openapi.yaml

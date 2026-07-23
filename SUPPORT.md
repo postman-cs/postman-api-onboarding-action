@@ -15,7 +15,7 @@ Use this repository for issues with the composite Postman API Onboarding action:
 
 Include the details that let maintainers reproduce the workflow without exposing secrets:
 
-- Action reference used, such as `postman-cs/postman-api-onboarding-action@v1` or an immutable `v1.x.y` tag.
+- Action reference used, such as `postman-cs/postman-api-onboarding-action@v2` or an immutable `v2.x.y` tag.
 - Whether the workflow used `postman-resolve-service-token-action` for `postman-access-token` and `postman-team-id`.
 - `postman-region` and whether `org-mode` was enabled.
 - Redacted workflow YAML for the failing steps.
@@ -26,4 +26,4 @@ Never paste Postman API keys, access tokens, service-token outputs, GitHub token
 
 ## Version Guidance
 
-Use `@v1` for the shortest marketplace install path. Use an immutable `@v1.x.y` tag or a commit SHA when reproducibility matters. See [RELEASE_POLICY.md](RELEASE_POLICY.md) for release sequencing and tag policy.
+Use `@v2` for the shortest marketplace install path. Use an immutable `@v2.x.y` tag or a commit SHA when reproducibility matters. See [RELEASE_POLICY.md](RELEASE_POLICY.md) for release sequencing and tag policy.

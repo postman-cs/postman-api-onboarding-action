@@ -339,7 +339,7 @@ Between repo sync and Insights, the action runs the generated smoke and contract
 
 Running outside GitHub Actions (GitLab CI, Bitbucket Pipelines, Azure DevOps)? The bootstrap and repo-sync CLIs cover that: see [docs/non-github-ci.md](docs/non-github-ci.md).
 
-Releases use immutable `v1.x.y` tags with `v1` as the rolling release channel; pin an immutable tag for reproducibility. See [RELEASE_POLICY.md](RELEASE_POLICY.md).
+Releases use immutable `v2.x.y` tags with `v2` as the rolling release channel; pin an immutable tag for reproducibility. See [RELEASE_POLICY.md](RELEASE_POLICY.md).
 
 ## Resources
 
