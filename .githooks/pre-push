@@ -1,0 +1,22 @@
+#!/bin/sh
+# Release tags are cut by .github/workflows/auto-release.yml, never by hand.
+#
+# A hand-pushed tag creates an immutable public identifier before any gate has
+# run against it. Reject immutable release tags here so the only path to a tag
+# is a passing CI cut.
+#
+# The rolling major alias (v2) is exempt: release.yml advances it from CI after
+# a successful publish, and that push is a legitimate force-update.
+while read -r local_ref local_sha remote_ref remote_sha; do
+  [ -z "$remote_ref" ] && continue
+  case "$remote_ref" in
+    refs/tags/v[0-9]*.[0-9]*)
+      if [ "${GITHUB_ACTIONS:-}" != "true" ]; then
+        echo "refusing to push immutable release tag ${remote_ref#refs/tags/} by hand." >&2
+        echo "Releases cut automatically from main: merge, and auto-release.yml tags only after gates pass." >&2
+        echo "Inspect the pending cut with 'node scripts/release-cut.mjs --plan'." >&2
+        exit 1
+      fi
+      ;;
+  esac
+done

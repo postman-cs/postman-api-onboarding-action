@@ -1,0 +1,91 @@
+name: Auto Release
+
+# Cuts releases automatically from main.
+#
+# The tag is an OUTPUT of a passing run, never an input to one. release.yml
+# still triggers on `push: tags`, but nothing hand-pushes those tags any more:
+# this workflow creates a tag only after the exact bytes of the release commit
+# pass the full gate set. A failed cut therefore leaves no tag and burns no
+# version number, and the next merge to main retries the cut on a fresh one.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One cut at a time. Never cancel a cut in flight: it holds an unpushed tag.
+concurrency:
+  group: auto-release-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  cut:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+          registry-url: 'https://registry.npmjs.org'
+      - run: npm ci
+      - name: Install actionlint
+        run: |
+          bash <(curl -sSfL https://raw.githubusercontent.com/rhysd/actionlint/393031adb9afb225ee52ae2ccd7a5af5525e03e8/scripts/download-actionlint.bash) 1.7.11 "$RUNNER_TEMP"
+          echo "ACTIONLINT_BIN=$RUNNER_TEMP/actionlint" >> "$GITHUB_ENV"
+
+      - name: Plan release
+        id: plan
+        env:
+          PLAN_FILE: ${{ runner.temp }}/plan.json
+        run: |
+          set -euo pipefail
+          node scripts/release-cut.mjs --plan | tee "$PLAN_FILE"
+          {
+            echo "release=$(node -p "require(process.env.PLAN_FILE).release === true")"
+            echo "version=$(node -p "require(process.env.PLAN_FILE).version || ''")"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Cut release
+        if: steps.plan.outputs.release == 'true'
+        env:
+          ACTIONLINT_BIN: ${{ env.ACTIONLINT_BIN }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          node scripts/release-cut.mjs --execute
+
+      - name: Push release tag
+        if: steps.plan.outputs.release == 'true'
+        env:
+          VERSION: ${{ steps.plan.outputs.version }}
+        run: |
+          set -euo pipefail
+          git push origin "refs/tags/v${VERSION}"
+
+      - name: Start release workflow for the new tag
+        if: steps.plan.outputs.release == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.plan.outputs.version }}
+        run: |
+          set -euo pipefail
+          gh workflow run release.yml --ref "v${VERSION}"
+
+      - name: Report skipped cut
+        if: steps.plan.outputs.release != 'true'
+        env:
+          PLAN_FILE: ${{ runner.temp }}/plan.json
+        run: |
+          set -euo pipefail
+          echo "::notice::No release cut. $(node -p "require(process.env.PLAN_FILE).reason || 'no plan reason'")"

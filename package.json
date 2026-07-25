@@ -18,6 +18,7 @@
     "url": "https://github.com/postman-cs/postman-api-onboarding-action"
   },
   "scripts": {
+    "prepare": "git config core.hooksPath .githooks",
     "test": "vitest run",
     "docs:tables": "node scripts/render-action-tables.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json",

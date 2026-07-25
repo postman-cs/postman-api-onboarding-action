@@ -110,6 +110,26 @@ Release from the bottom up:
 6. Update `README.md`, this file, and any compatibility notes affected by the release.
 7. Release `postman-api-onboarding-action` last.
 
+## Release checks
+
+Releases are cut automatically. Merging to `main` runs `.github/workflows/auto-release.yml`,
+which derives the next version from the conventional-commit history, then runs
+`scripts/release-cut.mjs`: bump manifests, run the gate set, commit, and tag.
+
+The tag is created only after the exact bytes of the release commit pass every
+gate, so a failed cut leaves no tag and burns no version number. The next merge
+retries on a fresh version, skipping any already-tagged one.
+
+Do not push `vX.Y.Z` tags by hand. The pre-push hook refuses them, because a
+hand-pushed tag becomes a public identifier before any gate has run against it.
+
+To see what the next merge would cut:
+
+```sh
+git fetch origin --tags
+node scripts/release-cut.mjs --plan
+```
+
 ## Verification and live monitors
 
 Pull requests and immutable releases run deterministic repository-local checks.
@@ -155,7 +175,7 @@ Before pushing a new release tag:
 4. Confirm `README.md` and `RELEASE_POLICY.md` still match the actual composite wiring.
 5. Confirm `SUPPORT.md` and `SECURITY.md` still match the current support and vulnerability-reporting paths.
 6. If lower-level actions changed behavior, verify whether the composite repo needs a coordinated release.
-7. Push the immutable release tag.
+7. Merge to `main` and let auto-release cut the immutable tag after gates pass.
 8. Confirm npm publication or matching SRI retry identity, then the matching
    GitHub release and rolling alias update.
 9. Review asynchronous post-release monitor results when the action is covered.

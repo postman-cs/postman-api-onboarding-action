@@ -25,6 +25,8 @@ RELEASE_POLICY.md       # Suite-wide release rules, tag policy, ordering
 npm ci          # Install (no build step -- composite action)
 npm test        # vitest -- validates action.yml contract
 npm run typecheck
+npm run lint
+node scripts/check-sibling-pins.mjs
 ```
 
 ## Key Inputs
@@ -50,3 +52,14 @@ lint, typecheck, test, sibling-pins, commitlint, and actionlint. Every check
 prints a `::group::` result even when another check fails.
 
 See workspace monorepo CI doc for shared rationale.
+
+## Releases
+
+Tags are an **output** of passing run, never input. Never push release tag by hand; `.githooks/pre-push` rejects it.
+
+- `.github/workflows/auto-release.yml` runs on every push to `main` and drives `scripts/release-cut.mjs`.
+- `node scripts/release-cut.mjs --plan` reports pending cut (fetch tags first). `--execute` bumps `package.json`/`package-lock.json`, runs typecheck/lint/test/sibling-pins/actionlint, commits, then tags last.
+- Version comes from highest tag ever cut, not `package.json`. Existing tags are burnt and skipped, so failed cut never reuses or rewinds version.
+- Conventional-commit type picks bump; `chore`/`ci`/`build`/`test`/`style` alone cut nothing.
+- release commit lives only on tag; `main` keeps advancing through pull requests.
+- `RELEASE_POLICY.md` holds full contract.
