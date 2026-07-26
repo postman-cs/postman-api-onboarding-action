@@ -120,6 +120,11 @@ The tag is created only after the exact bytes of the release commit pass every
 gate, so a failed cut leaves no tag and burns no version number. The next merge
 retries on a fresh version, skipping any already-tagged one.
 
+Before planning another cut, auto-release reconciles the latest immutable tag
+when its GitHub release is missing or its rolling alias has not advanced. It
+does not duplicate an active release run, and a successful release completion
+resumes planning.
+
 Do not push `vX.Y.Z` tags by hand. The pre-push hook refuses them, because a
 hand-pushed tag becomes a public identifier before any gate has run against it.
 

@@ -138,6 +138,28 @@ describe('auto-release workflow', () => {
     expect(autoReleaseWorkflow).toContain('gh workflow run release.yml --ref "$TAG"');
   });
 
+  it('reconciles the prior incomplete tag before planning another cut', () => {
+    const reconcile = autoReleaseWorkflow.indexOf('name: Reconcile prior release');
+    const plan = autoReleaseWorkflow.indexOf('name: Plan release');
+    expect(reconcile).toBeGreaterThan(-1);
+    expect(reconcile).toBeLessThan(plan);
+    expect(autoReleaseWorkflow).toContain("git tag --list 'v*'");
+    expect(autoReleaseWorkflow).toContain('if ! PACKAGE_VERSION="$(git show');
+    expect(autoReleaseWorkflow).toContain('gh run list --workflow release.yml --branch "$TAG"');
+    expect(autoReleaseWorkflow).toContain("steps.reconcile.outputs.blocked != 'true'");
+    const activeRun = autoReleaseWorkflow.indexOf('gh run list --workflow release.yml');
+    expect(autoReleaseWorkflow.indexOf('gh workflow run release.yml', activeRun)).toBeGreaterThan(
+      activeRun
+    );
+  });
+
+  it('recovers alias failures and resumes after a successful release', () => {
+    expect(autoReleaseWorkflow).toContain('workflow_run:');
+    expect(autoReleaseWorkflow).toContain('workflows: [Release]');
+    expect(autoReleaseWorkflow).toContain("github.event.workflow_run.conclusion == 'success'");
+    expect(autoReleaseWorkflow).toContain('git rev-parse --verify "${ALIAS}^{commit}"');
+  });
+
   it('never cancels a cut in flight', () => {
     expect(autoReleaseWorkflow).toContain('cancel-in-progress: false');
   });
