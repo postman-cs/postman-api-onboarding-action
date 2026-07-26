@@ -165,7 +165,7 @@ The full pattern, including sync-branch creation and programmatic PR opening, is
 
 ### Insights linking
 
-When `enable-insights: true`, the action chains `postman-cs/postman-insights-onboarding-action@v2` after bootstrap and repo sync, using the workspace from bootstrap plus the first environment from `environments-json`. Insights requires a separate human-user PMAK and human-user session access token; do not pass the service-account credentials used by bootstrap and repo sync.
+When `enable-insights: true`, the action chains `postman-cs/postman-insights-onboarding-action@v2.2.1` after bootstrap and repo sync, using the workspace from bootstrap plus the first environment from `environments-json`. This release accepts live human sessions identified by `user_type=human` even when `consumerType` is absent. Insights still requires a separate human-user PMAK and human-user session access token; do not pass the service-account credentials used by bootstrap and repo sync.
 
 ```yaml
 - uses: actions/checkout@v5
