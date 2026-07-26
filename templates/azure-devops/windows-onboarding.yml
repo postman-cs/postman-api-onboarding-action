@@ -34,6 +34,9 @@ parameters:
   - name: enableInsights
     type: boolean
     default: false
+  - name: enableMockEnvironment
+    type: boolean
+    default: false
   - name: insightsClusterName
     type: string
     default: ''
@@ -45,19 +48,19 @@ parameters:
     default: prod
   - name: resolveVersion
     type: string
-    default: 2.0.2
+    default: 2.0.9
   - name: bootstrapVersion
     type: string
-    default: 2.10.2
+    default: 2.11.5
   - name: smokeFlowVersion
     type: string
-    default: 2.1.5
+    default: 2.1.10
   - name: repoSyncVersion
     type: string
-    default: 2.1.9
+    default: 2.2.0
   - name: insightsVersion
     type: string
-    default: 2.1.3
+    default: 2.2.1
 
 jobs:
   - job: postman_onboarding
@@ -206,6 +209,7 @@ jobs:
             '--team-id', $env:POSTMAN_TEAM_ID,
             '--postman-region', $env:POSTMAN_REGION,
             '--postman-stack', $env:POSTMAN_STACK,
+            '--mock-environment-enabled', $env:ENABLE_MOCK_ENVIRONMENT,
             '--result-json', $resultPath
           )
           if (-not [string]::IsNullOrWhiteSpace($env:SPEC_PATH)) {
@@ -215,6 +219,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Repo sync failed with exit code $LASTEXITCODE" }
           $result = Get-Content -Raw -LiteralPath $resultPath | ConvertFrom-Json
           Write-Host "##vso[task.setvariable variable=POSTMAN_ENVIRONMENT_UIDS_JSON]$($result.'environment-uids-json')"
+          Write-Host "##vso[task.setvariable variable=POSTMAN_MOCK_URL]$($result.'mock-url')"
+          Write-Host "##vso[task.setvariable variable=POSTMAN_MOCK_ENVIRONMENT_UID]$($result.'mock-environment-uid')"
         displayName: Sync Postman artifacts and CI
         env:
           PROJECT_NAME: ${{ parameters.projectName }}
@@ -222,6 +228,7 @@ jobs:
           ENVIRONMENTS_JSON: ${{ parameters.environmentsJson }}
           ENV_RUNTIME_URLS_JSON: ${{ parameters.environmentRuntimeUrlsJson }}
           REPO_WRITE_MODE: ${{ parameters.repoWriteMode }}
+          ENABLE_MOCK_ENVIRONMENT: ${{ parameters.enableMockEnvironment }}
           GENERATE_CI_WORKFLOW: ${{ parameters.generateCiWorkflow }}
           CI_WORKFLOW_PATH: ${{ parameters.ciWorkflowPath }}
           CANONICAL_BRANCH: ${{ parameters.canonicalBranch }}

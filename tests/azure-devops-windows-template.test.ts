@@ -28,6 +28,8 @@ describe('Azure DevOps Windows onboarding template', () => {
     expect(renderedScripts).toContain('ConvertFrom-Json');
     expect(renderedScripts).toContain('issecret=true');
     expect(renderedScripts).toContain("'--ci-runner-os', 'windows'");
+    expect(renderedScripts).toContain("'--mock-environment-enabled', $env:ENABLE_MOCK_ENVIRONMENT");
+    expect(renderedScripts).toContain('POSTMAN_MOCK_ENVIRONMENT_UID');
     expect(source).not.toMatch(/\bjq\b|\bsource\b|curl\s.*\|\s*sh|shell:\s*bash/);
 
     const tokenStep = job.steps.find(
