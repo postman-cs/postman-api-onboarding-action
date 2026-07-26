@@ -235,7 +235,8 @@ Set `skip-built-in-tests: 'true'` when the caller workflow must perform post-onb
 | `release-label` | Optional release label for versioned specs and collections. When omitted during versioned sync, derived from GitHub tag or branch metadata. | no |  |
 | `monitor-id` | Existing smoke monitor ID. When set, the action validates and reuses this monitor instead of creating a new one. | no |  |
 | `mock-url` | Existing mock server URL. When set, the action validates and reuses this mock instead of creating a new one. | no |  |
-| `mock-environment-enabled` | Create or update a dedicated manual-validation environment whose baseUrl is the validated public mock URL. This environment is excluded from runtime CI selection. | no | `false` |
+| `mock-visibility` | Required mock access policy. Public is anonymous; private requires a runtime x-api-key supplied by the caller and is never persisted by repo-sync. | no | `public` |
+| `mock-environment-enabled` | Create or update a dedicated manual-validation environment whose baseUrl is the validated mock URL. This environment is excluded from runtime CI selection and never contains a mock credential. | no | `false` |
 | `monitor-cron` | Cron expression for monitor scheduling (e.g. '0 */6 * * *'). When empty, the monitor is created disabled and triggered to run once per workflow invocation (and once on every subsequent run). | no |  |
 | `generate-ci-workflow` | Whether to generate the CI workflow file. | no | `true` |
 | `ci-workflow-path` | Path to write the generated CI workflow file. | no | `.github/workflows/ci.yml` |
@@ -303,6 +304,8 @@ Tables are generated from `action.yml` by `npm run docs:tables`.
 | `breaking-change-summary-json` | JSON summary of the OpenAPI breaking-change check from bootstrap. |
 | `environment-uids-json` | JSON map of environment slug to Postman environment uid. |
 | `mock-url` | Mock server URL. |
+| `mock-visibility` | Authoritatively observed mock visibility: public or private. |
+| `mock-auth-required` | Whether the collection runner must supply postmanPrivateMockApiKey at runtime. |
 | `mock-environment-uid` | Dedicated manual-validation environment UID when mock-environment-enabled succeeds. |
 | `mock-environment-status` | Whether the optional manual-validation mock environment succeeded, was skipped, or failed. |
 | `monitor-id` | Smoke monitor ID. |

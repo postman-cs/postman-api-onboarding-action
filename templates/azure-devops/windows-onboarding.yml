@@ -37,6 +37,12 @@ parameters:
   - name: enableMockEnvironment
     type: boolean
     default: false
+  - name: mockVisibility
+    type: string
+    default: public
+    values:
+      - public
+      - private
   - name: insightsClusterName
     type: string
     default: ''
@@ -210,6 +216,7 @@ jobs:
             '--postman-region', $env:POSTMAN_REGION,
             '--postman-stack', $env:POSTMAN_STACK,
             '--mock-environment-enabled', $env:ENABLE_MOCK_ENVIRONMENT,
+            '--mock-visibility', $env:MOCK_VISIBILITY,
             '--result-json', $resultPath
           )
           if (-not [string]::IsNullOrWhiteSpace($env:SPEC_PATH)) {
@@ -229,6 +236,7 @@ jobs:
           ENV_RUNTIME_URLS_JSON: ${{ parameters.environmentRuntimeUrlsJson }}
           REPO_WRITE_MODE: ${{ parameters.repoWriteMode }}
           ENABLE_MOCK_ENVIRONMENT: ${{ parameters.enableMockEnvironment }}
+          MOCK_VISIBILITY: ${{ parameters.mockVisibility }}
           GENERATE_CI_WORKFLOW: ${{ parameters.generateCiWorkflow }}
           CI_WORKFLOW_PATH: ${{ parameters.ciWorkflowPath }}
           CANONICAL_BRANCH: ${{ parameters.canonicalBranch }}
