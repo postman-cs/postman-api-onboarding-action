@@ -355,7 +355,7 @@ describe('postman-api-onboarding-action composite contract', () => {
 
       expect(validateStep?.shell).toBe('bash');
       expect(bootstrapStep?.uses).toBe('postman-cs/postman-bootstrap-action@v2.10.19');
-      expect(repoSyncStep?.uses).toBe('postman-cs/postman-repo-sync-action@v2.1.15');
+      expect(repoSyncStep?.uses).toBe('postman-cs/postman-repo-sync-action@v2.2.0');
       expect(junitStep?.shell).toBe('bash');
       expect(uploadStep?.uses).toBe('actions/upload-artifact@v7.0.1');
       expect(insightsStep?.uses).toBe('postman-cs/postman-insights-onboarding-action@v2.2.1');
@@ -561,7 +561,7 @@ describe('postman-api-onboarding-action composite contract', () => {
       expect(bootstrapStep?.uses).toBe('postman-cs/postman-bootstrap-action@v2.10.19');
       expect(
         manifest.runs.steps.find((step) => step.id === 'repo_sync')?.uses
-      ).toBe('postman-cs/postman-repo-sync-action@v2.1.15');
+      ).toBe('postman-cs/postman-repo-sync-action@v2.2.0');
       expect(
         manifest.runs.steps.find((step) => step.id === 'insights_onboarding')?.uses
       ).toBe('postman-cs/postman-insights-onboarding-action@v2.2.1');
