@@ -219,6 +219,18 @@ Run AWS spec discovery before this composite action when the OpenAPI document sh
 
 Set `skip-built-in-tests: 'true'` when the caller workflow must perform post-onboarding setup (bearer-token minting, mTLS bootstrap, vault-hydrated secrets, dynamic env enrichment) before the smoke and contract suites can authenticate, then run the collections itself using the `collections-json` and `environment-uids-json` outputs. The full caller pattern is in [docs/deferred-tests.md](docs/deferred-tests.md).
 
+### Private mocks
+
+Default mock servers are public and anonymous. Teams that prohibit public mocks set `mock-visibility: private`. Repo-sync then installs a secret-free request hook on the smoke and contract collections, emits `mock-auth-required: true`, and never persists a credential.
+
+Where the transient `postmanPrivateMockApiKey` variable comes from:
+
+- **Generated CI** — supplied automatically from the `POSTMAN_API_KEY` secret this suite already provisions for `postman login`. No extra secret and no workflow edit.
+- **Manual runs in the Postman app** — enable `mock-environment-enabled: true`. The `<project> - Mock` environment carries `postmanPrivateMockApiKey` as an empty secret-typed variable; paste a key with access to the mock.
+- **A runner you wire yourself** — read the `mock-auth-required` output and pass the variable however that system handles secrets.
+
+The hook only attaches `x-api-key` for `*.mock.pstmn.io` hosts, so it stays inert on runs that target a real environment. A private-mock request with no key logs a console warning naming the variable.
+
 ## Inputs
 
 <!-- inputs-table:start -->
