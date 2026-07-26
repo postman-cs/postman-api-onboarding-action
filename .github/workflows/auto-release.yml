@@ -23,6 +23,7 @@ concurrency:
 
 jobs:
   cut:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -73,14 +74,31 @@ jobs:
           set -euo pipefail
           git push origin "refs/tags/v${VERSION}"
 
-      - name: Start release workflow for the new tag
-        if: steps.plan.outputs.release == 'true'
+      - name: Start or recover release workflow
+        id: release_target
         env:
           GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ steps.plan.outputs.version }}
+          PLAN_FILE: ${{ runner.temp }}/plan.json
         run: |
           set -euo pipefail
-          gh workflow run release.yml --ref "v${VERSION}"
+          RELEASE="$(node -p "require(process.env.PLAN_FILE).release === true")"
+          if [ "$RELEASE" = true ]; then
+            TAG="v$(node -p "require(process.env.PLAN_FILE).version")"
+          else
+            TAG="$(node -p "require(process.env.PLAN_FILE).previous || ''")"
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          if [ -z "$TAG" ]; then
+            echo "::notice::No release tag is available to dispatch."
+            exit 0
+          fi
+          if [ "$RELEASE" != true ] && gh release view "$TAG" >/dev/null 2>&1; then
+            echo "::notice::Release $TAG already exists; no recovery dispatch needed."
+            exit 0
+          fi
+          # GITHUB_TOKEN tag pushes do not trigger workflows. On a rerun with
+          # no new cut, retry the latest tag when its GitHub release is absent.
+          gh workflow run release.yml --ref "$TAG"
 
       - name: Report skipped cut
         if: steps.plan.outputs.release != 'true'

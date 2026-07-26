@@ -19,6 +19,7 @@ const selectNextVersion = releaseCut.selectNextVersion as (input: {
   bump: string;
   takenTags: string[];
 }) => { version: string; skipped: string[] };
+const latestReleaseTag = releaseCut.latestReleaseTag as (tags: string[]) => string | null;
 
 const repoRoot = process.cwd();
 const autoReleaseWorkflow = readFileSync(
@@ -44,6 +45,13 @@ describe('release version selection', () => {
     const plan = selectNextVersion({ current: '2.1.0', bump: 'patch', takenTags: taken });
     expect(taken).not.toContain(`v${plan.version}`);
     expect(plan.version).toBe('2.1.4');
+  });
+
+  it('normalizes accepted zero-patch minor tags', () => {
+    expect(latestReleaseTag(['v2.9.9', 'v3.0', 'v3'])).toBe('v3.0');
+    expect(
+      selectNextVersion({ current: '2.9.9', bump: 'major', takenTags: ['v3.0'] })
+    ).toEqual({ version: '3.0.1', skipped: ['3.0.0'] });
   });
 
   it('maps conventional commits onto semver bumps', () => {
@@ -98,6 +106,10 @@ describe('auto-release workflow', () => {
     expect(autoReleaseWorkflow).not.toMatch(/on:\n\s+push:\n\s+tags:/);
   });
 
+  it('rejects manually dispatched cuts outside main', () => {
+    expect(autoReleaseWorkflow).toContain("if: github.ref == 'refs/heads/main'");
+  });
+
   it('fetches full history and tags so burnt versions are visible', () => {
     expect(autoReleaseWorkflow).toContain('fetch-depth: 0');
     expect(autoReleaseWorkflow).toContain('fetch-tags: true');
@@ -117,10 +129,13 @@ describe('auto-release workflow', () => {
     expect(autoReleaseWorkflow).not.toContain('HEAD:${GITHUB_REF_NAME}');
   });
 
-  it('starts release.yml explicitly after the tag push', () => {
+  it('starts or recovers release.yml after the tag push', () => {
     const push = autoReleaseWorkflow.indexOf('name: Push release tag');
-    const dispatch = autoReleaseWorkflow.indexOf('gh workflow run release.yml');
+    const dispatch = autoReleaseWorkflow.indexOf('name: Start or recover release workflow');
     expect(dispatch).toBeGreaterThan(push);
+    expect(autoReleaseWorkflow).toContain('require(process.env.PLAN_FILE).previous');
+    expect(autoReleaseWorkflow).toContain('gh release view "$TAG"');
+    expect(autoReleaseWorkflow).toContain('gh workflow run release.yml --ref "$TAG"');
   });
 
   it('never cancels a cut in flight', () => {

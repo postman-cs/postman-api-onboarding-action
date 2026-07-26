@@ -29,6 +29,7 @@ const PKG_PATH = path.join(REPO_ROOT, 'package.json');
 const LOCK_PATH = path.join(REPO_ROOT, 'package-lock.json');
 
 const SEMVER = /^(\d+)\.(\d+)\.(\d+)$/;
+const IMMUTABLE_TAG = /^v?(\d+)\.(\d+)(?:\.(\d+))?$/;
 const RELEASE_ONLY = new Set(['package.json', 'package-lock.json']);
 
 /** Conventional-commit subjects that carry no shippable behavior on their own. */
@@ -98,6 +99,12 @@ export function applyBump(version, bump) {
   throw new Error(`unsupported bump ${bump}`);
 }
 
+export function normalizeReleaseVersion(value) {
+  const parsed = IMMUTABLE_TAG.exec(String(value || ''));
+  if (!parsed) return null;
+  return `${Number(parsed[1])}.${Number(parsed[2])}.${Number(parsed[3] ?? 0)}`;
+}
+
 /**
  * Pick the next free version. Any tag that already exists is burnt: release
  * tags are immutable, so a previously failed cut is skipped rather than
@@ -106,7 +113,9 @@ export function applyBump(version, bump) {
  * @param {{current: string, bump: 'major'|'minor'|'patch', takenTags: Iterable<string>}} input
  */
 export function selectNextVersion({ current, bump, takenTags }) {
-  const taken = new Set(Array.from(takenTags || [], (tag) => String(tag).replace(/^v/, '')));
+  const taken = new Set(
+    Array.from(takenTags || [], normalizeReleaseVersion).filter(Boolean)
+  );
   let candidate = applyBump(current, bump);
   const skipped = [];
   while (taken.has(candidate)) {
@@ -171,20 +180,22 @@ function commitsSince(tag) {
   return raw.split('\u0000').map((entry) => entry.trim()).filter(Boolean);
 }
 
-function latestReleaseTag(taken) {
-  const versions = Array.from(taken)
-    .map((tag) => tag.replace(/^v/, ''))
-    .filter((version) => SEMVER.test(version))
+export function latestReleaseTag(taken) {
+  const versions = Array.from(taken || [], (tag) => ({
+    tag: String(tag),
+    version: normalizeReleaseVersion(tag)
+  }))
+    .filter((entry) => entry.version)
     .sort((a, b) => {
-      const left = a.split('.').map(Number);
-      const right = b.split('.').map(Number);
+      const left = a.version.split('.').map(Number);
+      const right = b.version.split('.').map(Number);
       for (let i = 0; i < 3; i += 1) {
         if (left[i] !== right[i]) return left[i] - right[i];
       }
-      return 0;
+      return a.tag.split('.').length - b.tag.split('.').length;
     });
   const newest = versions[versions.length - 1];
-  return newest ? `v${newest}` : null;
+  return newest?.tag ?? null;
 }
 
 /**
@@ -202,7 +213,7 @@ export function planRelease() {
     return { release: false, reason: 'no shippable commits since the last release tag', previous };
   }
 
-  const base = previous ? previous.replace(/^v/, '') : pkg.version;
+  const base = previous ? normalizeReleaseVersion(previous) : pkg.version;
   const { version, skipped } = selectNextVersion({ current: base, bump, takenTags: taken });
   return { release: true, previous, bump, version, skipped, commits: messages.length };
 }
