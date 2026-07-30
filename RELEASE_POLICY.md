@@ -80,10 +80,10 @@ immutable tag, or force-push. Until these prerequisites close, do not publish v3
 
 The composite action currently depends on:
 
-- `postman-cs/postman-bootstrap-action@v2.13.8`
-- `postman-cs/postman-repo-sync-action@v2.6.8`
-- `postman-cs/postman-smoke-flow-action@v3.1.1` when `flow-path` or `flow-mode` is set
-- `postman-cs/postman-insights-onboarding-action@v2.3.0` when Insights is enabled
+- `postman-cs/postman-bootstrap-action@v2.14.0`
+- `postman-cs/postman-repo-sync-action@v2.7.0`
+- `postman-cs/postman-smoke-flow-action@v3.2.0` when `flow-path` or `flow-mode` is set
+- `postman-cs/postman-insights-onboarding-action@v2.4.0` when Insights is enabled
 
 Because these are immutable sibling pins, a consumer who pins `postman-api-onboarding-action` to an immutable tag gets a reproducible lower-level action set at runtime.
 
