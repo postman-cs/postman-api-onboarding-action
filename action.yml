@@ -21,6 +21,10 @@ inputs:
   contract-collection-id:
     description: Existing contract collection ID.
     required: false
+  sync-generated-assets:
+    description: Whether to create or update generated collections and downstream assets. Set false for workspace/spec-only onboarding.
+    required: false
+    default: 'true'
   sync-examples:
     description: Whether linked spec/collection relations should enable example syncing.
     required: false
@@ -110,6 +114,10 @@ inputs:
       file content is never embedded. Forwarded to bootstrap only when spec-url is empty.
     required: false
     default: ''
+  preserve-oas30-type-null:
+    description: Preserve supported OpenAPI 3.0 type null oneOf members in the uploaded source while using an internal nullable view for validation and generated artifacts.
+    required: false
+    default: 'false'
   breaking-change-mode:
     description: OpenAPI breaking-change comparison mode passed through to bootstrap (off, pr-native, baseline-only, or previous-spec).
     required: false
@@ -498,7 +506,7 @@ runs:
         fi
     - id: bootstrap
       name: Bootstrap Postman Assets
-      uses: postman-cs/postman-bootstrap-action@v2.17.2
+      uses: postman-cs/postman-bootstrap-action@f96dba881615d1ee721e2923b8365f76b8036256
       env:
         POSTMAN_TEAM_ID: ${{ inputs.postman-team-id }}
         POSTMAN_BRANCH_DECISION: ${{ steps.branch_decision.outputs.branch-decision }}
@@ -514,6 +522,7 @@ runs:
         baseline-collection-id: ${{ inputs.baseline-collection-id }}
         smoke-collection-id: ${{ inputs.smoke-collection-id }}
         contract-collection-id: ${{ inputs.contract-collection-id }}
+        sync-generated-assets: ${{ inputs.sync-generated-assets }}
         sync-examples: ${{ inputs.sync-examples }}
         collection-sync-mode: ${{ inputs.collection-sync-mode }}
         spec-sync-mode: ${{ inputs.spec-sync-mode }}
@@ -533,6 +542,7 @@ runs:
         # Same URL precedence for inventory: local path only; blank when
         # spec-url is non-empty so legacy dual callers remain unchanged.
         spec-files-json: ${{ inputs.spec-url == '' && inputs.spec-files-json || '' }}
+        preserve-oas30-type-null: ${{ inputs.preserve-oas30-type-null }}
         breaking-change-mode: ${{ inputs.breaking-change-mode }}
         breaking-baseline-spec-path: ${{ inputs.breaking-baseline-spec-path }}
         breaking-rules-path: ${{ inputs.breaking-rules-path }}
@@ -553,7 +563,7 @@ runs:
         postman-stack: ${{ inputs.postman-stack }}
     - id: smoke_flow
       name: Apply Smoke flow
-      if: ${{ (inputs.flow-path != '' || inputs.flow-mode != '') && steps.branch_decision.outputs.tier != 'gated' }}
+      if: ${{ inputs.sync-generated-assets != 'false' && (inputs.flow-path != '' || inputs.flow-mode != '') && steps.branch_decision.outputs.tier != 'gated' }}
       uses: postman-cs/postman-smoke-flow-action@v3.3.2
       env:
         POSTMAN_TEAM_ID: ${{ inputs.postman-team-id }}
@@ -578,7 +588,7 @@ runs:
     - id: repo_sync
       name: Sync Repository and Workspace
       if: ${{ steps.branch_decision.outputs.tier != 'gated' }}
-      uses: postman-cs/postman-repo-sync-action@v2.8.8
+      uses: postman-cs/postman-repo-sync-action@01971bad344a11f1a68404686a07aa26945c2973
       env:
         POSTMAN_TEAM_ID: ${{ inputs.postman-team-id }}
         POSTMAN_BRANCH_DECISION: ${{ steps.branch_decision.outputs.branch-decision }}
@@ -589,6 +599,7 @@ runs:
         baseline-collection-id: ${{ steps.bootstrap.outputs.baseline-collection-id }}
         smoke-collection-id: ${{ steps.bootstrap.outputs.smoke-collection-id }}
         contract-collection-id: ${{ steps.bootstrap.outputs.contract-collection-id }}
+        sync-generated-assets: ${{ inputs.sync-generated-assets }}
         # smoke_flow reshapes the cloud Smoke collection before repo-sync runs;
         # digest-matched prebuilt reuse would keep the pre-reshape on-disk tree and
         # skip the cloud export, so flow runs force a fresh export of every role.
@@ -638,7 +649,7 @@ runs:
       # `postman login --with-api-key`, which has no access-token login path. When
       # postman-api-key is absent (access-token-primary runs), skip the tests with
       # a warning instead of failing the run.
-      if: ${{ steps.bootstrap.outputs.collections-json != '' && inputs.skip-built-in-tests != 'true' && inputs.postman-api-key == '' }}
+      if: ${{ inputs.sync-generated-assets != 'false' && steps.bootstrap.outputs.collections-json != '' && inputs.skip-built-in-tests != 'true' && inputs.postman-api-key == '' }}
       shell: bash
       env:
         POSTMAN_TEAM_ID: ${{ inputs.postman-team-id }}
@@ -646,7 +657,7 @@ runs:
         echo "::warning::Skipping built-in smoke and contract tests: no postman-api-key was provided. The Postman CLI (postman login --with-api-key, then postman collection run) has no access-token login, so these tests require a PMAK. Provide postman-api-key to enable them, or set skip-built-in-tests: true to silence this warning."
     - id: install_postman_cli_windows
       name: Install Postman CLI on Windows
-      if: ${{ runner.os == 'Windows' && steps.bootstrap.outputs.collections-json != '' && inputs.skip-built-in-tests != 'true' && inputs.postman-api-key != '' }}
+      if: ${{ inputs.sync-generated-assets != 'false' && runner.os == 'Windows' && steps.bootstrap.outputs.collections-json != '' && inputs.skip-built-in-tests != 'true' && inputs.postman-api-key != '' }}
       shell: pwsh
       env:
         POSTMAN_TEAM_ID: ${{ inputs.postman-team-id }}
@@ -662,7 +673,7 @@ runs:
         }
     - id: run_tests_junit
       name: Run smoke and contract collections with JUnit output
-      if: ${{ steps.bootstrap.outputs.collections-json != '' && inputs.skip-built-in-tests != 'true' && inputs.postman-api-key != '' }}
+      if: ${{ inputs.sync-generated-assets != 'false' && steps.bootstrap.outputs.collections-json != '' && inputs.skip-built-in-tests != 'true' && inputs.postman-api-key != '' }}
       shell: bash
       continue-on-error: true
       env:
@@ -763,7 +774,7 @@ runs:
         fi
     - id: upload_junit_artifact
       name: Upload Postman JUnit results
-      if: always() && inputs.skip-built-in-tests != 'true'
+      if: always() && inputs.sync-generated-assets != 'false' && inputs.skip-built-in-tests != 'true'
       env:
         POSTMAN_TEAM_ID: ${{ inputs.postman-team-id }}
       uses: actions/upload-artifact@v7.0.1

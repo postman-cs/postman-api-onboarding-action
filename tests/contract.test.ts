@@ -224,6 +224,7 @@ describe('postman-api-onboarding-action composite contract', () => {
         'baseline-collection-id',
         'smoke-collection-id',
         'contract-collection-id',
+        'sync-generated-assets',
         'sync-examples',
         'collection-sync-mode',
         'spec-sync-mode',
@@ -247,6 +248,7 @@ describe('postman-api-onboarding-action composite contract', () => {
         'spec-url',
         'spec-path',
         'spec-files-json',
+        'preserve-oas30-type-null',
         'breaking-change-mode',
         'breaking-baseline-spec-path',
         'breaking-rules-path',
@@ -365,6 +367,26 @@ describe('postman-api-onboarding-action composite contract', () => {
       expect(manifest.inputs['skip-built-in-tests']?.default).toBe('false');
     });
 
+    it('defaults generated asset sync on so existing callers keep full onboarding behavior', () => {
+      const manifest = loadManifest();
+      expect(manifest.inputs['sync-generated-assets']).toBeDefined();
+      expect(manifest.inputs['sync-generated-assets']?.required).toBe(false);
+      expect(manifest.inputs['sync-generated-assets']?.default).toBe('true');
+    });
+
+    it('keeps OAS 3.0 null compatibility opt-in and forwards it to bootstrap', () => {
+      const manifest = loadManifest();
+      const bootstrapStep = manifest.runs.steps.find((step) => step.id === 'bootstrap');
+
+      expect(manifest.inputs['preserve-oas30-type-null']).toMatchObject({
+        required: false,
+        default: 'false'
+      });
+      expect(bootstrapStep?.with?.['preserve-oas30-type-null']).toBe(
+        '${{ inputs.preserve-oas30-type-null }}'
+      );
+    });
+
     it('has the complete expected output set', () => {
       const manifest = loadManifest();
       expect(Object.keys(manifest.outputs)).toEqual([
@@ -422,8 +444,8 @@ describe('postman-api-onboarding-action composite contract', () => {
       const insightsStep = steps.find((step) => step.id === 'insights_onboarding');
 
       expect(validateStep?.shell).toBe('bash');
-      expect(bootstrapStep?.uses).toBe('postman-cs/postman-bootstrap-action@v2.17.2');
-      expect(repoSyncStep?.uses).toBe('postman-cs/postman-repo-sync-action@v2.8.8');
+      expect(bootstrapStep?.uses).toBe('postman-cs/postman-bootstrap-action@f96dba881615d1ee721e2923b8365f76b8036256');
+      expect(repoSyncStep?.uses).toBe('postman-cs/postman-repo-sync-action@01971bad344a11f1a68404686a07aa26945c2973');
       expect(junitStep?.shell).toBe('bash');
       expect(uploadStep?.uses).toBe('actions/upload-artifact@v7.0.1');
       expect(smokeFlowStep?.uses).toBe('postman-cs/postman-smoke-flow-action@v3.3.2');
@@ -531,6 +553,7 @@ describe('postman-api-onboarding-action composite contract', () => {
       const smokeFlow = manifest.runs.steps.find((s) => s.id === 'smoke_flow');
       expect(smokeFlow?.if).toContain('flow-path');
       expect(smokeFlow?.if).toContain('flow-mode');
+      expect(smokeFlow?.if).toContain('sync-generated-assets');
       expect(smokeFlow?.if).toContain("!= ''");
       expect(smokeFlow?.with?.['flow-path']).toBe('${{ inputs.flow-path }}');
       expect(smokeFlow?.with?.['flow-mode']).toBe(
@@ -566,8 +589,10 @@ describe('postman-api-onboarding-action composite contract', () => {
       const junitStep = manifest.runs.steps.find((s) => s.id === 'run_tests_junit');
       const uploadStep = manifest.runs.steps.find((s) => s.id === 'upload_junit_artifact');
       expect(junitStep?.if).toContain('skip-built-in-tests');
+      expect(junitStep?.if).toContain('sync-generated-assets');
       expect(junitStep?.if).toContain("'true'");
       expect(uploadStep?.if).toContain('skip-built-in-tests');
+      expect(uploadStep?.if).toContain('sync-generated-assets');
       expect(uploadStep?.if).toContain("'true'");
     });
 
@@ -586,6 +611,12 @@ describe('postman-api-onboarding-action composite contract', () => {
       );
       expect(bootstrapStep?.with?.['contract-collection-id']).toBe(
         '${{ inputs.contract-collection-id }}'
+      );
+      expect(bootstrapStep?.with?.['sync-generated-assets']).toBe(
+        '${{ inputs.sync-generated-assets }}'
+      );
+      expect(bootstrapStep?.with?.['preserve-oas30-type-null']).toBe(
+        '${{ inputs.preserve-oas30-type-null }}'
       );
       expect(bootstrapStep?.with?.['breaking-change-mode']).toBe(
         '${{ inputs.breaking-change-mode }}'
@@ -616,6 +647,9 @@ describe('postman-api-onboarding-action composite contract', () => {
       );
       expect(repoSyncStep?.with?.['contract-collection-id']).toBe(
         '${{ steps.bootstrap.outputs.contract-collection-id }}'
+      );
+      expect(repoSyncStep?.with?.['sync-generated-assets']).toBe(
+        '${{ inputs.sync-generated-assets }}'
       );
       expect(repoSyncStep?.with?.['prebuilt-collections-json']).toBe(
         "${{ steps.smoke_flow.outcome == 'skipped' && steps.bootstrap.outputs.prebuilt-collections-json || '' }}"
@@ -671,10 +705,10 @@ describe('postman-api-onboarding-action composite contract', () => {
         "${{ inputs.spec-url == '' && inputs.spec-files-json || '' }}"
       );
       // Sibling pins stay on the current immutable tags.
-      expect(bootstrapStep?.uses).toBe('postman-cs/postman-bootstrap-action@v2.17.2');
+      expect(bootstrapStep?.uses).toBe('postman-cs/postman-bootstrap-action@f96dba881615d1ee721e2923b8365f76b8036256');
       expect(
         manifest.runs.steps.find((step) => step.id === 'repo_sync')?.uses
-      ).toBe('postman-cs/postman-repo-sync-action@v2.8.8');
+      ).toBe('postman-cs/postman-repo-sync-action@01971bad344a11f1a68404686a07aa26945c2973');
       expect(
         manifest.runs.steps.find((step) => step.id === 'smoke_flow')?.uses
       ).toBe('postman-cs/postman-smoke-flow-action@v3.3.2');

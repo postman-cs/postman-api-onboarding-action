@@ -28,15 +28,25 @@ const actionManifest = readFileSync(join(repoRoot, 'action.yml'), 'utf8');
 const contractTests = readFileSync(join(repoRoot, 'tests/contract.test.ts'), 'utf8');
 
 describe('pin extraction', () => {
-  it('extracts every immutable sibling pin from the real manifest', () => {
-    const pins = extractPins(actionManifest);
-    const repos = pins.map((pin) => pin.repo).sort();
-    expect(repos).toEqual([
+  it('keeps every sibling ref immutable and extracts every release-tag pin', () => {
+    const refs = [...actionManifest.matchAll(
+      /uses:\s*postman-cs\/(postman-[a-z-]+-action)@([^\s]+)/g
+    )].map((match) => ({ repo: match[1], ref: match[2] }));
+    expect(refs.map(({ repo }) => repo).sort()).toEqual([
       'postman-bootstrap-action',
       'postman-insights-onboarding-action',
       'postman-repo-sync-action',
       'postman-smoke-flow-action'
     ]);
+    for (const { ref } of refs) {
+      expect(ref).toMatch(/^(?:v\d+\.\d+\.\d+|[0-9a-f]{40})$/);
+    }
+
+    const pins = extractPins(actionManifest);
+    const repos = pins.map((pin) => pin.repo).sort();
+    expect(repos).toEqual(
+      refs.filter(({ ref }) => /^v\d+\.\d+\.\d+$/.test(ref)).map(({ repo }) => repo).sort()
+    );
     for (const pin of pins) {
       expect(pin.tag).toMatch(/^v\d+\.\d+\.\d+$/);
       expect(pin.major).toBe(Number(pin.tag.slice(1).split('.')[0]));
