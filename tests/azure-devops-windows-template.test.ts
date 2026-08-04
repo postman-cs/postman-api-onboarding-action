@@ -50,4 +50,38 @@ describe('Azure DevOps Windows onboarding template', () => {
     expect(source).toMatch(/onboarding-repo-sync@\$\{\{ parameters\.repoSyncVersion \}\}/);
     expect(source).toMatch(/onboarding-insights@\$\{\{ parameters\.insightsVersion \}\}/);
   });
+
+  it('declares a workspaceTeamId parameter with an empty default', () => {
+    const template = parse(readFileSync(templatePath, 'utf8'));
+    const param = template.parameters.find(
+      (p: { name: string }) => p.name === 'workspaceTeamId'
+    );
+    expect(param).toBeDefined();
+    expect(param.type).toBe('string');
+    expect(param.default).toBe('');
+  });
+
+  it('forwards --workspace-team-id to bootstrap only when the value is non-empty', () => {
+    const source = readFileSync(templatePath, 'utf8');
+    const template = parse(source);
+    const job = template.jobs[0];
+    const bootstrapStep = job.steps.find(
+      (step: { displayName?: string }) => step.displayName === 'Bootstrap Postman assets'
+    );
+
+    // The append is guarded by the same IsNullOrWhiteSpace conditional style
+    // used for specPath/specUrl, so an empty value never forwards the flag.
+    expect(bootstrapStep.pwsh).toMatch(
+      /if\s*\(\s*-not\s*\[string\]::IsNullOrWhiteSpace\(\$env:WORKSPACE_TEAM_ID\)\s*\)\s*\{\s*\n\s*\$arguments\s*\+=\s*@\('--workspace-team-id',\s*\$env:WORKSPACE_TEAM_ID\)/
+    );
+
+    // The value is sourced exclusively from the workspaceTeamId parameter via
+    // its own env var, never from POSTMAN_TEAM_ID.
+    expect(bootstrapStep.env.WORKSPACE_TEAM_ID).toBe(
+      '${{ parameters.workspaceTeamId }}'
+    );
+    expect(bootstrapStep.pwsh).not.toMatch(
+      /--workspace-team-id',\s*\$env:POSTMAN_TEAM_ID/
+    );
+  });
 });

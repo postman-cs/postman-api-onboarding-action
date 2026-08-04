@@ -1,6 +1,9 @@
 parameters:
   - name: projectName
     type: string
+  - name: workspaceTeamId
+    type: string
+    default: ''
   - name: specPath
     type: string
     default: ''
@@ -135,6 +138,9 @@ jobs:
           } else {
             throw 'One of specPath or specUrl is required.'
           }
+          if (-not [string]::IsNullOrWhiteSpace($env:WORKSPACE_TEAM_ID)) {
+            $arguments += @('--workspace-team-id', $env:WORKSPACE_TEAM_ID)
+          }
           & postman-bootstrap @arguments | Out-Null
           if ($LASTEXITCODE -ne 0) { throw "Bootstrap failed with exit code $LASTEXITCODE" }
           $result = Get-Content -Raw -LiteralPath $resultPath | ConvertFrom-Json
@@ -146,6 +152,7 @@ jobs:
         displayName: Bootstrap Postman assets
         env:
           PROJECT_NAME: ${{ parameters.projectName }}
+          WORKSPACE_TEAM_ID: ${{ parameters.workspaceTeamId }}
           SPEC_PATH: ${{ parameters.specPath }}
           SPEC_URL: ${{ parameters.specUrl }}
           CANONICAL_BRANCH: ${{ parameters.canonicalBranch }}
