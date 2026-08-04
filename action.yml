@@ -69,6 +69,9 @@ inputs:
   project-name:
     description: Service project name used across bootstrap and repo sync phases.
     required: true
+  repo-url:
+    description: Explicit repository URL forwarded to bootstrap and repo sync. Overrides CI auto-detection when a caller needs an isolated synthetic repository identity.
+    required: false
   domain:
     description: Business domain used for governance assignment.
     required: false
@@ -85,7 +88,13 @@ inputs:
     description: Comma-separated workspace admin user ids.
     required: false
   workspace-team-id:
-    description: Numeric sub-team ID for org-mode workspace creation. Required by the Postman API when the PMAK's team is scoped under an organization.
+    description: >-
+      Numeric SUB-TEAM (squad) id that should own the created org-mode workspace.
+      Required by the Postman API when the PMAK's team is scoped under a Postman
+      organization with multiple sub-teams. This is a squad id, NOT the resolver's
+      `team-id` output: that value is a parent/org team id and is never a valid
+      value here. On an org account whose squad list is unreadable or unusable,
+      bootstrap fails before any workspace is created unless this input is set.
     required: false
   spec-url:
     description: HTTPS URL to the OpenAPI document to bootstrap. Provide either spec-url or spec-path.
@@ -493,6 +502,11 @@ runs:
       env:
         POSTMAN_TEAM_ID: ${{ inputs.postman-team-id }}
         POSTMAN_BRANCH_DECISION: ${{ steps.branch_decision.outputs.branch-decision }}
+        # Bootstrap v2.15.0 reads this normalized env key through its exported
+        # getInput('repo-url') seam, while its action metadata does not declare a
+        # nested with-key. Keep the composite input explicit without violating
+        # the pinned child metadata contract.
+        INPUT_REPO_URL: ${{ inputs.repo-url }}
       with:
         project-name: ${{ inputs.project-name }}
         workspace-id: ${{ inputs.workspace-id }}
@@ -570,6 +584,7 @@ runs:
         POSTMAN_BRANCH_DECISION: ${{ steps.branch_decision.outputs.branch-decision }}
       with:
         project-name: ${{ inputs.project-name }}
+        repo-url: ${{ inputs.repo-url }}
         workspace-id: ${{ steps.bootstrap.outputs.workspace-id }}
         baseline-collection-id: ${{ steps.bootstrap.outputs.baseline-collection-id }}
         smoke-collection-id: ${{ steps.bootstrap.outputs.smoke-collection-id }}

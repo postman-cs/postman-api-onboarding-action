@@ -196,6 +196,7 @@ describe('postman-api-onboarding-action composite contract', () => {
         'ci-workflow-path',
         'ci-runner-os',
         'project-name',
+        'repo-url',
         'domain',
         'domain-code',
         'governance-group',
@@ -271,6 +272,17 @@ describe('postman-api-onboarding-action composite contract', () => {
       expect(manifest.inputs['project-name']?.required).toBe(true);
       expect(manifest.inputs['spec-url']?.required).toBe(false);
       expect(manifest.inputs['spec-path']?.required).toBe(false);
+    });
+
+    it('forwards an optional explicit repo-url to both mutating child actions', () => {
+      const manifest = loadManifest();
+      expect(manifest.inputs['repo-url']?.required).toBe(false);
+      expect(manifest.inputs['repo-url']?.description).toMatch(/isolated synthetic repository identity/i);
+      const bootstrap = manifest.runs.steps.find((step) => step.id === 'bootstrap');
+      const repoSync = manifest.runs.steps.find((step) => step.id === 'repo_sync');
+      expect(bootstrap?.env?.INPUT_REPO_URL).toBe('${{ inputs.repo-url }}');
+      expect(bootstrap?.with?.['repo-url']).toBeUndefined();
+      expect(repoSync?.with?.['repo-url']).toBe('${{ inputs.repo-url }}');
     });
 
     it('places optional content-free spec-files-json immediately after spec-path with empty default', () => {
