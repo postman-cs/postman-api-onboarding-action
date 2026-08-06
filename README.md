@@ -10,6 +10,19 @@ Canonical entrypoint for the Postman API Onboarding suite. Use this composite ac
 
 This workflow is the happy path for a new API repository. It mints a service-account access token and team ID with [Postman Onboarding: Service Token](https://github.com/postman-cs/postman-resolve-service-token-action), then feeds those outputs into this composite action. The OpenAPI fixture is public, so the workflow is paste-runnable after `POSTMAN_API_KEY` is configured.
 
+### Workspace-creation preflight
+
+Before running onboarding without an existing `workspace-id`, have a Postman Admin or Super Admin verify that the system service account behind `POSTMAN_API_KEY` can create internal workspaces at the intended team or organization scope. The action cannot complete a human approval request, so the service account must be allowed to create the workspace directly.
+
+Open the resource settings available for the target scope:
+
+- **Standalone team:** Go to **Settings > Team settings > Team resources**, then open **Create team-wide workspaces**.
+- **Postman organization:** Go to **Settings > Organization settings > Organization resources** for organization-wide workspace creation. For a workspace owned by a specific organization team, go to **Organization settings > Teams**, select the target team, and open its **Settings** tab.
+
+Under the workspace-creation policy, either allow all members or explicitly allow the service account (or a group containing it). Also confirm that the service account is assigned to the target team. In org mode, `workspace-team-id` selects the team that owns a new workspace; it does not grant workspace-creation permission. See [Manage organization and team resources](https://learning.postman.com/docs/administration/managing-your-team/manage-team-workspaces/) and [Manage service account identities](https://learning.postman.com/docs/administration/service-accounts/).
+
+When `workspace-id` points to an existing workspace, create permission is not required, but the service account must have sufficient access to update that workspace and its resources.
+
 ```yaml
 name: Postman API onboarding
 
