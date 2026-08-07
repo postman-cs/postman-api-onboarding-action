@@ -10,6 +10,19 @@ Canonical entrypoint for the Postman API Onboarding suite. Use this composite ac
 
 This workflow is the happy path for a new API repository. It mints a service-account access token and team ID with [Postman Onboarding: Service Token](https://github.com/postman-cs/postman-resolve-service-token-action), then feeds those outputs into this composite action. The OpenAPI fixture is public, so the workflow is paste-runnable after `POSTMAN_API_KEY` is configured.
 
+### Workspace-creation preflight
+
+Before running onboarding without an existing `workspace-id`, have a Postman Admin or Super Admin verify that the system service account behind `POSTMAN_API_KEY` can create internal workspaces at the intended team or organization scope. The action cannot complete a human approval request, so the service account must be allowed to create the workspace directly.
+
+Open the resource settings available for the target scope:
+
+- **Standalone team:** Go to **Settings > Team settings > Team resources**, then open **Create team-wide workspaces**.
+- **Postman organization:** Go to **Settings > Organization settings > Organization resources** for organization-wide workspace creation. For a workspace owned by a specific organization team, go to **Organization settings > Teams**, select the target team, and open its **Settings** tab.
+
+Under the workspace-creation policy, either allow all members or explicitly allow the service account (or a group containing it). Also confirm that the service account is assigned to the target team. In org mode, `workspace-team-id` selects the team that owns a new workspace; it does not grant workspace-creation permission. See [Manage organization and team resources](https://learning.postman.com/docs/administration/managing-your-team/manage-team-workspaces/) and [Manage service account identities](https://learning.postman.com/docs/administration/service-accounts/).
+
+When `workspace-id` points to an existing workspace, create permission is not required, but the service account must have sufficient access to update that workspace and its resources.
+
 ```yaml
 name: Postman API onboarding
 
@@ -80,7 +93,7 @@ Run `postman-resolve-service-token-action` first and pass its `token` and `team-
 | --- | --- | --- | --- | --- |
 | Service-account PMAK | `POSTMAN_API_KEY`, or `POSTMAN_SERVICE_ACCOUNT_API_KEY` in AWS examples | Access-token minting and the Postman CLI logins inside the wrapped actions (bootstrap spec lint, repo-sync generated-CI collection run) | GitHub secret backed by a [Postman service account](https://learning.postman.com/docs/administration/service-accounts/) API key | Long-lived until rotated in Postman and updated in CI |
 | Generated access token | `steps.postman-token.outputs.token`, passed as `postman-access-token` | Every Postman asset operation in bootstrap and repo sync, routed through the access-token gateway (workspace, spec, collection, environment, mock, monitor, tagging, identity) | Minted by `postman-resolve-service-token-action` from the service-account PMAK | Fresh per workflow run; avoid storing unless a scheduled refresh workflow intentionally writes `POSTMAN_ACCESS_TOKEN` |
-| Human-user Insights credentials | `insights-postman-api-key`, `insights-postman-access-token` | Optional Insights linking only | A human workspace-admin user's PMAK and session access token, stored as separate GitHub secrets | Required together only when `enable-insights: true`; never substitute the service-account suite credentials |
+| Human-user Insights credentials | `insights-postman-api-key`, `insights-postman-access-token` | Optional Insights linking only | A human workspace-admin user's PMAK and session access token, stored as separate GitHub secrets | Required together only when `enable-insights: true` and `onboarding-scope: full`; never substitute the service-account suite credentials |
 | Team ID | `postman-team-id`: `steps.postman-token.outputs.team-id` (parent/org team id for integration context). `workspace-team-id`: optional explicit squad id for org-mode workspace creation | `postman-team-id` supplies org-mode integration header context. `workspace-team-id` selects the sub-team that owns a new workspace; the resolver `team-id` output is a parent/org id and must never be substituted for `workspace-team-id` | `postman-team-id` from `postman-resolve-service-token-action`. `workspace-team-id` from a known squad id when bootstrap cannot infer one | Not secrets and do not expire; update if the parent org or target squad changes |
 | GitHub token | `github-token`, `gh-fallback-token`, or `${{ github.token }}` | Artifact commits, repository variables, generated workflow files, and optional secret writes | `GITHUB_TOKEN` needs `contents: write`; generated workflow updates need `actions: write`; repository secret writes need a PAT or GitHub App token with secrets write permission | `GITHUB_TOKEN` is job-scoped; PAT/App token lifetime follows its issuer policy |
 | AWS OIDC | `permissions: id-token: write` plus `aws-actions/configure-aws-credentials` | AWS Spec Discovery before onboarding | GitHub OIDC role assumption with least-privilege read permissions for API Gateway, AppSync, EventBridge, Lambda, or the providers you enable | Temporary AWS credentials for the job; no static AWS key is stored |
@@ -165,7 +178,7 @@ The full pattern, including sync-branch creation and programmatic PR opening, is
 
 ### Insights linking
 
-When `enable-insights: true`, the action chains `postman-cs/postman-insights-onboarding-action@v2.4.1` after bootstrap and repo sync, using the workspace from bootstrap plus the first environment from `environments-json`. This release accepts live human sessions identified by `user_type=human` even when `consumerType` is absent. Insights still requires a separate human-user PMAK and human-user session access token; do not pass the service-account credentials used by bootstrap and repo sync.
+When `enable-insights: true` and `onboarding-scope: full`, the action chains `postman-cs/postman-insights-onboarding-action@v2.4.2` after bootstrap and repo sync, using the workspace from bootstrap plus the first environment from `environments-json`. Spec-only onboarding skips Insights because that path intentionally does not create the required environment. This release accepts live human sessions identified by `user_type=human` even when `consumerType` is absent. Insights still requires a separate human-user PMAK and human-user session access token; do not pass the service-account credentials used by bootstrap and repo sync.
 
 ```yaml
 - uses: actions/checkout@v5
@@ -241,6 +254,7 @@ The hook only attaches `x-api-key` for `*.mock.pstmn.io` hosts, so it stays iner
 | `baseline-collection-id` | Existing baseline collection ID. | no |  |
 | `smoke-collection-id` | Existing smoke collection ID. | no |  |
 | `contract-collection-id` | Existing contract collection ID. | no |  |
+| `onboarding-scope` | Onboarding scope. Use full for the complete pipeline or spec-only for workspace/spec onboarding without generated assets. | no | `full` |
 | `sync-examples` | Whether linked spec/collection relations should enable example syncing. | no | `true` |
 | `collection-sync-mode` | Collection lifecycle policy (refresh or version). Default refresh ensures tracked collections stay in sync with the spec. | no | `refresh` |
 | `spec-sync-mode` | Spec lifecycle policy (update or version). | no | `update` |
@@ -264,6 +278,7 @@ The hook only attaches `x-api-key` for `*.mock.pstmn.io` hosts, so it stays iner
 | `spec-url` | HTTPS URL to the OpenAPI document to bootstrap. Provide either spec-url or spec-path. | no |  |
 | `spec-path` | Repo-root-relative path to the local spec file. Used for repo metadata generation and, when spec-url is not provided, as the spec source for bootstrap (read directly from the checked-out workspace). | no |  |
 | `spec-files-json` | Optional content-free JSON inventory of multi-file definition members from discovery (schemaVersion 1). Empty by default. When set, inventory root must equal spec-path. Cannot be combined with spec-url. Not a directory mode — companions are listed explicitly; file content is never embedded. Forwarded to bootstrap only when spec-url is empty. | no |  |
+| `preserve-oas30-type-null` | Preserve supported OpenAPI 3.0 type null oneOf members in the uploaded source while using an internal nullable view for validation and generated artifacts. | no | `false` |
 | `breaking-change-mode` | OpenAPI breaking-change comparison mode passed through to bootstrap (off, pr-native, baseline-only, or previous-spec). | no | `off` |
 | `breaking-baseline-spec-path` | Repo-root-relative baseline OpenAPI spec path used by bootstrap baseline-only mode and pr-native fallback. | no |  |
 | `breaking-rules-path` | Repo-root-relative openapi-changes rules file passed through to bootstrap. Missing files are ignored. | no | `changes-rules.yaml` |
@@ -277,8 +292,8 @@ The hook only attaches `x-api-key` for `*.mock.pstmn.io` hosts, so it stays iner
 | `env-runtime-urls-json` | JSON map of environment slug to runtime base URL. | no | `{}` |
 | `postman-api-key` | Postman API key (PMAK). Threaded to the wrapped actions to mint and re-mint the access token and to authenticate the Postman CLI logins (bootstrap spec lint, repo-sync generated-CI collection run). Individually optional; at least one of postman-api-key or postman-access-token is required. | no |  |
 | `postman-access-token` | Postman access token (x-access-token). Primary credential threaded to the wrapped actions; every Postman asset operation runs through the access-token gateway. Mint it with postman-resolve-service-token-action. Individually optional; at least one of postman-api-key or postman-access-token is required. | no |  |
-| `insights-postman-api-key` | Human-user Postman API key (PMAK) for Insights. Required with insights-postman-access-token only when enable-insights is true; do not use the service-account suite key. | no |  |
-| `insights-postman-access-token` | Human-user session access token for Insights. Required with insights-postman-api-key only when enable-insights is true; do not use a service-token mint. | no |  |
+| `insights-postman-api-key` | Human-user Postman API key (PMAK) for Insights. Required with insights-postman-access-token only when enable-insights is true and onboarding-scope is full; do not use the service-account suite key. | no |  |
+| `insights-postman-access-token` | Human-user session access token for Insights. Required with insights-postman-api-key only when enable-insights is true and onboarding-scope is full; do not use a service-token mint. | no |  |
 | `credential-preflight` | Credential identity preflight policy forwarded to bootstrap and repo sync. warn (default) logs a note and continues when postman-api-key and postman-access-token resolve to different parent orgs; enforce fails the run on that condition before any workspace is created. | no | `warn` |
 | `branch-strategy` | Branch-aware sync strategy. v2 preserves legacy by default; the future v3 major will default to publish-gate after its release gates close. | no | `legacy` |
 | `canonical-branch` | Explicit canonical branch. Defaults to the GitHub event repository default branch for non-legacy strategies. | no |  |

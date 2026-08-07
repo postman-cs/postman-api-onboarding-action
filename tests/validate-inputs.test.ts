@@ -45,6 +45,7 @@ function runValidation(env: Record<string, string>): { status: number; stderr: s
         POSTMAN_API_KEY: 'PMAK-test',
         POSTMAN_ACCESS_TOKEN: '',
         ENABLE_INSIGHTS: 'false',
+        ONBOARDING_SCOPE: 'full',
         INSIGHTS_POSTMAN_API_KEY: '',
         INSIGHTS_POSTMAN_ACCESS_TOKEN: '',
         ...env
@@ -96,6 +97,7 @@ describe('composite first-step input validation', () => {
     expect(validateStep?.env?.POSTMAN_API_KEY).toBe('${{ inputs.postman-api-key }}');
     expect(validateStep?.env?.POSTMAN_ACCESS_TOKEN).toBe('${{ inputs.postman-access-token }}');
     expect(validateStep?.env?.ENABLE_INSIGHTS).toBe('${{ inputs.enable-insights }}');
+    expect(validateStep?.env?.ONBOARDING_SCOPE).toBe('${{ inputs.onboarding-scope }}');
     expect(validateStep?.env?.INSIGHTS_POSTMAN_API_KEY).toBe('${{ inputs.insights-postman-api-key }}');
     expect(validateStep?.env?.INSIGHTS_POSTMAN_ACCESS_TOKEN).toBe('${{ inputs.insights-postman-access-token }}');
     expect(validateStep?.env?.BRANCH_TIER).toBe('${{ steps.branch_decision.outputs.tier }}');
@@ -105,22 +107,52 @@ describe('composite first-step input validation', () => {
   it.each([
     {
       label: 'Insights disabled without dedicated credentials',
-      env: { ENABLE_INSIGHTS: 'false', INSIGHTS_POSTMAN_API_KEY: '', INSIGHTS_POSTMAN_ACCESS_TOKEN: '' },
+      env: {
+        ENABLE_INSIGHTS: 'false',
+        ONBOARDING_SCOPE: 'full',
+        INSIGHTS_POSTMAN_API_KEY: '',
+        INSIGHTS_POSTMAN_ACCESS_TOKEN: ''
+      },
       status: 0
     },
     {
       label: 'Insights enabled with both dedicated credentials',
-      env: { ENABLE_INSIGHTS: 'true', INSIGHTS_POSTMAN_API_KEY: 'PMAK-user', INSIGHTS_POSTMAN_ACCESS_TOKEN: 'user-token' },
+      env: {
+        ENABLE_INSIGHTS: 'true',
+        ONBOARDING_SCOPE: 'full',
+        INSIGHTS_POSTMAN_API_KEY: 'PMAK-user',
+        INSIGHTS_POSTMAN_ACCESS_TOKEN: 'user-token'
+      },
+      status: 0
+    },
+    {
+      label: 'Insights omitted during spec-only sync without dedicated credentials',
+      env: {
+        ENABLE_INSIGHTS: 'true',
+        ONBOARDING_SCOPE: 'spec-only',
+        INSIGHTS_POSTMAN_API_KEY: '',
+        INSIGHTS_POSTMAN_ACCESS_TOKEN: ''
+      },
       status: 0
     },
     {
       label: 'Insights enabled without dedicated API key',
-      env: { ENABLE_INSIGHTS: 'true', INSIGHTS_POSTMAN_API_KEY: '', INSIGHTS_POSTMAN_ACCESS_TOKEN: 'user-token' },
+      env: {
+        ENABLE_INSIGHTS: 'true',
+        ONBOARDING_SCOPE: 'full',
+        INSIGHTS_POSTMAN_API_KEY: '',
+        INSIGHTS_POSTMAN_ACCESS_TOKEN: 'user-token'
+      },
       status: 1
     },
     {
       label: 'Insights enabled without dedicated access token',
-      env: { ENABLE_INSIGHTS: 'true', INSIGHTS_POSTMAN_API_KEY: 'PMAK-user', INSIGHTS_POSTMAN_ACCESS_TOKEN: '' },
+      env: {
+        ENABLE_INSIGHTS: 'true',
+        ONBOARDING_SCOPE: 'full',
+        INSIGHTS_POSTMAN_API_KEY: 'PMAK-user',
+        INSIGHTS_POSTMAN_ACCESS_TOKEN: ''
+      },
       status: 1
     }
   ])('$label validates dedicated Insights credentials before children run', ({ env, status }) => {
@@ -191,6 +223,13 @@ describe('composite first-step input validation', () => {
       attempted: 'Attempted repo-write-mode validation failed',
       accepted: 'Accepted values: none, commit-only, commit-and-push',
       remediation: 'Set the repo-write-mode input to one of those values'
+    },
+    {
+      envKey: 'ONBOARDING_SCOPE',
+      value: 'specs-only',
+      attempted: 'Attempted onboarding-scope validation failed',
+      accepted: 'Accepted values: full, spec-only',
+      remediation: 'Set the onboarding-scope input to one of those values'
     }
   ])('rejects invalid $envKey with actionable context and no value interpolation', ({
     envKey,
