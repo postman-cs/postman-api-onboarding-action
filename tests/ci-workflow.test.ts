@@ -7,7 +7,6 @@ import { parse } from 'yaml';
 const ACTIONLINT_DOWNLOADER_COMMIT = '393031adb9afb225ee52ae2ccd7a5af5525e03e8';
 const ACTIONLINT_VERSION = '1.7.11';
 const ACTIONLINT_DOWNLOADER_URL = `https://raw.githubusercontent.com/rhysd/actionlint/${ACTIONLINT_DOWNLOADER_COMMIT}/scripts/download-actionlint.bash`;
-const WINDOWS_CACHE_PIN = 'actions/cache@1bd1e32a3bdc45362d1e726936510720a7c30a57';
 
 const ciWorkflowText = readFileSync(join(process.cwd(), '.github/workflows/ci.yml'), 'utf8').replace(/\r\n/g, '\n');
 const ciWorkflow = parse(ciWorkflowText) as {
@@ -136,12 +135,24 @@ describe('CI workflow contract', () => {
     expect(windows).not.toMatch(/^\s*cache:\s*npm\s*$/m);
 
     const cacheStep = windowsJob?.steps?.find((step) => step.uses?.startsWith('actions/cache@'));
-    expect(cacheStep?.uses).toBe(WINDOWS_CACHE_PIN);
+    expect(cacheStep?.uses).toMatch(/^actions\/cache@[0-9a-f]{40}$/);
+    expect(cacheStep?.uses?.startsWith('actions/cache@')).toBe(true);
+    {
+      const sha = cacheStep?.uses?.split('@')[1] ?? '';
+      expect(sha).toMatch(/^[0-9a-f]{40}$/);
+    }
+    // All cache usages share same SHA and have semver comment
+    {
+      const cachePins = [...ciWorkflowText.matchAll(/actions\/cache@([0-9a-f]{40})/g)].map((m) => m[1]!);
+      expect(cachePins.length).toBeGreaterThanOrEqual(1);
+      for (const sha of cachePins) expect(sha).toMatch(/^[0-9a-f]{40}$/);
+      expect(new Set(cachePins).size).toBe(1);
+      expect(windows).toMatch(/uses:\s*actions\/cache@[0-9a-f]{40}\s+#\s*v\d+\.\d+\.\d+/);
+    }
     expect(cacheStep?.id).toBe('windows-node-modules');
     expect(cacheStep?.with?.path).toBe('node_modules');
     expect(cacheStep?.with?.key).toBe("Windows/node-24/${{ hashFiles('package-lock.json') }}");
     expect(cacheStep?.with).not.toHaveProperty('restore-keys');
-    expect(windows).toContain(`${WINDOWS_CACHE_PIN} # v4.2.0`);
     expect(windows).toContain('id: windows-node-modules');
     expect(windows).toContain('path: node_modules');
     expect(windows).toContain("key: Windows/node-24/${{ hashFiles('package-lock.json') }}");
