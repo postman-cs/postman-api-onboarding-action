@@ -118,6 +118,8 @@ jobs:
     permissions:
       contents: write
       id-token: write
+    outputs:
+      published: ${{ steps.npm-publish.outputs.published }}
     steps:
       - uses: actions/setup-node@v7
         with:
@@ -170,9 +172,20 @@ jobs:
             throw new Error(`tag ${process.env.GITHUB_REF_NAME} does not match package version ${packageJson.version}`);
           }
           NODE
-      - name: Publish or verify npm package
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
+        with:
+          generate_release_notes: true
+          files: |
+            release/release.tgz
+            release/release-manifest.json
+      - name: Publish npm package
+        id: npm-publish
+        continue-on-error: true
         run: |
           set -euo pipefail
+          if [ -z "${NODE_AUTH_TOKEN:-}" ]; then sed -i '/_authToken/d' "${NPM_CONFIG_USERCONFIG:-$HOME/.npmrc}"; fi
+          echo "published=false" >> "$GITHUB_OUTPUT"
           PKG_NAME=$(tar -xOf release/release.tgz package/package.json | node -p "JSON.parse(require('fs').readFileSync(0, 'utf8')).name")
           PKG_VERSION=$(tar -xOf release/release.tgz package/package.json | node -p "JSON.parse(require('fs').readFileSync(0, 'utf8')).version")
           SRI="sha512-$(openssl dgst -sha512 -binary release/release.tgz | openssl base64 -A)"
@@ -181,15 +194,24 @@ jobs:
           else
             npm publish ./release/release.tgz --provenance --access public
           fi
+          echo "published=true" >> "$GITHUB_OUTPUT"
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-      - name: Publish GitHub release
-        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
-        with:
-          generate_release_notes: true
-          files: |
-            release/release.tgz
-            release/release-manifest.json
+      - name: Verify npm registry identity
+        if: steps.npm-publish.outputs.published == 'true'
+        run: |
+          set -euo pipefail
+          PKG_NAME=$(tar -xOf release/release.tgz package/package.json | node -p "JSON.parse(require('fs').readFileSync(0, 'utf8')).name")
+          PKG_VERSION=$(tar -xOf release/release.tgz package/package.json | node -p "JSON.parse(require('fs').readFileSync(0, 'utf8')).version")
+          SRI="sha512-$(openssl dgst -sha512 -binary release/release.tgz | openssl base64 -A)"
+          EXISTING=$(npm view "$PKG_NAME@$PKG_VERSION" dist.integrity)
+          [ "$EXISTING" = "$SRI" ] || { echo '::error::Published npm integrity differs from staged tarball'; exit 1; }
+      - name: Report npm publish skipped
+        if: steps.npm-publish.outputs.published != 'true'
+        run: |
+          PACKAGE_VERSION=$(tar -xOf release/release.tgz package/package.json | node -p "JSON.parse(require('fs').readFileSync(0, 'utf8')).version")
+          echo "::warning::npm publish for @postman/onboarding-api@$PACKAGE_VERSION did not complete (missing/invalid NPM_TOKEN or registry error); GitHub Release remains authoritative; recover via backfill-npm.yml once publish access exists"
+          echo "npm publish for @postman/onboarding-api@$PACKAGE_VERSION did not complete (missing/invalid NPM_TOKEN or registry error); GitHub Release remains authoritative; recover via backfill-npm.yml once publish access exists" >> "$GITHUB_STEP_SUMMARY"
 
   verify-release-e2e:
     needs: [classify, verify-package, publish]

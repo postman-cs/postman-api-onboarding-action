@@ -1,0 +1,49 @@
+name: Backfill npm
+
+on:
+  workflow_dispatch:
+    inputs:
+      tags:
+        description: Ordered space-separated immutable tags, oldest first.
+        required: true
+        type: string
+
+permissions: {contents: read, id-token: write}
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+      - name: Publish immutable release artifacts
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+          TAGS: ${{ inputs.tags }}
+        run: |
+          set -euo pipefail
+          if [ -z "${NODE_AUTH_TOKEN:-}" ]; then sed -i '/_authToken/d' "${NPM_CONFIG_USERCONFIG:-$HOME/.npmrc}"; fi
+          PACKAGE_NAME='@postman/onboarding-api'
+          for TAG in $TAGS; do
+            DIRECTORY=$(mktemp -d)
+            trap 'rm -rf "$DIRECTORY"' EXIT
+            gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern 'release.tgz' --dir "$DIRECTORY"
+            TARBALL="$DIRECTORY/release.tgz"
+            PACKAGE_JSON=$(tar -xOf "$TARBALL" package/package.json)
+            NAME=$(printf '%s' "$PACKAGE_JSON" | node -p "JSON.parse(require('fs').readFileSync(0, 'utf8')).name")
+            VERSION=$(printf '%s' "$PACKAGE_JSON" | node -p "JSON.parse(require('fs').readFileSync(0, 'utf8')).version")
+            [ "$NAME" = "$PACKAGE_NAME" ] || { echo "::error::$TAG contains $NAME, expected $PACKAGE_NAME"; exit 1; }
+            [ "$VERSION" = "${TAG#v}" ] || { echo "::error::$TAG contains version $VERSION, expected ${TAG#v}"; exit 1; }
+            if npm view "$PACKAGE_NAME@$VERSION" version >/dev/null 2>&1; then
+              echo "::notice::$PACKAGE_NAME@$VERSION already exists; skipping"
+            else
+              npm publish "$TARBALL" --provenance --access public --tag backfill
+            fi
+            rm -rf "$DIRECTORY"
+            trap - EXIT
+          done
+          HIGHEST=$(npm view "$PACKAGE_NAME" versions --json | node -e "let input=''; process.stdin.on('data', chunk => input += chunk).on('end', () => { const versions = JSON.parse(input); const sorted = versions.filter(version => /^\\d+\\.\\d+\\.\\d+$/.test(version)).sort((a, b) => { const aa = a.split('.').map(Number); const bb = b.split('.').map(Number); return aa[0] - bb[0] || aa[1] - bb[1] || aa[2] - bb[2]; }); if (!sorted.length) process.exit(1); console.log(sorted.at(-1)); });")
+          npm dist-tag add "$PACKAGE_NAME@$HIGHEST" latest

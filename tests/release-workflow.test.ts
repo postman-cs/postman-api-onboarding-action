@@ -293,7 +293,7 @@ describe('release workflow publishing contract', () => {
     expect(publish).not.toContain('RUNNER_TEMP/verify-release-artifacts.mjs');
     expect(publish).not.toContain('$RUNNER_TEMP/verify-release-artifacts.mjs');
     const envelope = namedStep('Verify release artifact envelope');
-    const npm = namedStep('Publish or verify npm package');
+    const npm = namedStep('Publish npm package');
     expect(envelope).toContain("artifact.path !== 'release.tgz'");
     expect(envelope).toContain('/^[a-f0-9]{64}$/');
     expect(envelope).toContain("execFileSync('tar', ['-xOf', tarballPath, 'package/package.json']");
@@ -307,14 +307,20 @@ describe('release workflow publishing contract', () => {
     );
   });
 
-  it('publishes or verifies npm before GitHub Release and attaches staged artifacts', () => {
+  it('publishes the GitHub Release before the best-effort npm attempt and attaches staged artifacts', () => {
     const publish = job('publish');
     const npmPublish = publish.indexOf('npm publish ./release/release.tgz --provenance --access public');
     const githubRelease = publish.indexOf('softprops/action-gh-release');
     expect(npmPublish).toBeGreaterThanOrEqual(0);
     expect(githubRelease).toBeGreaterThanOrEqual(0);
-    expect(npmPublish).toBeLessThan(githubRelease);
+    expect(githubRelease).toBeLessThan(npmPublish);
     expect(publish).toContain('Published npm integrity differs from staged tarball');
+    expect(publish).toContain('id: npm-publish');
+    expect(publish).toContain('continue-on-error: true');
+    expect(publish).toContain('published: ${{ steps.npm-publish.outputs.published }}');
+    expect(publish).toContain("if: steps.npm-publish.outputs.published == 'true'");
+    expect(publish).toContain("if: steps.npm-publish.outputs.published != 'true'");
+    expect(publish).toContain('recover via backfill-npm.yml once publish access exists');
     expect(publish).toContain('release/release.tgz');
     expect(publish).toContain('release/release-manifest.json');
     expect(releaseWorkflow).toContain('group: release-${{ github.repository }}');
