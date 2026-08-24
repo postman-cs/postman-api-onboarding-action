@@ -1,5 +1,5 @@
 {
-  "name": "@postman-cse/onboarding-api",
+  "name": "@postman/onboarding-api",
   "version": "3.1.2",
   "description": "Composite Postman API onboarding GitHub Action.",
   "files": [

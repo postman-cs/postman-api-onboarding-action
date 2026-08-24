@@ -92,7 +92,7 @@ describe('postman-api-onboarding-action composite contract', () => {
 
     it('package.json name matches repository name', () => {
       const pkg = loadPackageJson();
-      expect(pkg.name).toBe('@postman-cse/onboarding-api');
+      expect(pkg.name).toBe('@postman/onboarding-api');
     });
 
     it('description carries the suite suffix, not beta', () => {
@@ -176,10 +176,12 @@ describe('postman-api-onboarding-action composite contract', () => {
       expect(classifier?.run).toContain("release_kind=alias");
       expect(verify.if).toBe("needs.classify.outputs.release_kind == 'immutable'");
       expect(publish.if).toBe("needs.classify.outputs.release_kind == 'immutable'");
-      const publishStep = publish.steps.find((step) => step.name === 'Publish or verify npm package');
+      const publishStep = publish.steps.find((step) => step.id === 'npm-publish');
       const releaseStep = publish.steps.find((step) => step.name === 'Publish GitHub release');
       expect(publishStep?.run).toContain('npm publish ./release/release.tgz --provenance --access public');
+      expect(publishStep?.['continue-on-error']).toBe(true);
       expect(releaseStep?.uses).toContain('softprops/action-gh-release');
+      expect(publish.steps.indexOf(releaseStep!)).toBeLessThan(publish.steps.indexOf(publishStep!));
     });
 
     it('README documents all inputs from action.yml', () => {

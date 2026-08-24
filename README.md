@@ -1,6 +1,6 @@
 # Postman API Onboarding
 
-[![CI](https://github.com/postman-cs/postman-api-onboarding-action/actions/workflows/ci.yml/badge.svg)](https://github.com/postman-cs/postman-api-onboarding-action/actions/workflows/ci.yml) [![Release](https://img.shields.io/github/v/release/postman-cs/postman-api-onboarding-action?sort=semver)](https://github.com/postman-cs/postman-api-onboarding-action/releases) [![npm](https://img.shields.io/npm/v/%40postman-cse%2Fonboarding-api)](https://www.npmjs.com/package/@postman-cse/onboarding-api) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![CI](https://github.com/postman-cs/postman-api-onboarding-action/actions/workflows/ci.yml/badge.svg)](https://github.com/postman-cs/postman-api-onboarding-action/actions/workflows/ci.yml) [![Release](https://img.shields.io/github/v/release/postman-cs/postman-api-onboarding-action?sort=semver)](https://github.com/postman-cs/postman-api-onboarding-action/releases) [![npm](https://img.shields.io/npm/v/%40postman%2Fonboarding-api)](https://www.npmjs.com/package/@postman/onboarding-api) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 Canonical entrypoint for the Postman API Onboarding suite. Use this composite action when a GitHub repository needs the full onboarding path: workspace bootstrap, OpenAPI upload, collection generation, repository artifact sync, built-in smoke and contract runs, and optional Postman Insights linking.
 
@@ -392,7 +392,7 @@ Releases use immutable `v3.x.y` tags with `v3` as the rolling release channel; p
 
 ## Resources
 
-- npm package: [@postman-cse/onboarding-api](https://www.npmjs.com/package/@postman-cse/onboarding-api)
+- npm package: [@postman/onboarding-api](https://www.npmjs.com/package/@postman/onboarding-api)
 - Docs in this repo: [credentials](docs/credentials.md), [contract and output mapping](docs/contract.md), [protected-branch workflows](docs/protected-branch-workflows.md), [deferred tests](docs/deferred-tests.md), [non-GitHub CI](docs/non-github-ci.md)
 - Marketplace docs: [support](SUPPORT.md), [security](SECURITY.md), [release policy](RELEASE_POLICY.md)
 - Postman API and auth references: [Postman API](https://learning.postman.com/docs/reference/postman-api/intro-api/), [API authentication](https://learning.postman.com/docs/reference/postman-api/authentication/), [service accounts](https://learning.postman.com/docs/administration/service-accounts/), [EU data residency](https://learning.postman.com/docs/administration/enterprise/about-eu-data-residency/)

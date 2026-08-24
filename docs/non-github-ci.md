@@ -5,7 +5,7 @@ On GitHub Actions, use the composite action as documented in the [README](../REA
 Install the CLIs globally:
 
 ```bash
-npm install -g @postman-cse/onboarding-bootstrap @postman-cse/onboarding-repo-sync @postman-cse/onboarding-resolve-service-token
+npm install -g @postman/onboarding-bootstrap @postman/onboarding-repo-sync @postman/onboarding-resolve-service-token
 ```
 
 For CI jobs that need governance, workspace linking, or system environment association, mint a service-account access token before bootstrap:
@@ -78,4 +78,4 @@ postman-repo-sync \
 
 Both CLIs support `--dotenv-path` for shell-friendly KEY=VALUE output that can be sourced with `source ./bootstrap.env`.
 
-For Insights linking outside GitHub Actions, install `@postman-cse/onboarding-insights` and run `postman-insights-onboard` after the service has been discovered by Insights. See [postman-insights-onboarding-action/docs/cli.md](https://github.com/postman-cs/postman-insights-onboarding-action/blob/main/docs/cli.md) for the required service, workspace, and environment inputs.
+For Insights linking outside GitHub Actions, install `@postman/onboarding-insights` and run `postman-insights-onboard` after the service has been discovered by Insights. See [postman-insights-onboarding-action/docs/cli.md](https://github.com/postman-cs/postman-insights-onboarding-action/blob/main/docs/cli.md) for the required service, workspace, and environment inputs.

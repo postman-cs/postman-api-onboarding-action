@@ -48,10 +48,12 @@ function npmCliPath(npmExecPath: string | undefined): string {
 }
 
 type WorkflowStep = {
+  id?: string;
   name?: string;
   uses?: string;
   run?: string;
   env?: Record<string, string>;
+  'continue-on-error'?: boolean;
   with?: Record<string, unknown>;
 };
 
@@ -89,7 +91,7 @@ function ensurePacked(packageVersion: string): string {
   writeFileSync(
     join(source, 'package.json'),
     `${JSON.stringify({
-      name: '@postman-cse/onboarding-api',
+      name: '@postman/onboarding-api',
       version: packageVersion,
       files: ['scripts/verify-release-artifacts.mjs']
     }, null, 2)}\n`
@@ -121,7 +123,7 @@ function caseFixture(options?: { packageVersion?: string; tag?: string }): strin
       repository: 'postman-cs/postman-api-onboarding-action',
       commit_sha: 'a'.repeat(40),
       tag,
-      package_name: '@postman-cse/onboarding-api',
+      package_name: '@postman/onboarding-api',
       package_version: packageVersion,
       artifacts: [{ path: 'release.tgz', sha256: sha256(releaseTarball) }]
     })
@@ -190,8 +192,9 @@ describe('release workflow artifact handoff', () => {
     expect(JSON.stringify(publish)).not.toContain('package/scripts/verify-release-artifacts.mjs');
     const tokenSteps = (publish?.steps ?? []).filter((step) => JSON.stringify(step).includes('NODE_AUTH_TOKEN'));
     expect(tokenSteps).toHaveLength(1);
-    expect(tokenSteps[0]?.name).toBe('Publish or verify npm package');
+    expect(tokenSteps[0]?.id).toBe('npm-publish');
     expect(tokenSteps[0]?.env?.NODE_AUTH_TOKEN).toBe('${{ secrets.NPM_TOKEN }}');
+    expect(tokenSteps[0]?.['continue-on-error']).toBe(true);
   });
 
   it('executes the trusted inline verifier on a real tarball without running package code under OIDC env', () => {
@@ -217,7 +220,7 @@ describe('release workflow artifact handoff', () => {
         repository: 'postman-cs/postman-api-onboarding-action',
         commit_sha: 'a'.repeat(40),
         tag: 'v2.1.2',
-        package_name: '@postman-cse/onboarding-api',
+        package_name: '@postman/onboarding-api',
         package_version: '2.1.2',
         artifacts: [{ path: 'release.tgz', sha256: sha256(tarballPath) }]
       })
@@ -265,7 +268,7 @@ describe('release artifact verifier', () => {
     const directory = caseFixture();
     const manifestPath = join(directory, 'release-manifest.json');
     const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
-    manifest.package_name = '@postman-cse/wrong';
+    manifest.package_name = '@postman/wrong';
     writeFileSync(manifestPath, JSON.stringify(manifest));
     expect(() => verifyReleaseArtifacts(directory, expected())).toThrow(/package name/);
   });
