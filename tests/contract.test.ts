@@ -466,12 +466,12 @@ describe('postman-api-onboarding-action composite contract', () => {
       const insightsStep = steps.find((step) => step.id === 'insights_onboarding');
 
       expect(validateStep?.shell).toBe('bash');
-      expect(bootstrapStep?.uses).toBe('postman-cs/postman-bootstrap-action@v2.20.0');
-      expect(repoSyncStep?.uses).toBe('postman-cs/postman-repo-sync-action@v2.10.1');
+      expect(bootstrapStep?.uses).toBe('postman-cs/postman-bootstrap-action@v2.21.0');
+      expect(repoSyncStep?.uses).toBe('postman-cs/postman-repo-sync-action@v2.10.2');
       expect(junitStep?.shell).toBe('bash');
       expect(uploadStep?.uses).toBe('actions/upload-artifact@v7.0.1');
-      expect(smokeFlowStep?.uses).toBe('postman-cs/postman-smoke-flow-action@v3.7.2');
-      expect(insightsStep?.uses).toBe('postman-cs/postman-insights-onboarding-action@v2.5.0');
+      expect(smokeFlowStep?.uses).toBe('postman-cs/postman-smoke-flow-action@v3.7.3');
+      expect(insightsStep?.uses).toBe('postman-cs/postman-insights-onboarding-action@v2.5.1');
       for (const step of [bootstrapStep, repoSyncStep, smokeFlowStep, insightsStep]) {
         expect(step?.uses).not.toMatch(/@(main|v0)$/);
       }
@@ -728,16 +728,16 @@ describe('postman-api-onboarding-action composite contract', () => {
         "${{ inputs.spec-url == '' && inputs.spec-files-json || '' }}"
       );
       // Sibling pins stay on the current immutable tags.
-      expect(bootstrapStep?.uses).toBe('postman-cs/postman-bootstrap-action@v2.20.0');
+      expect(bootstrapStep?.uses).toBe('postman-cs/postman-bootstrap-action@v2.21.0');
       expect(
         manifest.runs.steps.find((step) => step.id === 'repo_sync')?.uses
-      ).toBe('postman-cs/postman-repo-sync-action@v2.10.1');
+      ).toBe('postman-cs/postman-repo-sync-action@v2.10.2');
       expect(
         manifest.runs.steps.find((step) => step.id === 'smoke_flow')?.uses
-      ).toBe('postman-cs/postman-smoke-flow-action@v3.7.2');
+      ).toBe('postman-cs/postman-smoke-flow-action@v3.7.3');
       expect(
         manifest.runs.steps.find((step) => step.id === 'insights_onboarding')?.uses
-      ).toBe('postman-cs/postman-insights-onboarding-action@v2.5.0');
+      ).toBe('postman-cs/postman-insights-onboarding-action@v2.5.1');
     });
 
     it('surfaces final outputs from phase steps', () => {
