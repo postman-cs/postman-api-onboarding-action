@@ -11,12 +11,9 @@ name: Advance Sibling Pins
 # covers missed or token-less dispatches; manual dispatch for on-demand runs.
 #
 # The postman-suite-pin-bot GitHub App mints a one-hour installation token
-# scoped to this repo. The direct HEAD:main push attempts only when that token
-# is minted and non-empty; a GITHUB_TOKEN push would succeed at the git layer
-# but cannot trigger Auto Release, so it is never used for main. When the App
-# token is absent or the push fails, the workflow falls back to a
-# ready-to-review pull request opened with github.token.
-
+# scoped to this repo so the pull request this workflow opens can trigger CI.
+# This workflow never writes the default branch: every pin advance lands
+# through a reviewed pull request, and CI is dispatched explicitly for it.
 on:
   repository_dispatch:
     types: [sibling-release]
@@ -79,38 +76,27 @@ jobs:
           node scripts/check-sibling-pins.mjs
           npm test
 
-      - name: Commit and push
+      - name: Commit and open pull request
         if: steps.advance.outputs.changed == 'true'
         env:
-          APP_TOKEN: ${{ steps.app-token.outputs.token }}
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token || github.token }}
         run: |
           set -euo pipefail
           git config user.name "postman-suite-pin-bot[bot]"
           git config user.email "311553872+postman-suite-pin-bot[bot]@users.noreply.github.com"
           git add action.yml tests/contract.test.ts RELEASE_POLICY.md README.md
           git commit -m "fix(deps): advance sibling pins to the latest released tags"
-          # Direct main push requires the App token: a GITHUB_TOKEN push to main
-          # may succeed at the git layer but does not trigger Auto Release, so a
-          # pin commit pushed without the bot App can remain unreleased on main.
-          # Only attempt the direct push when the App token was minted.
-          if [ -n "$APP_TOKEN" ]; then
-            if git push origin HEAD:main; then
-              echo "::notice::Pin advance pushed to main; Auto Release will cut the composite release."
-              exit 0
-            fi
-            echo "::notice::App-backed push to main failed; opening a pull request instead."
-          else
-            echo "::notice::No App token minted; skipping direct main push for review and opening a pull request instead."
-          fi
-          # Protected main without bypass, or no App token: carry the bump on a
-          # PR so a reviewer can land it. CI is dispatched explicitly because
-          # GITHUB_TOKEN-created pull requests do not emit pull_request runs.
+          # Pin advances always land through a reviewed pull request. This
+          # workflow has no default-branch write path: a direct push to main
+          # would bypass branch protection and raise the
+          # GitHub_Multiple_Protected_Branch_Policy_Override alarm.
           BRANCH="chore/advance-sibling-pins-$(date -u +%Y%m%d%H%M%S)"
           git push origin "HEAD:refs/heads/${BRANCH}"
           gh pr create \
             --base main \
             --head "$BRANCH" \
             --title "fix(deps): advance sibling pins to the latest released tags" \
-            --body "Automated sibling pin advance. Opened by advance-pins.yml because main requires review and the pin bot App cannot bypass it."
+            --body "Automated sibling pin advance. Opened by advance-pins.yml; merging it lets Auto Release cut the composite release."
+          # CI is dispatched explicitly because GITHUB_TOKEN-created pull
+          # requests do not emit pull_request runs.
           gh workflow run ci.yml --ref "$BRANCH"
