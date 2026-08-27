@@ -77,7 +77,7 @@ rewrite an immutable tag or force-push.
 
 The composite action currently depends on:
 
-- `postman-cs/postman-bootstrap-action@v2.21.0`
+- `postman-cs/postman-bootstrap-action@v2.21.2`
 - `postman-cs/postman-repo-sync-action@v2.10.2`
 - `postman-cs/postman-smoke-flow-action@v3.7.3` when `flow-path` or `flow-mode` is set
 - `postman-cs/postman-insights-onboarding-action@v2.5.1` when Insights is enabled
