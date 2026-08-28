@@ -32,6 +32,8 @@ jobs:
           node-version: '24'
           cache: npm
           registry-url: 'https://registry.npmjs.org'
+      - name: Reject tracked scratch paths
+        run: node scripts/check-tracked-scratch-paths.mjs
       - run: npm ci
       - name: Install actionlint
         run: |

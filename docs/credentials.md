@@ -10,10 +10,7 @@ To generate one:
 
 1. Create or select a [Postman service account](https://learning.postman.com/docs/administration/service-accounts/) for the onboarding automation.
 2. Generate a PMAK for that service account and copy the key (starts with `PMAK-`).
-3. Set it as a GitHub secret:
-   ```bash
-   gh secret set POSTMAN_API_KEY --repo <owner>/<repo>
-   ```
+3. In the repository, open **Settings** > **Secrets and variables** > **Actions**, create a repository secret named `POSTMAN_API_KEY`, and paste the key as its value.
 
 > **Note:** A personal user PMAK can still work for standard API operations, but service-account PMAKs are the supported CI credential because they can mint fresh access tokens at run time.
 
@@ -42,34 +39,7 @@ Primary path: mint the token with [postman-resolve-service-token-action](https:/
 
 For [EU data residency](https://learning.postman.com/docs/administration/enterprise/about-eu-data-residency/), change both `postman-region` values to `eu`.
 
-User/session access tokens from `postman login` are deprecated for CI. They expire, can belong to a different parent org than the PMAK, and should only be used as a legacy fallback while migrating to service accounts.
-
-Legacy fallback:
-
-1. **Log in via the [Postman CLI](https://learning.postman.com/docs/postman-cli/postman-cli-auth/)**:
-   ```bash
-   postman login
-   ```
-   Complete the interactive sign-in.
-
-2. **Extract the access token** from the CLI credential store:
-   ```bash
-   cat ~/.postman/postmanrc | jq -r '.login._profiles[].accessToken'
-   ```
-
-3. **Set it as a GitHub secret** on your repository or organization:
-   ```bash
-   # Repository-level secret
-   gh secret set POSTMAN_ACCESS_TOKEN --repo <owner>/<repo>
-
-   # Organization-level secret (recommended for multi-repo use)
-   gh secret set POSTMAN_ACCESS_TOKEN --org <org> --visibility selected --repos <repo1>,<repo2>
-   ```
-   Paste the token value when prompted.
-
-> **Important:** The fallback token must come from the Postman CLI credential store populated by `postman login`. Do not paste copied cookies, DevTools values, or manually harvested session credentials into CI secrets.
-
-> **Note:** `postman login --with-api-key` stores a PMAK, which is not the access token these APIs require.
+CI access tokens must be minted at run time from the service-account PMAK with `postman-resolve-service-token-action`. Interactive Postman CLI sessions, browser storage, cookies, and developer-tools values are not supported CI credential sources.
 
 ## Team ID derivation
 
