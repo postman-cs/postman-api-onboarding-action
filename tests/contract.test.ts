@@ -466,7 +466,7 @@ describe('postman-api-onboarding-action composite contract', () => {
       const insightsStep = steps.find((step) => step.id === 'insights_onboarding');
 
       expect(validateStep?.shell).toBe('bash');
-      expect(bootstrapStep?.uses).toBe('postman-cs/postman-bootstrap-action@v2.21.0');
+      expect(bootstrapStep?.uses).toBe('postman-cs/postman-bootstrap-action@v2.21.3');
       expect(repoSyncStep?.uses).toBe('postman-cs/postman-repo-sync-action@v2.10.2');
       expect(junitStep?.shell).toBe('bash');
       expect(uploadStep?.uses).toBe('actions/upload-artifact@v7.0.1');
@@ -728,7 +728,7 @@ describe('postman-api-onboarding-action composite contract', () => {
         "${{ inputs.spec-url == '' && inputs.spec-files-json || '' }}"
       );
       // Sibling pins stay on the current immutable tags.
-      expect(bootstrapStep?.uses).toBe('postman-cs/postman-bootstrap-action@v2.21.0');
+      expect(bootstrapStep?.uses).toBe('postman-cs/postman-bootstrap-action@v2.21.3');
       expect(
         manifest.runs.steps.find((step) => step.id === 'repo_sync')?.uses
       ).toBe('postman-cs/postman-repo-sync-action@v2.10.2');
