@@ -553,7 +553,7 @@ runs:
         fi
     - id: bootstrap
       name: Bootstrap Postman Assets
-      uses: postman-cs/postman-bootstrap-action@v2.21.5
+      uses: postman-cs/postman-bootstrap-action@v2.21.9
       env:
         POSTMAN_TEAM_ID: ${{ inputs.postman-team-id }}
         POSTMAN_BRANCH_DECISION: ${{ steps.branch_decision.outputs.branch-decision }}
@@ -612,7 +612,7 @@ runs:
     - id: smoke_flow
       name: Apply Smoke flow
       if: ${{ inputs.onboarding-scope == 'full' && (inputs.flow-path != '' || inputs.flow-mode != '') && steps.branch_decision.outputs.tier != 'gated' }}
-      uses: postman-cs/postman-smoke-flow-action@v3.7.3
+      uses: postman-cs/postman-smoke-flow-action@v3.7.4
       env:
         POSTMAN_TEAM_ID: ${{ inputs.postman-team-id }}
         POSTMAN_BRANCH_DECISION: ${{ steps.branch_decision.outputs.branch-decision }}
@@ -637,7 +637,7 @@ runs:
     - id: repo_sync
       name: Sync Repository and Workspace
       if: ${{ steps.branch_decision.outputs.tier != 'gated' }}
-      uses: postman-cs/postman-repo-sync-action@v2.10.3
+      uses: postman-cs/postman-repo-sync-action@v2.10.9
       env:
         POSTMAN_TEAM_ID: ${{ inputs.postman-team-id }}
         POSTMAN_BRANCH_DECISION: ${{ steps.branch_decision.outputs.branch-decision }}
