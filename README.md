@@ -254,79 +254,79 @@ The hook only attaches `x-api-key` for `*.mock.pstmn.io` hosts, so it stays iner
 ## Inputs
 
 <!-- inputs-table:start -->
-| Name | Description | Required | Default |
-| --- | --- | --- | --- |
-| `working-directory` | Repository-root-relative service directory used for all local inputs and generated artifacts. | no |  |
-| `workspace-id` | Existing Postman workspace ID. | no |  |
-| `spec-id` | Existing Postman spec ID. | no |  |
-| `baseline-collection-id` | Existing baseline collection ID. | no |  |
-| `smoke-collection-id` | Existing smoke collection ID. | no |  |
-| `contract-collection-id` | Existing contract collection ID. | no |  |
-| `onboarding-scope` | Onboarding scope. Use full for the complete pipeline or spec-only for workspace/spec onboarding without generated assets. | no | `full` |
-| `sync-examples` | Whether linked spec/collection relations should enable example syncing. | no | `true` |
-| `collection-sync-mode` | Collection lifecycle policy (refresh or version). Default refresh ensures tracked collections stay in sync with the spec. | no | `refresh` |
-| `spec-sync-mode` | Spec lifecycle policy (update or version). | no | `update` |
-| `release-label` | Optional release label for versioned specs and collections. When omitted during versioned sync, derived from GitHub tag or branch metadata. | no |  |
-| `monitor-id` | Existing smoke monitor ID. When set, the action validates and reuses this monitor instead of creating a new one. | no |  |
-| `mock-url` | Existing mock server URL. When set, the action validates and reuses this mock instead of creating a new one. | no |  |
-| `mock-visibility` | Required mock access policy. Public is anonymous; private requires a runtime x-api-key supplied by the caller and is never persisted by repo-sync. | no | `public` |
-| `mock-environment-enabled` | Create or update a dedicated manual-validation environment whose baseUrl is the validated mock URL. This environment is excluded from runtime CI selection and never contains a mock credential. | no | `false` |
-| `monitor-cron` | Cron expression for monitor scheduling (e.g. '0 */6 * * *'). When empty, the monitor is created disabled and triggered to run once per workflow invocation (and once on every subsequent run). | no |  |
-| `generate-ci-workflow` | Whether to generate the CI workflow file. Defaults to true at the repository root and false when working-directory is set. | no |  |
-| `ci-workflow-path` | Path to write the generated CI workflow file. | no | `.github/workflows/ci.yml` |
-| `ci-runner-os` | Runner operating system for the generated CI workflow. Use windows for native PowerShell Azure DevOps CI. | no | `linux` |
-| `project-name` | Service project name used across bootstrap and repo sync phases. | yes |  |
-| `repo-url` | Explicit repository URL forwarded to bootstrap and repo sync. Overrides CI auto-detection when a caller needs an isolated synthetic repository identity. | no |  |
-| `domain` | Business domain used for governance assignment. | no |  |
-| `domain-code` | Short domain code used in workspace naming. | no |  |
-| `governance-group` | Postman governance workspace group name. Overrides the postman-governance-group repository custom property and domain mapping. | no |  |
-| `requester-email` | Requester email used for workspace membership. | no |  |
-| `workspace-admin-user-ids` | Comma-separated workspace admin user ids. | no |  |
-| `workspace-team-id` | Numeric SUB-TEAM (squad) id that should own the created org-mode workspace. Required by the Postman API when the PMAK's team is scoped under a Postman organization with multiple sub-teams. This is a squad id, NOT the resolver's `team-id` output: that value is a parent/org team id and is never a valid value here. On an org account whose squad list is unreadable or unusable, bootstrap fails before any workspace is created unless this input is set. | no |  |
-| `spec-url` | HTTPS URL to the OpenAPI document to bootstrap. Provide either spec-url or spec-path. | no |  |
-| `spec-path` | Repo-root-relative path to the local spec file. Used for repo metadata generation and, when spec-url is not provided, as the spec source for bootstrap (read directly from the checked-out workspace). | no |  |
-| `spec-files-json` | Optional content-free JSON inventory of multi-file definition members from discovery (schemaVersion 1). Empty by default. When set, inventory root must equal spec-path. Cannot be combined with spec-url. Not a directory mode — companions are listed explicitly; file content is never embedded. Forwarded to bootstrap only when spec-url is empty. | no |  |
-| `preserve-oas30-type-null` | Preserve supported OpenAPI 3.0 type null oneOf members in the uploaded source while using an internal nullable view for validation and generated artifacts. | no | `false` |
-| `breaking-change-mode` | OpenAPI breaking-change comparison mode passed through to bootstrap (off, pr-native, baseline-only, or previous-spec). | no | `off` |
-| `breaking-baseline-spec-path` | Repo-root-relative baseline OpenAPI spec path used by bootstrap baseline-only mode and pr-native fallback. | no |  |
-| `breaking-rules-path` | Repo-root-relative openapi-changes rules file passed through to bootstrap. Missing files are ignored. | no | `changes-rules.yaml` |
-| `breaking-target-ref` | Optional target branch or git ref override for bootstrap pr-native breaking-change comparisons. | no |  |
-| `breaking-summary-path` | Optional markdown breaking-change report path. Defaults to a bootstrap runner-temp file. | no |  |
-| `breaking-log-path` | Optional raw breaking-change log path. Defaults to a bootstrap runner-temp file. | no |  |
-| `environments-json` | JSON array of environment slugs to materialize. | no | `["prod"]` |
-| `system-env-map-json` | JSON map of environment slug to system environment id. | no | `{}` |
-| `environment-uids-json` | JSON map of environment slug to existing Postman environment UID. When provided, repo-sync reuses these environments instead of creating new ones. | no | `{}` |
-| `governance-mapping-json` | JSON map of business domain to governance group name. | no | `{}` |
-| `env-runtime-urls-json` | JSON map of environment slug to runtime base URL. | no | `{}` |
-| `postman-api-key` | Postman API key (PMAK). Threaded to the wrapped actions to mint and re-mint the access token and to authenticate the Postman CLI logins (bootstrap spec lint, repo-sync generated-CI collection run). Individually optional; at least one of postman-api-key or postman-access-token is required. | no |  |
-| `postman-access-token` | Postman access token (x-access-token). Primary credential threaded to the wrapped actions; every Postman asset operation runs through the access-token gateway. Mint it with postman-resolve-service-token-action. Individually optional; at least one of postman-api-key or postman-access-token is required. | no |  |
-| `insights-postman-api-key` | Human-user Postman API key (PMAK) for Insights. Required with insights-postman-access-token only when enable-insights is true and onboarding-scope is full; do not use the service-account suite key. | no |  |
-| `insights-postman-access-token` | Human-user session access token for Insights. Required with insights-postman-api-key only when enable-insights is true and onboarding-scope is full; do not use a service-token mint. | no |  |
-| `credential-preflight` | Credential identity preflight policy forwarded to bootstrap and repo sync. warn (default) logs a note and continues when postman-api-key and postman-access-token resolve to different parent orgs; enforce fails the run on that condition before any workspace is created. | no | `warn` |
-| `branch-strategy` | Branch-aware sync strategy. v2 preserves legacy by default; the future v3 major will default to publish-gate after its release gates close. | no | `legacy` |
-| `canonical-branch` | Explicit canonical branch. Defaults to the GitHub event repository default branch for non-legacy strategies. | no |  |
-| `channels` | Comma-separated channel map, for example develop=DEV, staging=STAGE, release/*=RC. | no |  |
-| `preview-ttl` | Sliding preview retention TTL in days, forwarded to repo-sync. | no | `30` |
-| `postman-team-id` | Explicit Postman team ID override for org-mode integration calls. | no |  |
-| `postman-region` | Postman data residency region for public API and Postman CLI calls. One of us or eu. | no | `us` |
-| `github-token` | GitHub token used for repo variables and generated commits. | no |  |
-| `gh-fallback-token` | Fallback GitHub token for variable and workflow-file APIs. | no |  |
-| `repo-write-mode` | Repo mutation mode for generated assets and workflow files. One of none, commit-only, or commit-and-push. | no | `commit-and-push` |
-| `current-ref` | Explicit ref override for detached checkout push semantics. | no |  |
-| `committer-name` | Commit author name for generated sync commits. | no | `Postman` |
-| `committer-email` | Commit author email for generated sync commits. | no | `support@postman.com` |
-| `flow-path` | Optional repo-root-relative path to the smoke flow.yaml manifest, defaulting to postman/flow.yaml inside the wrapped action. When set, the composite chains postman-cs/postman-smoke-flow-action before repo sync: a manifest at the effective path drives a curated reshape of the canonical Smoke collection, and under flow-mode auto a missing manifest is derived from spec-path and persisted to that path so repo sync commits it and the next run takes the curated path. Leave empty (default) to skip the smoke-flow step unless flow-mode requests it. | no |  |
-| `flow-mode` | Optional flow selection policy forwarded to postman-cs/postman-smoke-flow-action. Set to auto to run the smoke-flow step without a curated manifest: it derives a deterministic smoke flow from spec-path (create before read, output-to-input bindings resolved by provenance) and persists it to the effective flow path for repo sync to commit. Set to curated to require flow-path, or off to refresh the canonical Smoke collection without curation. Leave empty (default) to run the smoke-flow step only when flow-path is set, preserving the pre-flow-mode contract. | no |  |
-| `flow-allow-delete` | Whether a derived smoke flow may include DELETE operations whose identifiers are proven to originate from the same run's create steps. Forwarded to postman-cs/postman-smoke-flow-action; ignored for curated manifests. Defaults to false. | no | `false` |
-| `persist-derived-flow` | Whether a freshly derived smoke flow is written to the effective flow path (flow-path or postman/flow.yaml) after a successful apply, so repo sync commits it and the next run is curated. Forwarded to postman-cs/postman-smoke-flow-action; create-only, never overwrites an existing manifest. Set false to derive without persisting. | no | `true` |
-| `enable-insights` | Whether to enable Postman Insights. | no | `false` |
-| `skip-built-in-tests` | When 'true', skip the built-in smoke and contract Postman CLI test run and JUnit artifact upload that normally happen inside this action. Set this to 'true' when the caller workflow needs to perform additional post-onboarding setup (e.g. bearer-token injection, mTLS bootstrap, vault-hydrated secrets, dynamic env enrichment) before the smoke and contract suites can authenticate successfully, and will run the tests itself afterward. Default 'false' preserves existing behavior for all current callers. | no | `false` |
-| `cluster-name` | Insights cluster name passed to the downstream Insights onboarding step. | no |  |
-| `org-mode` | Whether the Postman team uses org-mode. When true, x-entity-team-id is included on integration calls. Non-org teams must omit this header. | no | `false` |
-| `ssl-client-cert` | Base64-encoded PEM client certificate for mTLS. Passed through to repo-sync for CI workflow generation. | no |  |
-| `ssl-client-key` | Base64-encoded PEM client private key. Passed through to repo-sync. | no |  |
-| `ssl-client-passphrase` | Passphrase for encrypted private key. Passed through to repo-sync. | no |  |
-| `ssl-extra-ca-certs` | Base64-encoded PEM additional CA certificates. Passed through to repo-sync. | no |  |
+| Name | Description | Options | Required | Default |
+| --- | --- | --- | --- | --- |
+| `working-directory` | Repository-root-relative service directory used for all local inputs and generated artifacts. | Repo-relative directory path | no |  |
+| `workspace-id` | Existing Postman workspace ID. | Any existing Postman workspace ID | no |  |
+| `spec-id` | Existing Postman spec ID. | Any existing Postman spec ID | no |  |
+| `baseline-collection-id` | Existing baseline collection ID. | Any existing Postman collection ID | no |  |
+| `smoke-collection-id` | Existing smoke collection ID. | Any existing Postman collection ID | no |  |
+| `contract-collection-id` | Existing contract collection ID. | Any existing Postman collection ID | no |  |
+| `onboarding-scope` | Onboarding scope. Use full for the complete pipeline or spec-only for workspace/spec onboarding without generated assets. | `full`, `spec-only` | no | `full` |
+| `sync-examples` | Whether linked spec/collection relations should enable example syncing. | `true`, `false` | no | `true` |
+| `collection-sync-mode` | Collection lifecycle policy (refresh or version). Default refresh ensures tracked collections stay in sync with the spec. | `refresh`, `version` | no | `refresh` |
+| `spec-sync-mode` | Spec lifecycle policy (update or version). | `update`, `version` | no | `update` |
+| `release-label` | Optional release label for versioned specs and collections. When omitted during versioned sync, derived from GitHub tag or branch metadata. | Any string | no |  |
+| `monitor-id` | Existing smoke monitor ID. When set, the action validates and reuses this monitor instead of creating a new one. | Any existing Postman monitor ID | no |  |
+| `mock-url` | Existing mock server URL. When set, the action validates and reuses this mock instead of creating a new one. | Any Postman mock server URL | no |  |
+| `mock-visibility` | Required mock access policy. Public is anonymous; private requires a runtime x-api-key supplied by the caller and is never persisted by repo-sync. | `public`, `private` | no | `public` |
+| `mock-environment-enabled` | Create or update a dedicated manual-validation environment whose baseUrl is the validated mock URL. This environment is excluded from runtime CI selection and never contains a mock credential. | `true`, `false` | no | `false` |
+| `monitor-cron` | Cron expression for monitor scheduling (e.g. '0 */6 * * *'). When empty, the monitor is created disabled and triggered to run once per workflow invocation (and once on every subsequent run). | Any valid cron expression | no |  |
+| `generate-ci-workflow` | Whether to generate the CI workflow file. Defaults to true at the repository root and false when working-directory is set. | `true`, `false` | no |  |
+| `ci-workflow-path` | Path to write the generated CI workflow file. | Repo-relative file path | no | `.github/workflows/ci.yml` |
+| `ci-runner-os` | Runner operating system for the generated CI workflow. Use windows for native PowerShell Azure DevOps CI. | `linux`, `windows` | no | `linux` |
+| `project-name` | Service project name used across bootstrap and repo sync phases. | Any string | yes |  |
+| `repo-url` | Explicit repository URL forwarded to bootstrap and repo sync. Overrides CI auto-detection when a caller needs an isolated synthetic repository identity. | Any repository URL | no |  |
+| `domain` | Business domain used for governance assignment. | Any string | no |  |
+| `domain-code` | Short domain code used in workspace naming. | Any string | no |  |
+| `governance-group` | Postman governance workspace group name. Overrides the postman-governance-group repository custom property and domain mapping. | Any governance workspace group name | no |  |
+| `requester-email` | Requester email used for workspace membership. | Any email address | no |  |
+| `workspace-admin-user-ids` | Comma-separated workspace admin user ids. | Comma-separated Postman user IDs | no |  |
+| `workspace-team-id` | Numeric SUB-TEAM (squad) id that should own the created org-mode workspace. Required by the Postman API when the PMAK's team is scoped under a Postman organization with multiple sub-teams. This is a squad id, NOT the resolver's `team-id` output: that value is a parent/org team id and is never a valid value here. On an org account whose squad list is unreadable or unusable, bootstrap fails before any workspace is created unless this input is set. | Numeric Postman sub-team (squad) ID | no |  |
+| `spec-url` | HTTPS URL to the OpenAPI document to bootstrap. Provide either spec-url or spec-path. | Any HTTPS URL | no |  |
+| `spec-path` | Repo-root-relative path to the local spec file. Used for repo metadata generation and, when spec-url is not provided, as the spec source for bootstrap (read directly from the checked-out workspace). | Repo-relative file path | no |  |
+| `spec-files-json` | Optional content-free JSON inventory of multi-file definition members from discovery (schemaVersion 1). Empty by default. When set, inventory root must equal spec-path. Cannot be combined with spec-url. Not a directory mode — companions are listed explicitly; file content is never embedded. Forwarded to bootstrap only when spec-url is empty. | JSON object string (schemaVersion 1 inventory) | no |  |
+| `preserve-oas30-type-null` | Preserve supported OpenAPI 3.0 type null oneOf members in the uploaded source while using an internal nullable view for validation and generated artifacts. | `true`, `false` | no | `false` |
+| `breaking-change-mode` | OpenAPI breaking-change comparison mode passed through to bootstrap (off, pr-native, baseline-only, or previous-spec). | `off`, `pr-native`, `baseline-only`, `previous-spec` | no | `off` |
+| `breaking-baseline-spec-path` | Repo-root-relative baseline OpenAPI spec path used by bootstrap baseline-only mode and pr-native fallback. | Repo-relative file path | no |  |
+| `breaking-rules-path` | Repo-root-relative openapi-changes rules file passed through to bootstrap. Missing files are ignored. | Repo-relative file path | no | `changes-rules.yaml` |
+| `breaking-target-ref` | Optional target branch or git ref override for bootstrap pr-native breaking-change comparisons. | Any git branch or ref | no |  |
+| `breaking-summary-path` | Optional markdown breaking-change report path. Defaults to a bootstrap runner-temp file. | Any file path | no |  |
+| `breaking-log-path` | Optional raw breaking-change log path. Defaults to a bootstrap runner-temp file. | Any file path | no |  |
+| `environments-json` | JSON array of environment slugs to materialize. | JSON array string of environment slugs | no | `["prod"]` |
+| `system-env-map-json` | JSON map of environment slug to system environment id. | JSON object string mapping slug to system environment id | no | `{}` |
+| `environment-uids-json` | JSON map of environment slug to existing Postman environment UID. When provided, repo-sync reuses these environments instead of creating new ones. | JSON object string mapping slug to Postman environment UID | no | `{}` |
+| `governance-mapping-json` | JSON map of business domain to governance group name. | JSON object string mapping domain to governance group name | no | `{}` |
+| `env-runtime-urls-json` | JSON map of environment slug to runtime base URL. | JSON object string mapping slug to runtime base URL | no | `{}` |
+| `postman-api-key` | Postman API key (PMAK). Threaded to the wrapped actions to mint and re-mint the access token and to authenticate the Postman CLI logins (bootstrap spec lint, repo-sync generated-CI collection run). Individually optional; at least one of postman-api-key or postman-access-token is required. | Any Postman API key (PMAK) | no |  |
+| `postman-access-token` | Postman access token (x-access-token). Primary credential threaded to the wrapped actions; every Postman asset operation runs through the access-token gateway. Mint it with postman-resolve-service-token-action. Individually optional; at least one of postman-api-key or postman-access-token is required. | Any Postman access token | no |  |
+| `insights-postman-api-key` | Human-user Postman API key (PMAK) for Insights. Required with insights-postman-access-token only when enable-insights is true and onboarding-scope is full; do not use the service-account suite key. | Any human-user Postman API key (PMAK) | no |  |
+| `insights-postman-access-token` | Human-user session access token for Insights. Required with insights-postman-api-key only when enable-insights is true and onboarding-scope is full; do not use a service-token mint. | Any human-user session access token | no |  |
+| `credential-preflight` | Credential identity preflight policy forwarded to bootstrap and repo sync. warn (default) logs a note and continues when postman-api-key and postman-access-token resolve to different parent orgs; enforce fails the run on that condition before any workspace is created. | `warn`, `enforce` | no | `warn` |
+| `branch-strategy` | Branch-aware sync strategy. v2 preserves legacy by default; the future v3 major will default to publish-gate after its release gates close. | `legacy`, `publish-gate`, `preview` | no | `legacy` |
+| `canonical-branch` | Explicit canonical branch. Defaults to the GitHub event repository default branch for non-legacy strategies. | Any git branch name | no |  |
+| `channels` | Comma-separated channel map, for example develop=DEV, staging=STAGE, release/*=RC. | Comma-separated `pattern=CODE` pairs | no |  |
+| `preview-ttl` | Sliding preview retention TTL in days, forwarded to repo-sync. | Any positive integer (days) | no | `30` |
+| `postman-team-id` | Explicit Postman team ID override for org-mode integration calls. | Numeric Postman team ID | no |  |
+| `postman-region` | Postman data residency region for public API and Postman CLI calls. One of us or eu. | `us`, `eu` | no | `us` |
+| `github-token` | GitHub token used for repo variables and generated commits. | Any GitHub token | no |  |
+| `gh-fallback-token` | Fallback GitHub token for variable and workflow-file APIs. | Any GitHub token | no |  |
+| `repo-write-mode` | Repo mutation mode for generated assets and workflow files. One of none, commit-only, or commit-and-push. | `none`, `commit-only`, `commit-and-push` | no | `commit-and-push` |
+| `current-ref` | Explicit ref override for detached checkout push semantics. | Any git ref | no |  |
+| `committer-name` | Commit author name for generated sync commits. | Any string | no | `Postman` |
+| `committer-email` | Commit author email for generated sync commits. | Any email address | no | `support@postman.com` |
+| `flow-path` | Optional repo-root-relative path to the smoke flow.yaml manifest, defaulting to postman/flow.yaml inside the wrapped action. When set, the composite chains postman-cs/postman-smoke-flow-action before repo sync: a manifest at the effective path drives a curated reshape of the canonical Smoke collection, and under flow-mode auto a missing manifest is derived from spec-path and persisted to that path so repo sync commits it and the next run takes the curated path. Leave empty (default) to skip the smoke-flow step unless flow-mode requests it. | Repo-relative file path | no |  |
+| `flow-mode` | Optional flow selection policy forwarded to postman-cs/postman-smoke-flow-action. Set to auto to run the smoke-flow step without a curated manifest: it derives a deterministic smoke flow from spec-path (create before read, output-to-input bindings resolved by provenance) and persists it to the effective flow path for repo sync to commit. Set to curated to require flow-path, or off to refresh the canonical Smoke collection without curation. Leave empty (default) to run the smoke-flow step only when flow-path is set, preserving the pre-flow-mode contract. | `auto`, `curated`, `off` | no |  |
+| `flow-allow-delete` | Whether a derived smoke flow may include DELETE operations whose identifiers are proven to originate from the same run's create steps. Forwarded to postman-cs/postman-smoke-flow-action; ignored for curated manifests. Defaults to false. | `true`, `false` | no | `false` |
+| `persist-derived-flow` | Whether a freshly derived smoke flow is written to the effective flow path (flow-path or postman/flow.yaml) after a successful apply, so repo sync commits it and the next run is curated. Forwarded to postman-cs/postman-smoke-flow-action; create-only, never overwrites an existing manifest. Set false to derive without persisting. | `true`, `false` | no | `true` |
+| `enable-insights` | Whether to enable Postman Insights. | `true`, `false` | no | `false` |
+| `skip-built-in-tests` | When 'true', skip the built-in smoke and contract Postman CLI test run and JUnit artifact upload that normally happen inside this action. Set this to 'true' when the caller workflow needs to perform additional post-onboarding setup (e.g. bearer-token injection, mTLS bootstrap, vault-hydrated secrets, dynamic env enrichment) before the smoke and contract suites can authenticate successfully, and will run the tests itself afterward. Default 'false' preserves existing behavior for all current callers. | `true`, `false` | no | `false` |
+| `cluster-name` | Insights cluster name passed to the downstream Insights onboarding step. | Any string | no |  |
+| `org-mode` | Whether the Postman team uses org-mode. When true, x-entity-team-id is included on integration calls. Non-org teams must omit this header. | `true`, `false` | no | `false` |
+| `ssl-client-cert` | Base64-encoded PEM client certificate for mTLS. Passed through to repo-sync for CI workflow generation. | Base64-encoded PEM certificate | no |  |
+| `ssl-client-key` | Base64-encoded PEM client private key. Passed through to repo-sync. | Base64-encoded PEM private key | no |  |
+| `ssl-client-passphrase` | Passphrase for encrypted private key. Passed through to repo-sync. | Any string | no |  |
+| `ssl-extra-ca-certs` | Base64-encoded PEM additional CA certificates. Passed through to repo-sync. | Base64-encoded PEM certificate(s) | no |  |
 <!-- inputs-table:end -->
 
 Tables are generated from `action.yml` by `npm run docs:tables`.

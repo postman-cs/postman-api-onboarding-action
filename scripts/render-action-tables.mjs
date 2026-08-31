@@ -22,6 +22,85 @@ const MARKERS = {
 const HIDDEN_INPUTS = new Set(['integration-backend', 'postman-stack']);
 const HIDDEN_OUTPUTS = new Set(['integration-backend']);
 
+// Accepted values per input. GitHub Actions inputs are untyped strings, so
+// enums and formats validated in action.yml (or forwarded to and validated
+// by a sibling action) are not derivable from the manifest and live here
+// instead.
+const INPUT_OPTIONS = {
+  'working-directory': 'Repo-relative directory path',
+  'workspace-id': 'Any existing Postman workspace ID',
+  'spec-id': 'Any existing Postman spec ID',
+  'baseline-collection-id': 'Any existing Postman collection ID',
+  'smoke-collection-id': 'Any existing Postman collection ID',
+  'contract-collection-id': 'Any existing Postman collection ID',
+  'onboarding-scope': '`full`, `spec-only`',
+  'sync-examples': '`true`, `false`',
+  'collection-sync-mode': '`refresh`, `version`',
+  'spec-sync-mode': '`update`, `version`',
+  'release-label': 'Any string',
+  'monitor-id': 'Any existing Postman monitor ID',
+  'mock-url': 'Any Postman mock server URL',
+  'mock-visibility': '`public`, `private`',
+  'mock-environment-enabled': '`true`, `false`',
+  'monitor-cron': 'Any valid cron expression',
+  'generate-ci-workflow': '`true`, `false`',
+  'ci-workflow-path': 'Repo-relative file path',
+  'ci-runner-os': '`linux`, `windows`',
+  'project-name': 'Any string',
+  'repo-url': 'Any repository URL',
+  domain: 'Any string',
+  'domain-code': 'Any string',
+  'governance-group': 'Any governance workspace group name',
+  'requester-email': 'Any email address',
+  'workspace-admin-user-ids': 'Comma-separated Postman user IDs',
+  'workspace-team-id': 'Numeric Postman sub-team (squad) ID',
+  'spec-url': 'Any HTTPS URL',
+  'spec-path': 'Repo-relative file path',
+  'spec-files-json': 'JSON object string (schemaVersion 1 inventory)',
+  'preserve-oas30-type-null': '`true`, `false`',
+  'breaking-change-mode': '`off`, `pr-native`, `baseline-only`, `previous-spec`',
+  'breaking-baseline-spec-path': 'Repo-relative file path',
+  'breaking-rules-path': 'Repo-relative file path',
+  'breaking-target-ref': 'Any git branch or ref',
+  'breaking-summary-path': 'Any file path',
+  'breaking-log-path': 'Any file path',
+  'environments-json': 'JSON array string of environment slugs',
+  'system-env-map-json': 'JSON object string mapping slug to system environment id',
+  'environment-uids-json': 'JSON object string mapping slug to Postman environment UID',
+  'governance-mapping-json': 'JSON object string mapping domain to governance group name',
+  'env-runtime-urls-json': 'JSON object string mapping slug to runtime base URL',
+  'postman-api-key': 'Any Postman API key (PMAK)',
+  'postman-access-token': 'Any Postman access token',
+  'insights-postman-api-key': 'Any human-user Postman API key (PMAK)',
+  'insights-postman-access-token': 'Any human-user session access token',
+  'credential-preflight': '`warn`, `enforce`',
+  'branch-strategy': '`legacy`, `publish-gate`, `preview`',
+  'canonical-branch': 'Any git branch name',
+  channels: 'Comma-separated `pattern=CODE` pairs',
+  'preview-ttl': 'Any positive integer (days)',
+  'postman-team-id': 'Numeric Postman team ID',
+  'postman-region': '`us`, `eu`',
+  'postman-stack': '`prod`, `beta`',
+  'github-token': 'Any GitHub token',
+  'gh-fallback-token': 'Any GitHub token',
+  'repo-write-mode': '`none`, `commit-only`, `commit-and-push`',
+  'current-ref': 'Any git ref',
+  'committer-name': 'Any string',
+  'committer-email': 'Any email address',
+  'flow-path': 'Repo-relative file path',
+  'flow-mode': '`auto`, `curated`, `off`',
+  'flow-allow-delete': '`true`, `false`',
+  'persist-derived-flow': '`true`, `false`',
+  'enable-insights': '`true`, `false`',
+  'skip-built-in-tests': '`true`, `false`',
+  'cluster-name': 'Any string',
+  'org-mode': '`true`, `false`',
+  'ssl-client-cert': 'Base64-encoded PEM certificate',
+  'ssl-client-key': 'Base64-encoded PEM private key',
+  'ssl-client-passphrase': 'Any string',
+  'ssl-extra-ca-certs': 'Base64-encoded PEM certificate(s)',
+};
+
 function cell(text) {
   return String(text ?? '')
     .replace(/\s+/g, ' ')
@@ -33,9 +112,10 @@ export function renderInputsTable(manifest) {
   const rows = Object.entries(manifest.inputs).filter(([name]) => !HIDDEN_INPUTS.has(name)).map(([name, spec]) => {
     const required = spec.required ? 'yes' : 'no';
     const def = spec.default !== undefined && spec.default !== '' ? `\`${cell(spec.default)}\`` : '';
-    return `| \`${name}\` | ${cell(spec.description)} | ${required} | ${def} |`;
+    const options = cell(INPUT_OPTIONS[name] ?? '');
+    return `| \`${name}\` | ${cell(spec.description)} | ${options} | ${required} | ${def} |`;
   });
-  return ['| Name | Description | Required | Default |', '| --- | --- | --- | --- |', ...rows].join('\n');
+  return ['| Name | Description | Options | Required | Default |', '| --- | --- | --- | --- | --- |', ...rows].join('\n');
 }
 
 export function renderOutputsTable(manifest) {
