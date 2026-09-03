@@ -86,11 +86,13 @@ describe('Azure DevOps Windows onboarding template', () => {
     });
   });
 
-  it('accepts exact stable and prerelease SemVer values before npm is invoked', () => {
-    expect(runVersionValidation().status).toBe(0);
-    expect(
-      runVersionValidation({ BOOTSTRAP_VERSION: '2.22.0-rc.1+build.7' }).status
-    ).toBe(0);
+  // One pwsh spawn per case: a cold PowerShell start on a loaded runner is
+  // 2-3s, so two sequential spawns inside one 5s budget were a flaky timeout.
+  it.each([
+    ['stable', {}],
+    ['prerelease', { BOOTSTRAP_VERSION: '2.22.0-rc.1+build.7' }]
+  ] as const)('accepts exact %s SemVer values before npm is invoked', (_label, overrides) => {
+    expect(runVersionValidation(overrides).status).toBe(0);
   });
 
   it.each([
