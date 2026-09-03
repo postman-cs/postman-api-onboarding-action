@@ -774,7 +774,7 @@ runs:
     - id: smoke_flow
       name: Apply Smoke flow
       if: ${{ inputs.onboarding-scope == 'full' && (inputs.flow-path != '' || inputs.flow-mode != '') && steps.branch_decision.outputs.tier != 'gated' }}
-      uses: postman-cs/postman-smoke-flow-action@v3.7.4
+      uses: postman-cs/postman-smoke-flow-action@v3.7.5
       env:
         POSTMAN_TEAM_ID: ${{ inputs.postman-team-id }}
         POSTMAN_BRANCH_DECISION: ${{ steps.branch_decision.outputs.branch-decision }}
