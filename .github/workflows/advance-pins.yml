@@ -97,6 +97,8 @@ jobs:
           permission-contents: write
           permission-pull-requests: write
           permission-actions: write
+          # release.yml carries pin literals; pushing it needs the workflows scope.
+          permission-workflows: write
 
       - name: Commit and open pull request
         if: steps.advance.outputs.changed == 'true'

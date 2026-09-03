@@ -471,10 +471,12 @@ describe('advance-pins workflow', () => {
     expect(readMint).not.toContain('permission-contents: write');
     expect(readMint).not.toContain('permission-pull-requests:');
     expect(readMint).not.toContain('permission-actions:');
+    expect(readMint).not.toContain('permission-workflows:');
     expect(writeMint).toContain('repositories: postman-api-onboarding-action');
     expect(writeMint).toContain('permission-contents: write');
     expect(writeMint).toContain('permission-pull-requests: write');
     expect(writeMint).toContain('permission-actions: write');
+    expect(writeMint).toContain('permission-workflows: write');
     expect(writeMint).toContain("if: steps.advance.outputs.changed == 'true'");
 
     expect(advanceWorkflow).toContain('token: ${{ github.token }}');
