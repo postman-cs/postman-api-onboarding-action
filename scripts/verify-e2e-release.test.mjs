@@ -32,11 +32,11 @@ const PROVIDER_SOURCE_DIGEST = 'd'.repeat(64);
 const PROVIDER_TAG = 'e2e-provider-v1.2.0';
 const RELEASE_TAG = 'v9.9.9';
 const PEER_TAGS = {
-  'postman-cs/postman-repo-sync-action': 'v2.10.9',
+  'postman-cs/postman-repo-sync-action': 'v2.11.1',
   'postman-cs/postman-insights-onboarding-action': 'v2.5.2',
-  'postman-cs/postman-bootstrap-action': 'v2.21.10',
+  'postman-cs/postman-bootstrap-action': 'v2.22.0',
   'postman-cs/postman-resolve-service-token-action': 'v2.2.4',
-  'postman-cs/postman-smoke-flow-action': 'v3.7.4'
+  'postman-cs/postman-smoke-flow-action': 'v3.7.5'
 };
 const PEER_TAGS_JSON = canonicalJsonStringify(PEER_TAGS).trimEnd();
 const NOW = Date.parse('2026-08-29T04:00:00.000Z');
