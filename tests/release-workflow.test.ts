@@ -387,7 +387,7 @@ describe('release workflow publishing contract', () => {
       'E2E_GATE_PROVIDER_SOURCE_DIGEST: 8c7ee211fccd2869f3901fcbc5ed154d6dea8e3d0d7d2e5312f6c0b57b4f6b78'
     );
     expect(verifier).toContain(
-      'E2E_GATE_PEER_TAGS: \'{"postman-cs/postman-bootstrap-action":"v2.21.10","postman-cs/postman-insights-onboarding-action":"v2.5.2","postman-cs/postman-repo-sync-action":"v2.10.9","postman-cs/postman-resolve-service-token-action":"v2.2.4","postman-cs/postman-smoke-flow-action":"v3.7.4"}\''
+      'E2E_GATE_PEER_TAGS: \'{"postman-cs/postman-bootstrap-action":"v2.22.0","postman-cs/postman-insights-onboarding-action":"v2.5.2","postman-cs/postman-repo-sync-action":"v2.11.1","postman-cs/postman-resolve-service-token-action":"v2.2.4","postman-cs/postman-smoke-flow-action":"v3.7.5"}\''
     );
     expect(verifier).not.toContain('E2E_GATE_WORKFLOW_REF: main');
     expect(verifier).not.toContain('E2E_GATE_REGISTRY_REVISION');
