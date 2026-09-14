@@ -7,7 +7,7 @@ import {
   rmSync,
   writeFileSync,
 } from 'node:fs';
-import { devNull, tmpdir } from 'node:os';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 import { parse } from 'yaml';
@@ -83,11 +83,15 @@ const GIT_DIR_PATH = path.dirname(GIT_BIN);
 // tools (BASH_ENV/ENV), and stray GIT_* overrides that would redirect fixture
 // operations. Explicit per-call overrides still win. Still shells out to the
 // real git binary.
+// Git on Windows rejects the platform null device as a config path, so point
+// the hermetic overrides at a real empty config file instead.
+const emptyGitConfig = path.join(mkdtempSync(path.join(tmpdir(), 'git-config-')), 'empty.gitconfig');
+writeFileSync(emptyGitConfig, '');
 const hermeticGitEnv: NodeJS.ProcessEnv = {
   ...process.env,
-  GIT_CONFIG_GLOBAL: devNull,
+  GIT_CONFIG_GLOBAL: emptyGitConfig,
   GIT_CONFIG_NOSYSTEM: '1',
-  GIT_CONFIG_SYSTEM: devNull,
+  GIT_CONFIG_SYSTEM: emptyGitConfig,
   BASH_ENV: undefined,
   ENV: undefined,
   GIT_DIR: undefined,
