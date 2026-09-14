@@ -8,7 +8,13 @@ Canonical entrypoint for the Postman API Onboarding suite. Use this composite ac
 
 ## Quick start
 
-This workflow is the happy path for a new API repository. It mints a service-account access token and team ID with [Postman Onboarding: Service Token](https://github.com/postman-cs/postman-resolve-service-token-action), then feeds those outputs into this composite action. The OpenAPI fixture is public, so the workflow is paste-runnable after `POSTMAN_API_KEY` is configured.
+This workflow onboards a new API repository using a public OpenAPI fixture. It mints a service-account access token and team ID with [Postman Onboarding: Service Token](https://github.com/postman-cs/postman-resolve-service-token-action), then passes those outputs to this action.
+
+Before running it:
+
+- Configure `POSTMAN_API_KEY` and verify the workspace permissions below.
+- The default run commits and pushes generated files to the checked-out branch. For a protected branch, use the [pull-request workflow](docs/protected-branch-workflows.md). Set `repo-write-mode: none` to leave generated files on the runner without committing them; Postman-side provisioning still runs.
+- For a service folder, use the [monorepo inputs](#monorepos) instead of repository-root paths. Set `generate-ci-workflow: 'false'` if your repository already owns its test workflow.
 
 ### Workspace-creation preflight
 
@@ -60,6 +66,12 @@ That run creates or reuses a [Postman workspace](https://learning.postman.com/do
 
 Use `postman-region: eu` for [EU data residency](https://learning.postman.com/docs/administration/enterprise/about-eu-data-residency/). Keep the same region on the service-token step and the composite action.
 
+### Read the result
+
+Use `workspace-url` to open the workspace and `commit-sha` to identify the generated commit, when one was created. The `bootstrap-outcome`, `smoke-flow-outcome`, `repo-sync-outcome`, and `insights-outcome` outputs identify each phase's runner outcome; optional phases can be skipped.
+
+The built-in smoke and contract runs are warning-only. A successful onboarding step does **not** prove the API tests passed. Inspect the test-step logs and `postman-test-results` JUnit artifact. To make test failures fail your workflow, [defer the built-in tests and run them in a strict caller step](docs/deferred-tests.md).
+
 ## Which action should I use?
 
 | Scenario | Start with | Why |
@@ -75,6 +87,23 @@ Use `postman-region: eu` for [EU data residency](https://learning.postman.com/do
 ## Monorepos
 
 Use one dispatcher under the repository-root `.github/workflows/` directory; GitHub ignores workflow files inside service directories. Set `working-directory: services/<service>` on the composite so relative spec and flow paths, `postman/` exports, and `.postman/` state stay inside that service. Each service should use its own `project-name` and Postman workspace by default.
+
+Set `working-directory` under the action's `with:` block. GitHub's `defaults.run.working-directory` only affects shell steps. For a checked-out file at `services/payments/openapi.yaml`, use:
+
+```yaml
+- uses: postman-cs/postman-api-onboarding-action@v3
+  with:
+    working-directory: services/payments
+    project-name: payments
+    spec-path: openapi.yaml
+    generate-ci-workflow: 'false'
+    postman-api-key: ${{ secrets.POSTMAN_API_KEY }}
+    github-token: ${{ github.token }}
+```
+
+Both `spec-path` and `flow-path` are relative to `working-directory` when it's set, otherwise to the repository root. The example writes artifacts to `services/payments/postman/` and state to `services/payments/.postman/`. No `artifact-directory` input is needed or exposed by this action.
+
+If you see `spec-path does not name a file under GITHUB_WORKSPACE`, check that you haven't repeated the service prefix. With the example above, `spec-path: services/payments/openapi.yaml` would look for `services/payments/services/payments/openapi.yaml`. The error's “repository-relative” wording refers to the repository root only when `working-directory` is omitted. Also check that the file exists in the checked-out revision with the exact filename and case.
 
 When `working-directory` is omitted, `generate-ci-workflow` still defaults to `true`. With a service directory it defaults to `false`, and explicitly requesting `true` fails because the nested workflow would not run. Start with [`examples/monorepo-dispatcher.yml`](examples/monorepo-dispatcher.yml), which detects changed services, serializes onboarding commits, prevents generated-artifact loops, and runs service collections in parallel. The canonical layout and CLI alternative are in the [repo-sync monorepo guide](https://github.com/postman-cs/postman-repo-sync-action/blob/main/docs/monorepo.md).
 
@@ -92,13 +121,13 @@ When `working-directory` is omitted, `generate-ci-workflow` still defaults to `t
 
 ## Credentials and region
 
-Run `postman-resolve-service-token-action` first and pass its `token` and `team-id` outputs as `postman-access-token` and `postman-team-id`: the access token is the primary credential, carrying every Postman asset operation in the wrapped actions through the access-token gateway. The `postman-api-key` PMAK mints and re-mints that token and authenticates the Postman CLI logins (bootstrap spec lint, repo-sync generated-CI collection run). `github-token` (and optionally `gh-fallback-token`) handles repository writes, and `credential-preflight: enforce` fails before workspace creation when the PMAK and access token resolve to different parent orgs. Detailed setup and the legacy fallback: [docs/credentials.md](docs/credentials.md).
+Run `postman-resolve-service-token-action` first and pass its `token` and `team-id` outputs as `postman-access-token` and `postman-team-id`: the access token is the primary credential, carrying every Postman asset operation in the wrapped actions through the access-token gateway. The `postman-api-key` PMAK mints and re-mints that token and authenticates the Postman CLI logins (the built-in smoke/contract test run, repo-sync generated-CI collection run). `github-token` (and optionally `gh-fallback-token`) handles repository writes, and `credential-preflight: enforce` fails before workspace creation when the PMAK and access token resolve to different parent orgs. Detailed setup and the legacy fallback: [docs/credentials.md](docs/credentials.md).
 
 ### Authentication matrix
 
 | Credential or permission | Where it appears | Required for | Source and permissions | Expiration behavior |
 | --- | --- | --- | --- | --- |
-| Service-account PMAK | `POSTMAN_API_KEY`, or `POSTMAN_SERVICE_ACCOUNT_API_KEY` in AWS examples | Access-token minting and the Postman CLI logins inside the wrapped actions (bootstrap spec lint, repo-sync generated-CI collection run) | GitHub secret backed by a [Postman service account](https://learning.postman.com/docs/administration/service-accounts/) API key | Long-lived until rotated in Postman and updated in CI |
+| Service-account PMAK | `POSTMAN_API_KEY`, or `POSTMAN_SERVICE_ACCOUNT_API_KEY` in AWS examples | Access-token minting and the Postman CLI logins inside the wrapped actions (the built-in smoke/contract test run, repo-sync generated-CI collection run) | GitHub secret backed by a [Postman service account](https://learning.postman.com/docs/administration/service-accounts/) API key | Long-lived until rotated in Postman and updated in CI |
 | Generated access token | `steps.postman-token.outputs.token`, passed as `postman-access-token` | Every Postman asset operation in bootstrap and repo sync, routed through the access-token gateway (workspace, spec, collection, environment, mock, monitor, tagging, identity) | Minted by `postman-resolve-service-token-action` from the service-account PMAK | Fresh per workflow run; avoid storing unless a scheduled refresh workflow intentionally writes `POSTMAN_ACCESS_TOKEN` |
 | Human-user Insights credentials | `insights-postman-api-key`, `insights-postman-access-token` | Optional Insights linking only | A human workspace-admin user's PMAK and session access token, stored as separate GitHub secrets | Required together only when `enable-insights: true` and `onboarding-scope: full`; never substitute the service-account suite credentials |
 | Team ID | `postman-team-id`: `steps.postman-token.outputs.team-id` (parent/org team id for integration context). `workspace-team-id`: optional explicit squad id for org-mode workspace creation | `postman-team-id` supplies org-mode integration header context. `workspace-team-id` selects the sub-team that owns a new workspace; the resolver `team-id` output is a parent/org id and must never be substituted for `workspace-team-id` | `postman-team-id` from `postman-resolve-service-token-action`. `workspace-team-id` from a known squad id when bootstrap cannot infer one | Not secrets and do not expire; update if the parent org or target squad changes |
@@ -284,7 +313,7 @@ The hook only attaches `x-api-key` for `*.mock.pstmn.io` hosts, so it stays iner
 | `workspace-admin-user-ids` | Comma-separated workspace admin user ids. | no |  |
 | `workspace-team-id` | Numeric SUB-TEAM (squad) id that should own the created org-mode workspace. Required by the Postman API when the PMAK's team is scoped under a Postman organization with multiple sub-teams. This is a squad id, NOT the resolver's `team-id` output: that value is a parent/org team id and is never a valid value here. On an org account whose squad list is unreadable or unusable, bootstrap fails before any workspace is created unless this input is set. | no |  |
 | `spec-url` | HTTPS URL to the OpenAPI document to bootstrap. Provide either spec-url or spec-path. | no |  |
-| `spec-path` | Repo-root-relative path to the local spec file. Used for repo metadata generation and, when spec-url is not provided, as the spec source for bootstrap (read directly from the checked-out workspace). | no |  |
+| `spec-path` | Path to the checked-out spec file, relative to working-directory when set, otherwise the repository root. Do not repeat the working-directory prefix. Used for repo metadata and as the bootstrap spec source when spec-url is not provided. | no |  |
 | `spec-files-json` | Optional content-free JSON inventory of multi-file definition members from discovery (schemaVersion 1). Empty by default. When set, inventory root must equal spec-path. Cannot be combined with spec-url. Not a directory mode — companions are listed explicitly; file content is never embedded. Forwarded to bootstrap only when spec-url is empty. | no |  |
 | `preserve-oas30-type-null` | Preserve supported OpenAPI 3.0 type null oneOf members in the uploaded source while using an internal nullable view for validation and generated artifacts. | no | `false` |
 | `breaking-change-mode` | OpenAPI breaking-change comparison mode passed through to bootstrap (off, pr-native, baseline-only, or previous-spec). | no | `off` |
@@ -298,7 +327,7 @@ The hook only attaches `x-api-key` for `*.mock.pstmn.io` hosts, so it stays iner
 | `environment-uids-json` | JSON map of environment slug to existing Postman environment UID. When provided, repo-sync reuses these environments instead of creating new ones. | no | `{}` |
 | `governance-mapping-json` | JSON map of business domain to governance group name. | no | `{}` |
 | `env-runtime-urls-json` | JSON map of environment slug to runtime base URL. | no | `{}` |
-| `postman-api-key` | Postman API key (PMAK). Threaded to the wrapped actions to mint and re-mint the access token and to authenticate the Postman CLI logins (bootstrap spec lint, repo-sync generated-CI collection run). Individually optional; at least one of postman-api-key or postman-access-token is required. | no |  |
+| `postman-api-key` | Postman API key (PMAK). Threaded to the wrapped actions to mint and re-mint the access token and to authenticate the Postman CLI logins (the built-in smoke/contract test run, repo-sync generated-CI collection run). Individually optional; at least one of postman-api-key or postman-access-token is required. | no |  |
 | `postman-access-token` | Postman access token (x-access-token). Primary credential threaded to the wrapped actions; every Postman asset operation runs through the access-token gateway. Mint it with postman-resolve-service-token-action. Individually optional; at least one of postman-api-key or postman-access-token is required. | no |  |
 | `insights-postman-api-key` | Human-user Postman API key (PMAK) for Insights. Required with insights-postman-access-token only when enable-insights is true and onboarding-scope is full; do not use the service-account suite key. | no |  |
 | `insights-postman-access-token` | Human-user session access token for Insights. Required with insights-postman-api-key only when enable-insights is true and onboarding-scope is full; do not use a service-token mint. | no |  |
@@ -315,7 +344,7 @@ The hook only attaches `x-api-key` for `*.mock.pstmn.io` hosts, so it stays iner
 | `current-ref` | Explicit ref override for detached checkout push semantics. | no |  |
 | `committer-name` | Commit author name for generated sync commits. | no | `Postman` |
 | `committer-email` | Commit author email for generated sync commits. | no | `support@postman.com` |
-| `flow-path` | Optional repo-root-relative path to the smoke flow.yaml manifest, defaulting to postman/flow.yaml inside the wrapped action. When set, the composite chains postman-cs/postman-smoke-flow-action before repo sync: a manifest at the effective path drives a curated reshape of the canonical Smoke collection, and under flow-mode auto a missing manifest is derived from spec-path and persisted to that path so repo sync commits it and the next run takes the curated path. Leave empty (default) to skip the smoke-flow step unless flow-mode requests it. | no |  |
+| `flow-path` | Optional path to the smoke flow.yaml manifest, relative to working-directory when set, otherwise the repository root, defaulting to postman/flow.yaml inside the wrapped action. When set, the composite chains postman-cs/postman-smoke-flow-action before repo sync: a manifest at the effective path drives a curated reshape of the canonical Smoke collection, and under flow-mode auto a missing manifest is derived from spec-path and persisted to that path so repo sync commits it and the next run takes the curated path. Leave empty (default) to skip the smoke-flow step unless flow-mode requests it. | no |  |
 | `flow-mode` | Optional flow selection policy forwarded to postman-cs/postman-smoke-flow-action. Set to auto to run the smoke-flow step without a curated manifest: it derives a deterministic smoke flow from spec-path (create before read, output-to-input bindings resolved by provenance) and persists it to the effective flow path for repo sync to commit. Set to curated to require flow-path, or off to refresh the canonical Smoke collection without curation. Leave empty (default) to run the smoke-flow step only when flow-path is set, preserving the pre-flow-mode contract. | no |  |
 | `flow-allow-delete` | Whether a derived smoke flow may include DELETE operations whose identifiers are proven to originate from the same run's create steps. Forwarded to postman-cs/postman-smoke-flow-action; ignored for curated manifests. Defaults to false. | no | `false` |
 | `persist-derived-flow` | Whether a freshly derived smoke flow is written to the effective flow path (flow-path or postman/flow.yaml) after a successful apply, so repo sync commits it and the next run is curated. Forwarded to postman-cs/postman-smoke-flow-action; create-only, never overwrites an existing manifest. Set false to derive without persisting. | no | `true` |
@@ -373,8 +402,8 @@ Tables are generated from `action.yml` by `npm run docs:tables`.
 This is a composite action, the primary partner-facing entrypoint of the Postman onboarding suite. It chains up to four sibling actions in order:
 
 1. **Bootstrap** (`postman-cs/postman-bootstrap-action`) creates or reuses the workspace, uploads the spec to [Spec Hub](https://learning.postman.com/docs/design-apis/specifications/overview/), and [generates](https://learning.postman.com/docs/design-apis/specifications/generate-collections/) baseline, smoke, and contract collections.
-2. **Repo sync** (`postman-cs/postman-repo-sync-action`) exports [Postman Collection v3](https://learning.postman.com/docs/use/use-collections/collections-schemas/) multi-file YAML artifacts into the repository, materializes environments, registers the mock server and smoke monitor, and optionally generates a CI workflow. Bootstrap outputs are explicitly mapped into repo-sync inputs in `action.yml`.
-3. **Smoke flow** (`postman-cs/postman-smoke-flow-action`, when `flow-path` or `flow-mode` is set) reshapes the canonical Smoke collection before repo sync and the built-in test run: from the `flow.yaml` manifest at the effective flow path (`flow-path` or `postman/flow.yaml`) when one exists, otherwise derived deterministically from the spec under `flow-mode: auto` and persisted to that path. Repo sync then commits the manifest with the rest of the `postman/` tree and exports the post-reshape Smoke collection, so run 2 takes the curated path from the committed file; `derived-flow-path` reports where the manifest landed.
+2. **Smoke flow** (`postman-cs/postman-smoke-flow-action`, when `flow-path` or `flow-mode` is set) reshapes the canonical Smoke collection before repo sync and the built-in test run: from the `flow.yaml` manifest at the effective flow path (`flow-path` or `postman/flow.yaml`) when one exists, otherwise derived deterministically from the spec under `flow-mode: auto` and persisted to that path. Repo sync then commits the manifest with the rest of the `postman/` tree and exports the post-reshape Smoke collection, so run 2 takes the curated path from the committed file; `derived-flow-path` reports where the manifest landed.
+3. **Repo sync** (`postman-cs/postman-repo-sync-action`) exports [Postman Collection v3](https://learning.postman.com/docs/use/use-collections/collections-schemas/) multi-file YAML artifacts into the repository, materializes environments, registers the mock server and smoke monitor, and optionally generates a CI workflow. Bootstrap outputs are explicitly mapped into repo-sync inputs in `action.yml`.
 4. **Insights** (`postman-cs/postman-insights-onboarding-action`, only when `enable-insights: true`) links [Postman Insights](https://learning.postman.com/docs/insights/overview/) discovered services to the workspace.
 
 ```mermaid
@@ -382,9 +411,9 @@ flowchart TB
     TOKEN["resolve-service-token<br/>mints access token + team ID"] --> COMP
     AWS["aws-spec-discovery<br/>optional spec source"] -.->|"spec-url / spec-path"| COMP
     subgraph COMP["postman-api-onboarding-action (composite)"]
-        B["bootstrap<br/>workspace + spec + collections<br/>+ injected contract tests"] --> RS["repo-sync<br/>artifacts, environments, mocks,<br/>monitors, CI workflow"]
-        RS --> SF["smoke-flow<br/>curated flow.yaml or<br/>spec-derived (flow-mode auto)"]
-        SF --> T["built-in smoke + contract run<br/>Postman CLI, JUnit artifact"]
+        B["bootstrap<br/>workspace + spec + collections<br/>+ injected contract tests"] --> SF["smoke-flow<br/>curated flow.yaml or<br/>spec-derived (flow-mode auto)"]
+        SF --> RS["repo-sync<br/>artifacts, environments, mocks,<br/>monitors, CI workflow"]
+        RS --> T["built-in smoke + contract run<br/>Postman CLI, JUnit artifact"]
         T --> INS["insights linking<br/>enable-insights: true"]
     end
     RS --> CI["generated CI workflow<br/>reruns both collections<br/>on push and schedule"]

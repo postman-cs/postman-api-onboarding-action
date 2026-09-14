@@ -2,24 +2,21 @@
 
 ## Obtaining `postman-api-key`
 
-The `postman-api-key` is a [Postman API key](https://learning.postman.com/docs/reference/postman-api/authentication/) (PMAK) used for all standard Postman API operations: creating workspaces, uploading specs, generating collections, exporting artifacts, and managing environments.
+The `postman-api-key` is a [Postman API key](https://learning.postman.com/docs/reference/postman-api/authentication/) (PMAK) that mints and re-mints the short-lived access token and authenticates the Postman CLI logins (the built-in smoke/contract test run and the generated-CI collection run). It never carries asset operations: those run through the access-token gateway.
 
-For bootstrap and repo-sync CI operations, use a service-account PMAK. The same key can run the standard Postman API calls and mint the short-lived access token used by integration steps. See the [service accounts documentation](https://learning.postman.com/docs/administration/service-accounts/) for setup and assignment guidance. Insights is an exception: it requires separate human-user credentials described below.
+For bootstrap and repo-sync CI operations, use a service-account PMAK. The same key mints the short-lived access token the wrapped actions use at run time. See the [service accounts documentation](https://learning.postman.com/docs/administration/service-accounts/) for setup and assignment guidance. Insights is an exception: it requires separate human-user credentials described below.
 
 To generate one:
 
 1. Create or select a [Postman service account](https://learning.postman.com/docs/administration/service-accounts/) for the onboarding automation.
 2. Generate a PMAK for that service account and copy the key (starts with `PMAK-`).
-3. Set it as a GitHub secret:
-   ```bash
-   gh secret set POSTMAN_API_KEY --repo <owner>/<repo>
-   ```
+3. In the repository, open **Settings** > **Secrets and variables** > **Actions**, create a repository secret named `POSTMAN_API_KEY`, and paste the key as its value.
 
 > **Note:** A personal user PMAK can still work for standard API operations, but service-account PMAKs are the supported CI credential because they can mint fresh access tokens at run time.
 
 ## Obtaining `postman-access-token`
 
-The `postman-access-token` is required for onboarding operations that the standard PMAK API key cannot perform, specifically workspace-to-repo git sync, governance group assignment, and system environment associations. Without it, those integration steps are skipped during the onboarding pipeline.
+The `postman-access-token` is the primary credential for bootstrap, repo-sync, and smoke-flow: their Postman asset operations run through the access-token gateway. When it is omitted, those actions mint one from `postman-api-key` at run time instead of skipping those steps; if minting fails, the run fails. Insights uses separate human-user credentials, described below.
 
 Primary path: mint the token with [postman-resolve-service-token-action](https://github.com/postman-cs/postman-resolve-service-token-action) and feed its outputs into onboarding:
 
@@ -42,34 +39,7 @@ Primary path: mint the token with [postman-resolve-service-token-action](https:/
 
 For [EU data residency](https://learning.postman.com/docs/administration/enterprise/about-eu-data-residency/), change both `postman-region` values to `eu`.
 
-User/session access tokens from `postman login` are deprecated for CI. They expire, can belong to a different parent org than the PMAK, and should only be used as a legacy fallback while migrating to service accounts.
-
-Legacy fallback:
-
-1. **Log in via the [Postman CLI](https://learning.postman.com/docs/postman-cli/postman-cli-auth/)**:
-   ```bash
-   postman login
-   ```
-   Complete the interactive sign-in.
-
-2. **Extract the access token** from the CLI credential store:
-   ```bash
-   cat ~/.postman/postmanrc | jq -r '.login._profiles[].accessToken'
-   ```
-
-3. **Set it as a GitHub secret** on your repository or organization:
-   ```bash
-   # Repository-level secret
-   gh secret set POSTMAN_ACCESS_TOKEN --repo <owner>/<repo>
-
-   # Organization-level secret (recommended for multi-repo use)
-   gh secret set POSTMAN_ACCESS_TOKEN --org <org> --visibility selected --repos <repo1>,<repo2>
-   ```
-   Paste the token value when prompted.
-
-> **Important:** The fallback token must come from the Postman CLI credential store populated by `postman login`. Do not paste copied cookies, DevTools values, or manually harvested session credentials into CI secrets.
-
-> **Note:** `postman login --with-api-key` stores a PMAK, which is not the access token these APIs require.
+For bootstrap, repo-sync, and smoke-flow, use a service-account token minted at run time. The resolver step makes that handoff explicit; PMAK-only callers let the wrapped actions mint it. Interactive Postman CLI sessions, browser storage, cookies, and developer-tools values are not supported sources for these service-account CI credentials.
 
 ## Team ID derivation
 
@@ -91,7 +61,7 @@ The [roles and permissions](https://learning.postman.com/docs/administration/rol
 
 ## Insights credentials
 
-When `enable-insights: true`, provide both `insights-postman-api-key` and `insights-postman-access-token`. They must be a human workspace-admin user's PMAK and session access token for the same identity. Store them as separate CI secrets, such as `POSTMAN_INSIGHTS_USER_API_KEY` and `POSTMAN_INSIGHTS_USER_ACCESS_TOKEN`.
+When `enable-insights: true` and `onboarding-scope: full`, provide both `insights-postman-api-key` and `insights-postman-access-token`. They must be a human workspace-admin user's PMAK and session access token for the same identity. Store them as separate CI secrets, such as `POSTMAN_INSIGHTS_USER_API_KEY` and `POSTMAN_INSIGHTS_USER_ACCESS_TOKEN`.
 
 Do not use `postman-resolve-service-token-action` outputs, a service-account PMAK, or the suite `postman-api-key` / `postman-access-token` for Insights. When Insights is disabled, both dedicated inputs may be empty.
 

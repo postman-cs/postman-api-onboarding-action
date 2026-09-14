@@ -22,6 +22,7 @@ npm run lint        # ESLint
 - [ ] `npm test` passes
 - [ ] `npm run typecheck` passes
 - [ ] `npm run lint` passes
+- [ ] `node scripts/check-sibling-pins.mjs` passes
 - [ ] Changes are focused and address a single concern
 - [ ] New functionality includes tests
 
@@ -57,18 +58,11 @@ docs: update CLI usage examples
 ci: add ESLint to CI workflow
 ```
 
-Commit messages are validated in CI via commitlint. Optionally install git hooks locally for faster feedback -- see [Local Git Hooks](#local-git-hooks).
+CI validates commit messages with commitlint.
 
-## Local Git Hooks (Optional)
+## Local Git Hooks
 
-For commit message validation before push:
-
-```bash
-npx husky init
-echo 'npx --no-install commitlint --edit "$1"' > .husky/commit-msg
-```
-
-This is optional. CI validates commit messages on every pull request regardless.
+`npm ci` configures `.githooks/` through the `prepare` script. The `pre-push` hook rejects hand-pushed immutable release tags; it does not run the test suite. Run the checks above before pushing. CI runs the required checks on pull requests.
 
 ## Code Style
 
