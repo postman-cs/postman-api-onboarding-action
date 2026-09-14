@@ -268,7 +268,10 @@ describe('monorepo dispatcher example', () => {
     const result = spawnSync('bash', ['--noprofile', '--norc', '-c', detector], {
       cwd: root,
       env: {
-        ...process.env,
+        ...hermeticGitEnv,
+        // Same real-git-first PATH as runDetector: these cases must exercise
+        // the validator, not an operator PATH shim.
+        PATH: `${GIT_DIR_PATH}${path.delimiter}${process.env.PATH ?? ''}`,
         EVENT_NAME: 'push',
         BEFORE_SHA: initial,
         HEAD_SHA: head,
@@ -294,7 +297,10 @@ describe('monorepo dispatcher example', () => {
     const result = spawnSync('bash', ['--noprofile', '--norc', '-c', detector], {
       cwd: root,
       env: {
-        ...process.env,
+        ...hermeticGitEnv,
+        // Same real-git-first PATH as runDetector: these cases must exercise
+        // the validator, not an operator PATH shim.
+        PATH: `${GIT_DIR_PATH}${path.delimiter}${process.env.PATH ?? ''}`,
         EVENT_NAME: 'workflow_dispatch',
         BEFORE_SHA: '',
         HEAD_SHA: git(root, ['rev-parse', 'HEAD']),
@@ -321,7 +327,10 @@ describe('monorepo dispatcher example', () => {
     const result = spawnSync('bash', ['--noprofile', '--norc', '-c', detector], {
       cwd: root,
       env: {
-        ...process.env,
+        ...hermeticGitEnv,
+        // Same real-git-first PATH as runDetector: these cases must exercise
+        // the validator, not an operator PATH shim.
+        PATH: `${GIT_DIR_PATH}${path.delimiter}${process.env.PATH ?? ''}`,
         EVENT_NAME: 'workflow_dispatch',
         BEFORE_SHA: '',
         HEAD_SHA: git(root, ['rev-parse', 'HEAD']),
