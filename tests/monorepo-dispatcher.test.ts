@@ -43,6 +43,17 @@ const exampleText = readFileSync(examplePath, 'utf8');
 const workflow = parse(exampleText) as Workflow;
 const detectJob = workflow.jobs.detect;
 const detector = detectJob?.steps.find((step) => step.id === 'changes')?.run ?? '';
+const resourceResolver =
+  workflow.jobs.run?.steps.find(
+    (step) => step.name === 'Resolve service Postman resource IDs',
+  )?.run ?? '';
+const resourceResolverRubyMatch = resourceResolver.match(
+  /^ruby <<'RUBY'\r?\n([\s\S]*?)\r?\nRUBY\s*$/,
+);
+if (!resourceResolverRubyMatch) {
+  throw new Error('Expected the resource resolver to contain one quoted Ruby heredoc');
+}
+const resourceResolverRuby = resourceResolverRubyMatch[1];
 const temporaryRoots: string[] = [];
 
 // Resolve the real git binary instead of trusting PATH: disposable fixtures
@@ -164,6 +175,24 @@ function runDetector(
   return outputs;
 }
 
+function runResourceResolver(resourcesYaml: string) {
+  const root = mkdtempSync(path.join(tmpdir(), 'monorepo-resource-resolver-'));
+  temporaryRoots.push(root);
+  mkdirSync(path.join(root, '.postman'), { recursive: true });
+  writeFileSync(path.join(root, '.postman', 'resources.yaml'), resourcesYaml);
+  const githubEnv = path.join(root, 'github-env.txt');
+  writeFileSync(githubEnv, 'EXISTING=preserved\n');
+  // Exercise the exact Ruby payload without an unnecessary Git Bash process.
+  // Starting both shells for every table case is particularly expensive on
+  // Windows and can obscure a resolver regression with harness startup delay.
+  const result = spawnSync('ruby', ['-e', resourceResolverRuby], {
+    cwd: root,
+    env: { ...process.env, GITHUB_ENV: githubEnv },
+    encoding: 'utf8',
+  });
+  return { result, githubEnv: readFileSync(githubEnv, 'utf8') };
+}
+
 afterEach(() => {
   while (temporaryRoots.length > 0) rmSync(temporaryRoots.pop()!, { recursive: true, force: true });
 });
@@ -215,13 +244,99 @@ describe('monorepo dispatcher example', () => {
   it('runs both tracked collections through the Postman CLI from service-local resources', () => {
     const run = workflow.jobs.run;
     const combined = run.steps.map((step) => step.run ?? '').join('\n');
-    expect(combined).toContain("YAML.load_file('.postman/resources.yaml')");
+    expect(combined).toContain("YAML.safe_load(File.read('.postman/resources.yaml'), aliases: false)");
+    expect(combined).toContain('Postman resource IDs must be 1-256 safe ASCII identifier characters');
     expect(combined).toContain('postman login --with-api-key "$POSTMAN_API_KEY"');
     expect(combined).toContain('postman collection run "$uid"');
     expect(combined).toContain('run_collection Smoke "$POSTMAN_SMOKE_COLLECTION_UID"');
     expect(combined).toContain('run_collection Contract "$POSTMAN_CONTRACT_COLLECTION_UID"');
     expect(combined).toContain('::group::');
     expect(combined).toContain('::endgroup::');
+    expect(combined).not.toContain('::group::${{ matrix.service }}');
+    const collectionStep = run.steps.find((step) => step.name === 'Run service collections');
+    expect(collectionStep?.env?.SERVICE_NAME).toBe('${{ matrix.service }}');
+    expect(collectionStep?.run).toContain('::group::$SERVICE_NAME');
+  });
+
+  it('rejects service directory names that are unsafe to propagate through the matrix', () => {
+    const { root, initial } = createFixture();
+    const unsafeService = '$(touch pwned)';
+    mkdirSync(path.join(root, 'services', unsafeService), { recursive: true });
+    writeFileSync(path.join(root, 'services', unsafeService, 'openapi.yaml'), 'openapi: 3.1.0\n');
+    const head = commit(root, 'test: add unsafe service name');
+    const outputPath = path.join(root, 'github-output.txt');
+    const result = spawnSync('bash', ['--noprofile', '--norc', '-c', detector], {
+      cwd: root,
+      env: {
+        ...process.env,
+        EVENT_NAME: 'push',
+        BEFORE_SHA: initial,
+        HEAD_SHA: head,
+        BASE_REF: '',
+        DEFAULT_BRANCH: 'main',
+        SYNC_COMMITTER_NAME: 'Postman',
+        SYNC_COMMITTER_EMAIL: 'support@postman.com',
+        GITHUB_OUTPUT: outputPath,
+        RUNNER_TEMP: root,
+      },
+      encoding: 'utf8',
+    });
+    expect(result.status).toBe(1);
+    expect(`${result.stdout}${result.stderr}`).toContain('Unsupported service directory name');
+    expect(existsSync(path.join(root, 'pwned'))).toBe(false);
+  });
+
+  it('routes workflow_dispatch service names through the same rejecting validator', () => {
+    const { root } = createFixture();
+    const unsafeService = '$(touch pwned)';
+    mkdirSync(path.join(root, 'services', unsafeService), { recursive: true });
+    const outputPath = path.join(root, 'github-output.txt');
+    const result = spawnSync('bash', ['--noprofile', '--norc', '-c', detector], {
+      cwd: root,
+      env: {
+        ...process.env,
+        EVENT_NAME: 'workflow_dispatch',
+        BEFORE_SHA: '',
+        HEAD_SHA: git(root, ['rev-parse', 'HEAD']),
+        BASE_REF: '',
+        DEFAULT_BRANCH: 'main',
+        SYNC_COMMITTER_NAME: 'Postman',
+        SYNC_COMMITTER_EMAIL: 'support@postman.com',
+        GITHUB_OUTPUT: outputPath,
+        RUNNER_TEMP: root,
+      },
+      encoding: 'utf8',
+    });
+
+    expect(result.status).toBe(1);
+    expect(`${result.stdout}${result.stderr}`).toContain('Unsupported service directory name');
+    expect(existsSync(path.join(root, 'pwned'))).toBe(false);
+  });
+
+  it('rejects an oversized otherwise-safe service directory name', () => {
+    const { root } = createFixture();
+    const oversizedService = 'a'.repeat(101);
+    mkdirSync(path.join(root, 'services', oversizedService), { recursive: true });
+    const outputPath = path.join(root, 'github-output.txt');
+    const result = spawnSync('bash', ['--noprofile', '--norc', '-c', detector], {
+      cwd: root,
+      env: {
+        ...process.env,
+        EVENT_NAME: 'workflow_dispatch',
+        BEFORE_SHA: '',
+        HEAD_SHA: git(root, ['rev-parse', 'HEAD']),
+        BASE_REF: '',
+        DEFAULT_BRANCH: 'main',
+        SYNC_COMMITTER_NAME: 'Postman',
+        SYNC_COMMITTER_EMAIL: 'support@postman.com',
+        GITHUB_OUTPUT: outputPath,
+        RUNNER_TEMP: root,
+      },
+      encoding: 'utf8',
+    });
+
+    expect(result.status).toBe(1);
+    expect(`${result.stdout}${result.stderr}`).toContain('use 1-100');
   });
 
   it('dispatches every existing service deterministically', () => {
@@ -230,6 +345,86 @@ describe('monorepo dispatcher example', () => {
       'changed-code': ['orders', 'payments'],
       'changed-collections': ['orders', 'payments'],
     });
+  });
+
+  it.each([
+    ['LF', '\n'],
+    ['CR', '\r'],
+    ['NUL', '\0'],
+    ['workflow-command delimiter', '<<INJECTED'],
+    ['space', ' '],
+  ])('rejects an executable %s env-file injection before writing GITHUB_ENV', (_label, unsafeText) => {
+    const resources = JSON.stringify({
+      canonical: {
+        collections: {
+          '[Smoke] orders': `smoke${unsafeText}INJECTED=owned`,
+          '[Contract] orders': 'contract',
+        },
+        environments: { prod: 'environment' },
+      },
+    });
+    const { result, githubEnv } = runResourceResolver(resources);
+
+    expect(result.status).not.toBe(0);
+    expect(`${result.stdout}${result.stderr}`).toContain(
+      'Postman resource IDs must be 1-256 safe ASCII identifier characters',
+    );
+    expect(githubEnv).toBe('EXISTING=preserved\n');
+    expect(githubEnv).not.toContain('INJECTED=owned');
+  });
+
+  it.each([
+    ['empty', ''],
+    ['oversized', 'x'.repeat(257)],
+    ['non-string', 42],
+  ])('rejects an %s resource ID before writing GITHUB_ENV', (_label, unsafeId) => {
+    const resources = JSON.stringify({
+      canonical: {
+        collections: {
+          '[Smoke] orders': unsafeId,
+          '[Contract] orders': '12345678-aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
+        },
+        environments: { prod: '12345678-ffffffff-bbbb-cccc-dddd-eeeeeeeeeeee' },
+      },
+    });
+    const { result, githubEnv } = runResourceResolver(resources);
+
+    expect(result.status).not.toBe(0);
+    expect(githubEnv).toBe('EXISTING=preserved\n');
+  });
+
+  it('accepts owner-prefixed Postman UIDs and writes exactly three records', () => {
+    const resources = JSON.stringify({
+      canonical: {
+        collections: {
+          '[Smoke] orders': '12345678-aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
+          '[Contract] orders': '12345678-11111111-2222-3333-4444-555555555555',
+        },
+        environments: {
+          'postman/environments/prod.postman_environment.json':
+            '12345678-ffffffff-bbbb-cccc-dddd-eeeeeeeeeeee',
+        },
+      },
+    });
+    const { result, githubEnv } = runResourceResolver(resources);
+
+    expect(result.status, `${result.stdout}${result.stderr}`).toBe(0);
+    expect(githubEnv.trim().split(/\r?\n/)).toEqual([
+      'EXISTING=preserved',
+      'POSTMAN_SMOKE_COLLECTION_UID=12345678-aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
+      'POSTMAN_CONTRACT_COLLECTION_UID=12345678-11111111-2222-3333-4444-555555555555',
+      'POSTMAN_ENVIRONMENT_UID=12345678-ffffffff-bbbb-cccc-dddd-eeeeeeeeeeee',
+    ]);
+  });
+
+  it('rejects an unsafe YAML object tag without mutating GITHUB_ENV', () => {
+    const { result, githubEnv } = runResourceResolver(
+      '--- !ruby/object:Object\ncanonical: {}\n',
+    );
+
+    expect(result.status).not.toBe(0);
+    expect(`${result.stdout}${result.stderr}`).toMatch(/DisallowedClass|unspecified class/);
+    expect(githubEnv).toBe('EXISTING=preserved\n');
   });
 
   it('classifies code for onboarding and generated artifacts for run-only checks', () => {

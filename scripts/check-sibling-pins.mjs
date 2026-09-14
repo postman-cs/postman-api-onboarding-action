@@ -4,6 +4,7 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { TextDecoder } from 'node:util';
 import { parse } from 'yaml';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -47,6 +48,8 @@ export const REPO_SYNC_SUMMARY_GATED_KEYS = ['status', 'reason'];
 
 /** Upper bound for git ls-remote and raw.githubusercontent.com fetches in main(). */
 export const SIBLING_PIN_NETWORK_TIMEOUT_MS = 30_000;
+/** Upper bound for each decoded sibling action/source response. */
+export const SIBLING_PIN_MAX_SOURCE_BYTES = 2 * 1024 * 1024;
 
 /**
  * @param {string} repo
@@ -72,6 +75,53 @@ export function gitTagExistsExecOptions(timeoutMs = SIBLING_PIN_NETWORK_TIMEOUT_
  */
 export function pinnedFileFetchInit(timeoutMs = SIBLING_PIN_NETWORK_TIMEOUT_MS) {
   return { signal: globalThis.AbortSignal.timeout(timeoutMs) };
+}
+
+/**
+ * Consume a Fetch response without ever buffering more than maxBytes. A
+ * Content-Length check rejects obvious oversize responses early, while the
+ * streaming count remains authoritative for missing, compressed, or false
+ * length headers.
+ * @param {Response} response
+ * @param {number} [maxBytes]
+ * @returns {Promise<string>}
+ */
+export async function readBoundedResponseText(response, maxBytes = SIBLING_PIN_MAX_SOURCE_BYTES) {
+  if (!Number.isSafeInteger(maxBytes) || maxBytes <= 0) throw new Error('sibling source byte cap must be positive');
+  const declaredLength = response.headers.get('content-length');
+  if (declaredLength !== null) {
+    if (!/^(0|[1-9][0-9]*)$/.test(declaredLength)) throw new Error('sibling source Content-Length is malformed');
+    if (Number(declaredLength) > maxBytes) throw new Error(`sibling source exceeds ${maxBytes} bytes`);
+  }
+  const reader = response.body?.getReader();
+  if (!reader) throw new Error('sibling source response has no readable body');
+  const decoder = new TextDecoder('utf-8', { fatal: true });
+  let byteCount = 0;
+  let text = '';
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      byteCount += value.byteLength;
+      if (byteCount > maxBytes) {
+        try {
+          await reader.cancel('sibling source byte cap exceeded');
+        } catch {
+          // Preserve the deterministic size violation if stream cancellation fails.
+        }
+        throw new Error(`sibling source exceeds ${maxBytes} bytes`);
+      }
+      text += decoder.decode(value, { stream: true });
+    }
+    return text + decoder.decode();
+  } catch (error) {
+    if (error instanceof TypeError) {
+      throw new Error('sibling source is not valid UTF-8', { cause: error });
+    }
+    throw error;
+  } finally {
+    reader.releaseLock();
+  }
 }
 
 /**
@@ -258,11 +308,16 @@ export function validateEnvironmentUidsEmit(source, diag) {
  */
 export function validateRepoSyncSummaryKeys(source, diag) {
   const label = diagLabel({ file: 'src/index.ts', ...diag });
-  const summary = source.match(/function createRepoSummary\([\s\S]*?JSON\.stringify\(\{([\s\S]*?)\}\);/);
-  if (!summary) {
+  const functionStart = source.indexOf('function createRepoSummary(');
+  const stringifyMarker = 'JSON.stringify({';
+  const stringifyStart = functionStart < 0 ? -1 : source.indexOf(stringifyMarker, functionStart);
+  const bodyStart = stringifyStart < 0 ? -1 : stringifyStart + stringifyMarker.length;
+  const bodyEnd = bodyStart < 0 ? -1 : source.indexOf('});', bodyStart);
+  if (functionStart < 0 || stringifyStart < 0 || bodyEnd < 0) {
     return [`${label}: createRepoSummary JSON.stringify shape not found`];
   }
-  const keys = [...summary[1].matchAll(/^\s*([A-Za-z0-9_]+)\s*(?:[,:]|$)/gm)].map((match) => match[1]).sort();
+  const summaryBody = source.slice(bodyStart, bodyEnd);
+  const keys = [...summaryBody.matchAll(/^\s*([A-Za-z0-9_]+)\s*(?:[,:]|$)/gm)].map((match) => match[1]).sort();
   const expected = [...REPO_SYNC_SUMMARY_KEYS].sort();
   if (keys.join(',') !== expected.join(',')) {
     return [
@@ -443,7 +498,7 @@ async function fetchPinnedFile(repo, tag, filePath) {
   if (!response.ok) {
     throw new Error(`Failed to fetch ${url}: HTTP ${response.status}`);
   }
-  return response.text();
+  return readBoundedResponseText(response);
 }
 
 async function main() {

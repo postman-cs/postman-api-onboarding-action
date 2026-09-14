@@ -120,7 +120,7 @@ describe('composite handoff edges', () => {
 
   it('covers the full edge surface (ratchet: update this count when edges change)', () => {
     // Every distinct (producer step, output, consuming site) triple.
-    expect(edges.length).toBe(54);
+    expect(edges.length).toBe(81);
     const distinctPairs = new Set(edges.map((edge) => `${edge.step}.${edge.output}`));
     expect(distinctPairs.size).toBe(34);
   });
