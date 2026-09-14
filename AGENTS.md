@@ -1,15 +1,18 @@
 # postman-api-onboarding-action
 
-Composite GitHub Action -- primary partner-facing entrypoint. Chains bootstrap -> repo-sync -> (optional) insights. Contains NO runtime TypeScript; only `action.yml` wiring, tests, and type definitions.
+Composite GitHub Action: the primary partner-facing entrypoint. Chains bootstrap -> optional smoke-flow -> repo-sync -> built-in tests -> optional Insights. Contains no runtime TypeScript; behavior lives in `action.yml`, with tests and type definitions alongside it.
 
 ## How It Works
 
 `action.yml` uses `runs: composite` to call sibling actions at immutable release tags:
 1. `postman-bootstrap-action` -- creates workspace, uploads spec, generates collections
-2. `postman-repo-sync-action` -- exports artifacts to repo, creates envs/mocks/monitors
-3. `postman-insights-onboarding-action` -- (when `enable-insights: true`) links discovered services
+2. `postman-smoke-flow-action` -- (when `flow-path` or `flow-mode` is set) reshapes the canonical Smoke collection before repo sync
+3. `postman-repo-sync-action` -- exports artifacts to repo, creates envs/mocks/monitors
+4. `postman-insights-onboarding-action` -- (when `enable-insights: true`) links discovered services
 
-Outputs from bootstrap are wired into repo-sync inputs in `action.yml`. Final outputs are surfaced from both lower-level actions.
+Between repo sync and Insights, the composite runs the smoke and contract collections with the Postman CLI (skippable via `skip-built-in-tests`) and uploads JUnit results.
+
+Outputs from bootstrap are wired into repo-sync inputs in `action.yml`. The composite exposes outputs from bootstrap, repo-sync, smoke-flow, and Insights.
 
 ## Structure
 
@@ -31,8 +34,8 @@ node scripts/check-sibling-pins.mjs
 
 ## Key Inputs
 
-- `project-name` (required), `spec-url` (required)
-- `workspace-id`, `spec-id`, `*-collection-id` -- for existing service reruns
+- `project-name` (required), exactly one of `spec-url` (HTTPS URL) or `spec-path` (checked-out file, relative to `working-directory` when set)
+- `workspace-id`, `spec-id`, `*-collection-id` -- for existing service reruns (bootstrap still updates the Spec Hub asset from whichever spec source you pass)
 - `postman-access-token` (primary asset credential; every wrapped-action asset op runs through access-token gateway), `postman-api-key` (mints/re-mints access token and authenticates Postman CLI logins). Individually optional; at least one is required.
 - `enable-insights` -- chains insights onboarding step
 - `generate-ci-workflow`, `ci-workflow-path` -- controls CI generation in target repo
@@ -41,7 +44,7 @@ node scripts/check-sibling-pins.mjs
 
 - Sibling action refs are pinned; update them deliberately during coordinated releases
 - Do not advance sibling immutable release pins from this composite; never log credentials from inputs
-- `spec-url` is always required, even when reusing existing `spec-id` (bootstrap updates from source)
+- `spec-url` and `spec-path` are one-of: pass exactly one (spec-path is forwarded to bootstrap only when spec-url is empty, so legacy callers passing both keep working)
 - `POSTMAN_TEAM_ID` env var is passed via `env:` block, not as input
 - `package.json` version is NOT release identifier -- git tags are
 

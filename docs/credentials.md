@@ -2,9 +2,9 @@
 
 ## Obtaining `postman-api-key`
 
-The `postman-api-key` is a [Postman API key](https://learning.postman.com/docs/reference/postman-api/authentication/) (PMAK) used for all standard Postman API operations: creating workspaces, uploading specs, generating collections, exporting artifacts, and managing environments.
+The `postman-api-key` is a [Postman API key](https://learning.postman.com/docs/reference/postman-api/authentication/) (PMAK) that mints and re-mints the short-lived access token and authenticates the Postman CLI logins (the built-in smoke/contract test run and the generated-CI collection run). It never carries asset operations: those run through the access-token gateway.
 
-For bootstrap and repo-sync CI operations, use a service-account PMAK. The same key can run the standard Postman API calls and mint the short-lived access token used by integration steps. See the [service accounts documentation](https://learning.postman.com/docs/administration/service-accounts/) for setup and assignment guidance. Insights is an exception: it requires separate human-user credentials described below.
+For bootstrap and repo-sync CI operations, use a service-account PMAK. The same key mints the short-lived access token the wrapped actions use at run time. See the [service accounts documentation](https://learning.postman.com/docs/administration/service-accounts/) for setup and assignment guidance. Insights is an exception: it requires separate human-user credentials described below.
 
 To generate one:
 
@@ -16,7 +16,7 @@ To generate one:
 
 ## Obtaining `postman-access-token`
 
-The `postman-access-token` is required for onboarding operations that the standard PMAK API key cannot perform, specifically workspace-to-repo git sync, governance group assignment, and system environment associations. Without it, those integration steps are skipped during the onboarding pipeline.
+The `postman-access-token` is the primary credential for bootstrap, repo-sync, and smoke-flow: their Postman asset operations run through the access-token gateway. When it is omitted, those actions mint one from `postman-api-key` at run time instead of skipping those steps; if minting fails, the run fails. Insights uses separate human-user credentials, described below.
 
 Primary path: mint the token with [postman-resolve-service-token-action](https://github.com/postman-cs/postman-resolve-service-token-action) and feed its outputs into onboarding:
 
@@ -39,7 +39,7 @@ Primary path: mint the token with [postman-resolve-service-token-action](https:/
 
 For [EU data residency](https://learning.postman.com/docs/administration/enterprise/about-eu-data-residency/), change both `postman-region` values to `eu`.
 
-CI access tokens must be minted at run time from the service-account PMAK with `postman-resolve-service-token-action`. Interactive Postman CLI sessions, browser storage, cookies, and developer-tools values are not supported CI credential sources.
+For bootstrap, repo-sync, and smoke-flow, use a service-account token minted at run time. The resolver step makes that handoff explicit; PMAK-only callers let the wrapped actions mint it. Interactive Postman CLI sessions, browser storage, cookies, and developer-tools values are not supported sources for these service-account CI credentials.
 
 ## Team ID derivation
 
@@ -61,7 +61,7 @@ The [roles and permissions](https://learning.postman.com/docs/administration/rol
 
 ## Insights credentials
 
-When `enable-insights: true`, provide both `insights-postman-api-key` and `insights-postman-access-token`. They must be a human workspace-admin user's PMAK and session access token for the same identity. Store them as separate CI secrets, such as `POSTMAN_INSIGHTS_USER_API_KEY` and `POSTMAN_INSIGHTS_USER_ACCESS_TOKEN`.
+When `enable-insights: true` and `onboarding-scope: full`, provide both `insights-postman-api-key` and `insights-postman-access-token`. They must be a human workspace-admin user's PMAK and session access token for the same identity. Store them as separate CI secrets, such as `POSTMAN_INSIGHTS_USER_API_KEY` and `POSTMAN_INSIGHTS_USER_ACCESS_TOKEN`.
 
 Do not use `postman-resolve-service-token-action` outputs, a service-account PMAK, or the suite `postman-api-key` / `postman-access-token` for Insights. When Insights is disabled, both dedicated inputs may be empty.
 

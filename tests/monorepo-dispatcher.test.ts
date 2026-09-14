@@ -1,12 +1,13 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import {
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { devNull, tmpdir } from 'node:os';
 import path from 'node:path';
 
 import { parse } from 'yaml';
@@ -44,10 +45,54 @@ const detectJob = workflow.jobs.detect;
 const detector = detectJob?.steps.find((step) => step.id === 'changes')?.run ?? '';
 const temporaryRoots: string[] = [];
 
+// Resolve the real git binary instead of trusting PATH: disposable fixtures
+// must never execute operator shell shims. Mirrors the Windows Git Bash
+// resolution used in contract.test.ts.
+function gitBinary(): string {
+  if (process.platform === 'win32') {
+    const candidates = [
+      process.env.GIT_INSTALL_ROOT && path.join(process.env.GIT_INSTALL_ROOT, 'bin', 'git.exe'),
+      process.env.ProgramFiles && path.join(process.env.ProgramFiles, 'Git', 'bin', 'git.exe'),
+      'C:\\Program Files\\Git\\bin\\git.exe'
+    ].filter((candidate): candidate is string => Boolean(candidate));
+    const executable = candidates.find((candidate) => existsSync(candidate));
+    if (!executable) throw new Error('Git is required for monorepo dispatcher fixture repos');
+    return executable;
+  }
+  const posix = ['/usr/bin/git', '/usr/local/bin/git'].find((candidate) => existsSync(candidate));
+  if (!posix) throw new Error('Git is required for monorepo dispatcher fixture repos');
+  return posix;
+}
+
+const GIT_BIN = gitBinary();
+const GIT_DIR_PATH = path.dirname(GIT_BIN);
+
+// Hermetic git environment: ignore the host machine's global and system git
+// config (hooks, signing, aliases), shell startup files that could redefine
+// tools (BASH_ENV/ENV), and stray GIT_* overrides that would redirect fixture
+// operations. Explicit per-call overrides still win. Still shells out to the
+// real git binary.
+const hermeticGitEnv: NodeJS.ProcessEnv = {
+  ...process.env,
+  GIT_CONFIG_GLOBAL: devNull,
+  GIT_CONFIG_NOSYSTEM: '1',
+  GIT_CONFIG_SYSTEM: devNull,
+  BASH_ENV: undefined,
+  ENV: undefined,
+  GIT_DIR: undefined,
+  GIT_WORK_TREE: undefined,
+  GIT_PREFIX: undefined,
+  GIT_INDEX_FILE: undefined,
+  GIT_AUTHOR_NAME: undefined,
+  GIT_AUTHOR_EMAIL: undefined,
+  GIT_COMMITTER_NAME: undefined,
+  GIT_COMMITTER_EMAIL: undefined
+};
+
 function git(root: string, args: string[], env: NodeJS.ProcessEnv = {}): string {
-  return execFileSync('git', args, {
+  return execFileSync(GIT_BIN, args, {
     cwd: root,
-    env: { ...process.env, ...env },
+    env: { ...hermeticGitEnv, ...env },
     encoding: 'utf8',
   }).trim();
 }
@@ -55,7 +100,7 @@ function git(root: string, args: string[], env: NodeJS.ProcessEnv = {}): string 
 function createFixture(): { root: string; initial: string } {
   const root = mkdtempSync(path.join(tmpdir(), 'monorepo-dispatcher-'));
   temporaryRoots.push(root);
-  git(root, ['init', '-b', 'main']);
+  git(root, ['init', '--template=', '-b', 'main']);
   git(root, ['config', 'user.name', 'Fixture User']);
   git(root, ['config', 'user.email', 'fixture@example.com']);
   for (const service of ['orders', 'payments']) {
@@ -94,7 +139,10 @@ function runDetector(
   const result = spawnSync('bash', ['--noprofile', '--norc', '-c', detector], {
     cwd: root,
     env: {
-      ...process.env,
+      ...hermeticGitEnv,
+      // Put the real git first so the detector's git calls resolve to the
+      // same binary as the fixture helper, not a PATH shim.
+      PATH: `${GIT_DIR_PATH}${path.delimiter}${process.env.PATH ?? ''}`,
       EVENT_NAME: environment.EVENT_NAME ?? 'push',
       BEFORE_SHA: environment.BEFORE_SHA ?? '',
       HEAD_SHA: environment.HEAD_SHA ?? git(root, ['rev-parse', 'HEAD']),

@@ -106,7 +106,7 @@ inputs:
     description: HTTPS URL to the OpenAPI document to bootstrap. Provide either spec-url or spec-path.
     required: false
   spec-path:
-    description: Repo-root-relative path to the local spec file. Used for repo metadata generation and, when spec-url is not provided, as the spec source for bootstrap (read directly from the checked-out workspace).
+    description: Path to the checked-out spec file, relative to working-directory when set, otherwise the repository root. Do not repeat the working-directory prefix. Used for repo metadata and as the bootstrap spec source when spec-url is not provided.
     required: false
   spec-files-json:
     description: >-
@@ -163,7 +163,7 @@ inputs:
     required: false
     default: '{}'
   postman-api-key:
-    description: Postman API key (PMAK). Threaded to the wrapped actions to mint and re-mint the access token and to authenticate the Postman CLI logins (bootstrap spec lint, repo-sync generated-CI collection run). Individually optional; at least one of postman-api-key or postman-access-token is required.
+    description: Postman API key (PMAK). Threaded to the wrapped actions to mint and re-mint the access token and to authenticate the Postman CLI logins (the built-in smoke/contract test run, repo-sync generated-CI collection run). Individually optional; at least one of postman-api-key or postman-access-token is required.
     required: false
   postman-access-token:
     description: Postman access token (x-access-token). Primary credential threaded to the wrapped actions; every Postman asset operation runs through the access-token gateway. Mint it with postman-resolve-service-token-action. Individually optional; at least one of postman-api-key or postman-access-token is required.
@@ -226,7 +226,8 @@ inputs:
     default: support@postman.com
   flow-path:
     description: |
-      Optional repo-root-relative path to the smoke flow.yaml manifest,
+      Optional path to the smoke flow.yaml manifest, relative to working-directory
+      when set, otherwise the repository root,
       defaulting to postman/flow.yaml inside the wrapped action. When set, the
       composite chains postman-cs/postman-smoke-flow-action before repo sync:
       a manifest at the effective path drives a curated reshape of the
