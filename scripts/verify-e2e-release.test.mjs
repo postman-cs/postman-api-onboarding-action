@@ -36,7 +36,7 @@ const PEER_TAGS = {
   'postman-cs/postman-insights-onboarding-action': 'v2.5.2',
   'postman-cs/postman-bootstrap-action': 'v2.22.0',
   'postman-cs/postman-resolve-service-token-action': 'v2.2.4',
-  'postman-cs/postman-smoke-flow-action': 'v3.7.5'
+  'postman-cs/postman-smoke-flow-action': 'v3.7.7'
 };
 const PEER_TAGS_JSON = canonicalJsonStringify(PEER_TAGS).trimEnd();
 const NOW = Date.parse('2026-08-29T04:00:00.000Z');
