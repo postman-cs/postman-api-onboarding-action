@@ -1,5 +1,5 @@
-name: Postman API Onboarding
-description: 'Full Postman onboarding in one step: workspace bootstrap, repo sync, and optional Insights linking. Part of the Postman API Onboarding suite.'
+name: 'Postman Enterprise Automation: API Onboarding'
+description: 'Full Postman onboarding in one step: workspace bootstrap, repo sync, and optional Insights linking. Part of the Postman Enterprise Automation Suite.'
 author: Postman
 branding:
   icon: send
@@ -36,6 +36,10 @@ inputs:
     description: Collection lifecycle policy (refresh or version). Default refresh ensures tracked collections stay in sync with the spec.
     required: false
     default: refresh
+  collection-update-strategy:
+    description: Collection update strategy (auto or whole). Default whole preserves full collection updates.
+    required: false
+    default: whole
   spec-sync-mode:
     description: Spec lifecycle policy (update or version).
     required: false
@@ -405,193 +409,33 @@ runs:
       name: Resolve immutable branch decision
       shell: bash
       env:
+        POSTMAN_TEAM_ID: ${{ inputs.postman-team-id }}
         BRANCH_STRATEGY: ${{ inputs.branch-strategy }}
         CANONICAL_BRANCH: ${{ inputs.canonical-branch }}
         CHANNELS: ${{ inputs.channels }}
       run: |
         node <<'NODE'
         const fs = require('node:fs');
-        const MAX_EVENT_PAYLOAD_BYTES = 1 * 1024 * 1024;
-        const clean = (value) => typeof value === 'string' ? value.trim() || undefined : undefined;
-        const normalizeRepoName = (value) => {
-          const name = clean(value)?.toLowerCase();
-          return name && /^[a-z0-9_.-]+\/[a-z0-9_.-]+$/.test(name) ? name : undefined;
-        };
-        const fieldState = (value, normalize) => {
-          if (value === undefined || value === null || value === '') return { state: 'absent' };
-          const normalized = normalize(value);
-          return normalized === undefined ? { state: 'malformed' } : { state: 'valid', value: normalized };
-        };
-        const repoIdentity = (value) => {
-          if (!value || typeof value !== 'object') return undefined;
-          const id = fieldState(value.id, (candidate) => {
-            if (typeof candidate === 'number' && Number.isSafeInteger(candidate) && candidate > 0) return String(candidate);
-            return typeof candidate === 'string' && /^[1-9][0-9]*$/.test(candidate) ? candidate : undefined;
-          });
-          const fullName = fieldState(value.full_name, normalizeRepoName);
-          return { id, fullName };
-        };
-        const sameRepo = (left, right) => {
-          if (!left || !right) return false;
-          if (left.id.state !== 'absent' || right.id.state !== 'absent') {
-            if (left.id.state !== 'valid' || right.id.state !== 'valid' || left.id.value !== right.id.value) return false;
-            if (left.fullName.state === 'malformed' || right.fullName.state === 'malformed') return false;
-            return left.fullName.state !== 'valid' || right.fullName.state !== 'valid' || left.fullName.value === right.fullName.value;
-          }
-          return left.fullName.state === 'valid' && right.fullName.state === 'valid' && left.fullName.value === right.fullName.value;
-        };
-        const directPrEvents = new Set([
-          'pull_request',
-          'pull_request_target',
-          'pull_request_review',
-          'pull_request_review_comment'
-        ]);
-        const nestedPrEvents = new Set(['workflow_run', 'check_run', 'check_suite']);
-        const trustedNonPrEvents = new Set(['push', 'schedule', 'workflow_dispatch']);
-
+        const clean = (value) => (value || '').trim() || undefined;
         const strategy = clean(process.env.BRANCH_STRATEGY) || 'legacy';
         if (!['legacy', 'publish-gate', 'preview'].includes(strategy)) throw new Error('CONTRACT_BRANCH_STRATEGY_INVALID: expected legacy, publish-gate, or preview');
-        const eventName = clean(process.env.GITHUB_EVENT_NAME);
-        let event;
-        try {
-          const eventPath = clean(process.env.GITHUB_EVENT_PATH);
-          if (!eventPath) throw new Error('event path is missing');
-          const fd = fs.openSync(eventPath, 'r');
-          let payload;
-          try {
-            const stat = fs.fstatSync(fd);
-            if (!stat.isFile() || stat.size <= 0 || stat.size > MAX_EVENT_PAYLOAD_BYTES) throw new Error('event payload size is invalid');
-            payload = Buffer.alloc(stat.size);
-            let offset = 0;
-            while (offset < payload.length) {
-              const count = fs.readSync(fd, payload, offset, payload.length - offset, offset);
-              if (count === 0) throw new Error('event payload changed while reading');
-              offset += count;
-            }
-            if (fs.readSync(fd, Buffer.alloc(1), 0, 1, payload.length) !== 0) throw new Error('event payload exceeds size cap');
-          } finally {
-            fs.closeSync(fd);
-          }
-          event = JSON.parse(payload.toString('utf8'));
-          if (!event || typeof event !== 'object' || Array.isArray(event)) event = undefined;
-        } catch {}
+        let event = {};
+        try { event = JSON.parse(fs.readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8')); } catch {}
         const rawRef = clean(process.env.GITHUB_REF) || clean(process.env.GITHUB_REF_NAME);
-        const envHeadBranch = clean(process.env.GITHUB_HEAD_REF);
-        const defaultBranch = clean(process.env.CANONICAL_BRANCH) || clean(event?.repository?.default_branch);
-        const workflowRepo = repoIdentity({
-          id: process.env.GITHUB_REPOSITORY_ID,
-          full_name: process.env.GITHUB_REPOSITORY
-        });
-        const eventRepo = repoIdentity(event?.repository);
-        const hasPrMarker = Boolean(
-          event && (
-            Object.prototype.hasOwnProperty.call(event, 'pull_request') ||
-            event.issue?.pull_request ||
-            event.merge_group
-          )
-        );
-        let isPrContext = Boolean(
-          envHeadBranch || hasPrMarker || directPrEvents.has(eventName) || nestedPrEvents.has(eventName)
-        );
-        let isForkPr = false;
-        let sameRepository = false;
-        let eventEligible = false;
-        let eventReason;
-        let headBranch;
-
-        if (!eventName) {
-          eventReason = 'event name is missing';
-        } else if (!event) {
-          eventReason = `event ${eventName} payload is missing or unreadable`;
-        } else if (!workflowRepo) {
-          eventReason = 'workflow repository identity is missing or malformed';
-        } else if (!eventRepo || !sameRepo(eventRepo, workflowRepo)) {
-          eventReason = `event ${eventName} repository does not match the workflow repository`;
-        } else if (trustedNonPrEvents.has(eventName)) {
-          if (isPrContext) {
-            eventReason = `event ${eventName} unexpectedly carries pull-request metadata`;
-          } else {
-            eventEligible = true;
-            sameRepository = true;
-            headBranch = rawRef?.startsWith('refs/heads/') ? rawRef.slice(11) : undefined;
-            eventReason = `trusted non-PR event ${eventName}`;
-          }
-        } else if (directPrEvents.has(eventName)) {
-          isPrContext = true;
-          const pullRequest = event.pull_request;
-          const headRepo = repoIdentity(pullRequest?.head?.repo);
-          const baseRepo = repoIdentity(pullRequest?.base?.repo);
-          const payloadHeadBranch = clean(pullRequest?.head?.ref);
-          if (!eventRepo || !headRepo || !baseRepo || !payloadHeadBranch) {
-            eventReason = `${eventName} repository or head-branch identity is missing or malformed`;
-          } else if (!sameRepo(baseRepo, eventRepo)) {
-            eventReason = `${eventName} base repository does not match the workflow repository`;
-          } else if (!sameRepo(headRepo, eventRepo)) {
-            isForkPr = true;
-            eventReason = `${eventName} head repository is not the workflow repository`;
-          } else if (envHeadBranch && envHeadBranch !== payloadHeadBranch) {
-            eventReason = `${eventName} head branch does not match GITHUB_HEAD_REF`;
-          } else {
-            eventEligible = true;
-            sameRepository = true;
-            headBranch = payloadHeadBranch;
-            eventReason = `same-repository ${eventName}`;
-          }
-        } else if (nestedPrEvents.has(eventName)) {
-          isPrContext = true;
-          const container = eventName === 'workflow_run' ? event.workflow_run : event[eventName];
-          const pullRequests = Array.isArray(container?.pull_requests) ? container.pull_requests : [];
-          if (!eventRepo || pullRequests.length !== 1) {
-            eventReason = `${eventName} requires exactly one pull request with repository identity`;
-          } else {
-            const pullRequest = pullRequests[0];
-            const headRepo = repoIdentity(pullRequest?.head?.repo);
-            const baseRepo = repoIdentity(pullRequest?.base?.repo);
-            const payloadHeadBranch = clean(pullRequest?.head?.ref);
-            if (!headRepo || !baseRepo || !payloadHeadBranch) {
-              eventReason = `${eventName} pull-request repository or head-branch identity is missing or malformed`;
-            } else if (!sameRepo(baseRepo, eventRepo)) {
-              eventReason = `${eventName} base repository does not match the workflow repository`;
-            } else if (!sameRepo(headRepo, eventRepo)) {
-              isForkPr = true;
-              eventReason = `${eventName} head repository is not the workflow repository`;
-            } else if (envHeadBranch && envHeadBranch !== payloadHeadBranch) {
-              eventReason = `${eventName} head branch does not match GITHUB_HEAD_REF`;
-            } else {
-              eventEligible = true;
-              sameRepository = true;
-              headBranch = payloadHeadBranch;
-              eventReason = `same-repository ${eventName}`;
-            }
-          }
-        } else {
-          eventReason = `event ${eventName} is not credential-eligible`;
-        }
-        if (isPrContext && !eventEligible) isForkPr = true;
-
+        const headBranch = clean(process.env.GITHUB_HEAD_REF) || (rawRef?.startsWith('refs/heads/') ? rawRef.slice(11) : undefined);
+        const defaultBranch = clean(process.env.CANONICAL_BRANCH) || clean(event.repository?.default_branch);
+        const isPrContext = Boolean(clean(process.env.GITHUB_HEAD_REF));
+        const headRepo = event.pull_request?.head?.repo?.full_name;
+        const baseRepo = event.pull_request?.base?.repo?.full_name || event.repository?.full_name;
+        const isForkPr = Boolean(headRepo && baseRepo && headRepo !== baseRepo);
         let refKind = rawRef?.startsWith('refs/tags/') ? 'tag' : headBranch ? 'branch' : 'unknown';
         if (headBranch && defaultBranch && headBranch === defaultBranch) refKind = 'default-branch';
-        const identity = {
-          provider: 'github',
-          eventName,
-          headBranch,
-          rawRef,
-          defaultBranch,
-          refKind,
-          isPrContext,
-          isForkPr,
-          sameRepository,
-          eventEligible,
-          headSha: clean(process.env.GITHUB_SHA)
-        };
+        const identity = { provider: 'github', headBranch, rawRef, defaultBranch, refKind, isPrContext, isForkPr, headSha: clean(process.env.GITHUB_SHA) };
         const canonicalBranch = clean(process.env.CANONICAL_BRANCH) || defaultBranch;
-        let tier = 'gated';
-        let reason = `${eventReason}: credentials and mutations are ineligible`;
+        let tier = 'legacy';
+        let reason = 'branch-strategy legacy: branch-blind pre-v2 behavior';
         let channel;
-        if (eventEligible && strategy === 'legacy') {
-          tier = 'legacy';
-          reason = `${eventReason}; branch-strategy legacy: branch-blind pre-v2 behavior`;
-        } else if (eventEligible) {
+        if (strategy !== 'legacy') {
           if (!canonicalBranch) throw new Error('CONTRACT_DEFAULT_BRANCH_UNRESOLVED: set the canonical-branch input');
           const rules = (clean(process.env.CHANNELS)?.split(',') || []).filter(Boolean).map((entry) => {
             const parts = entry.split('=').map((part) => part.trim());
@@ -603,66 +447,36 @@ runs:
           if (refKind === 'tag' || refKind === 'unknown' || !headBranch) { tier = 'gated'; reason = `ref kind ${refKind}: no-op`; }
           else if (headBranch === canonicalBranch) { tier = 'canonical'; reason = `head branch equals canonical branch ${canonicalBranch}`; }
           else if (channel) { tier = 'channel'; reason = `branch ${headBranch} matches channel ${channel.pattern}=${channel.code}`; }
-          else if (strategy === 'preview') { tier = 'preview'; reason = `branch ${headBranch} under branch-strategy preview`; }
-          else { tier = 'gated'; reason = `branch ${headBranch} under branch-strategy publish-gate`; }
+          else if (strategy === 'preview' && !isForkPr) { tier = 'preview'; reason = `branch ${headBranch} under branch-strategy preview`; }
+          else { tier = 'gated'; reason = isForkPr ? 'fork PR: preview-ineligible, gated instead' : `branch ${headBranch} under branch-strategy publish-gate`; }
         }
         const decision = { tier, strategy, identity, canonicalBranch, ...(channel && tier === 'channel' ? { channel } : {}), reason };
         const serialized = JSON.stringify(decision);
         fs.appendFileSync(process.env.GITHUB_OUTPUT, `tier=${tier}\nbranch-decision=${serialized}\n`);
         fs.appendFileSync(process.env.GITHUB_ENV, `POSTMAN_BRANCH_DECISION=${serialized}\n`);
         NODE
-    - id: mask_postman_credentials
-      name: Mask Postman credentials
-      if: ${{ steps.branch_decision.outputs.tier != 'gated' }}
-      shell: bash
-      env:
-        POSTMAN_TEAM_ID: ${{ inputs.postman-team-id }}
-        POSTMAN_API_KEY: ${{ steps.branch_decision.outputs.tier != 'gated' && inputs.postman-api-key || '' }}
-        POSTMAN_ACCESS_TOKEN: ${{ steps.branch_decision.outputs.tier != 'gated' && inputs.postman-access-token || '' }}
-        INSIGHTS_POSTMAN_API_KEY: ${{ steps.branch_decision.outputs.tier != 'gated' && inputs.insights-postman-api-key || '' }}
-        INSIGHTS_POSTMAN_ACCESS_TOKEN: ${{ steps.branch_decision.outputs.tier != 'gated' && inputs.insights-postman-access-token || '' }}
-      run: |
-        mask_secret() {
-          local value="$1"
-          [ -n "$value" ] || return 0
-          value=${value//'%'/%25}
-          value=${value//$'\r'/%0D}
-          value=${value//$'\n'/%0A}
-          printf '::add-mask::%s\n' "$value"
-        }
-        mask_secret "$POSTMAN_API_KEY"
-        mask_secret "$POSTMAN_ACCESS_TOKEN"
-        mask_secret "$INSIGHTS_POSTMAN_API_KEY"
-        mask_secret "$INSIGHTS_POSTMAN_ACCESS_TOKEN"
     - id: validate_postman_stack
       name: Validate Postman stack and region
-      if: ${{ steps.branch_decision.outputs.tier != 'gated' }}
       shell: bash
       env:
         POSTMAN_TEAM_ID: ${{ inputs.postman-team-id }}
         POSTMAN_REGION: ${{ inputs.postman-region }}
         POSTMAN_STACK: ${{ inputs.postman-stack }}
         WORKING_DIRECTORY: ${{ inputs.working-directory }}
-        SPEC_PATH: ${{ inputs.spec-path }}
+        COLLECTION_UPDATE_STRATEGY: ${{ inputs.collection-update-strategy }}
         CREDENTIAL_PREFLIGHT: ${{ inputs.credential-preflight }}
         REPO_WRITE_MODE: ${{ inputs.repo-write-mode }}
-        POSTMAN_API_KEY: ${{ steps.branch_decision.outputs.tier != 'gated' && inputs.postman-api-key || '' }}
-        POSTMAN_ACCESS_TOKEN: ${{ steps.branch_decision.outputs.tier != 'gated' && inputs.postman-access-token || '' }}
+        POSTMAN_API_KEY: ${{ inputs.postman-api-key }}
+        POSTMAN_ACCESS_TOKEN: ${{ inputs.postman-access-token }}
         ENABLE_INSIGHTS: ${{ inputs.enable-insights }}
         ONBOARDING_SCOPE: ${{ inputs.onboarding-scope }}
         BRANCH_TIER: ${{ steps.branch_decision.outputs.tier }}
-        INSIGHTS_POSTMAN_API_KEY: ${{ steps.branch_decision.outputs.tier != 'gated' && inputs.insights-postman-api-key || '' }}
-        INSIGHTS_POSTMAN_ACCESS_TOKEN: ${{ steps.branch_decision.outputs.tier != 'gated' && inputs.insights-postman-access-token || '' }}
+        INSIGHTS_POSTMAN_API_KEY: ${{ inputs.insights-postman-api-key }}
+        INSIGHTS_POSTMAN_ACCESS_TOKEN: ${{ inputs.insights-postman-access-token }}
       run: |
         if [ -n "$WORKING_DIRECTORY" ]; then
-          if ! node -e 'const fs=require("node:fs"),path=require("node:path");const workspace=fs.realpathSync(process.env.GITHUB_WORKSPACE);const target=path.resolve(workspace,process.env.WORKING_DIRECTORY);if(!fs.existsSync(target)||!fs.statSync(target).isDirectory())process.exit(1);const realTarget=fs.realpathSync(target);const relative=path.relative(workspace,realTarget);process.exit(relative===""||(!relative.startsWith(`..${path.sep}`)&&relative!==".."&&!path.isAbsolute(relative))?0:1)'; then
+          if ! node -e 'const fs=require("node:fs"),path=require("node:path");const target=path.resolve(process.env.GITHUB_WORKSPACE,process.env.WORKING_DIRECTORY);process.exit(fs.existsSync(target)&&fs.statSync(target).isDirectory()?0:1)'; then
             echo "::error::working-directory does not exist under GITHUB_WORKSPACE. Create the directory or correct the input."
-            exit 1
-          fi
-        fi
-        if [ -n "$SPEC_PATH" ]; then
-          if ! node -e 'const fs=require("node:fs"),path=require("node:path");const workspace=fs.realpathSync(process.env.GITHUB_WORKSPACE);const root=path.resolve(workspace,process.env.WORKING_DIRECTORY||"");const target=path.resolve(root,process.env.SPEC_PATH);if(!fs.existsSync(target)||!fs.statSync(target).isFile())process.exit(1);const realTarget=fs.realpathSync(target);const relative=path.relative(workspace,realTarget);process.exit(!relative.startsWith(`..${path.sep}`)&&relative!==".."&&!path.isAbsolute(relative)?0:1)'; then
-            echo "::error::spec-path does not name a file under GITHUB_WORKSPACE. Check out the file and use a repository-relative path."
             exit 1
           fi
         fi
@@ -698,6 +512,13 @@ runs:
             exit 1
             ;;
         esac
+        case "$COLLECTION_UPDATE_STRATEGY" in
+          auto|whole) ;;
+          *)
+            echo "::error::Attempted collection-update-strategy validation failed: the provided value is unsupported. Accepted values: auto, whole. Set the collection-update-strategy input to one of those values."
+            exit 1
+            ;;
+        esac
         if [ "$BRANCH_TIER" != "gated" ] && [ -z "$POSTMAN_API_KEY" ] && [ -z "$POSTMAN_ACCESS_TOKEN" ]; then
           echo "::error::Attempted onboarding credential validation failed: neither postman-api-key nor postman-access-token was supplied. Provide one of those inputs and rerun."
           exit 1
@@ -715,8 +536,7 @@ runs:
         fi
     - id: bootstrap
       name: Bootstrap Postman Assets
-      if: ${{ steps.branch_decision.outputs.tier != 'gated' }}
-      uses: postman-cs/postman-bootstrap-action@v2.22.0
+      uses: postman-cs/postman-bootstrap-action@v2.21.0
       env:
         POSTMAN_TEAM_ID: ${{ inputs.postman-team-id }}
         POSTMAN_BRANCH_DECISION: ${{ steps.branch_decision.outputs.branch-decision }}
@@ -736,6 +556,7 @@ runs:
         onboarding-scope: ${{ inputs.onboarding-scope }}
         sync-examples: ${{ inputs.sync-examples }}
         collection-sync-mode: ${{ inputs.collection-sync-mode }}
+        collection-update-strategy: ${{ inputs.collection-update-strategy }}
         spec-sync-mode: ${{ inputs.spec-sync-mode }}
         release-label: ${{ inputs.release-label }}
         domain: ${{ inputs.domain }}
@@ -761,8 +582,8 @@ runs:
         breaking-summary-path: ${{ inputs.breaking-summary-path }}
         breaking-log-path: ${{ inputs.breaking-log-path }}
         governance-mapping-json: ${{ inputs.governance-mapping-json }}
-        github-token: ${{ steps.branch_decision.outputs.tier != 'gated' && inputs.github-token || '' }}
-        gh-fallback-token: ${{ steps.branch_decision.outputs.tier != 'gated' && inputs.gh-fallback-token || '' }}
+        github-token: ${{ inputs.github-token }}
+        gh-fallback-token: ${{ inputs.gh-fallback-token }}
         postman-api-key: ${{ steps.branch_decision.outputs.tier != 'gated' && inputs.postman-api-key || '' }}
         postman-access-token: ${{ steps.branch_decision.outputs.tier != 'gated' && inputs.postman-access-token || '' }}
         credential-preflight: ${{ inputs.credential-preflight }}
@@ -775,7 +596,7 @@ runs:
     - id: smoke_flow
       name: Apply Smoke flow
       if: ${{ inputs.onboarding-scope == 'full' && (inputs.flow-path != '' || inputs.flow-mode != '') && steps.branch_decision.outputs.tier != 'gated' }}
-      uses: postman-cs/postman-smoke-flow-action@v3.7.5
+      uses: postman-cs/postman-smoke-flow-action@v3.7.3
       env:
         POSTMAN_TEAM_ID: ${{ inputs.postman-team-id }}
         POSTMAN_BRANCH_DECISION: ${{ steps.branch_decision.outputs.branch-decision }}
@@ -790,8 +611,8 @@ runs:
         flow-allow-delete: ${{ inputs.flow-allow-delete }}
         persist-derived-flow: ${{ inputs.persist-derived-flow }}
         spec-path: ${{ inputs.spec-path }}
-        postman-api-key: ${{ steps.branch_decision.outputs.tier != 'gated' && inputs.postman-api-key || '' }}
-        postman-access-token: ${{ steps.branch_decision.outputs.tier != 'gated' && inputs.postman-access-token || '' }}
+        postman-api-key: ${{ inputs.postman-api-key }}
+        postman-access-token: ${{ inputs.postman-access-token }}
         postman-region: ${{ inputs.postman-region }}
         team-id: ${{ inputs.postman-team-id }}
         branch-strategy: ${{ inputs.branch-strategy }}
@@ -800,7 +621,7 @@ runs:
     - id: repo_sync
       name: Sync Repository and Workspace
       if: ${{ steps.branch_decision.outputs.tier != 'gated' }}
-      uses: postman-cs/postman-repo-sync-action@v2.11.1
+      uses: postman-cs/postman-repo-sync-action@v2.10.2
       env:
         POSTMAN_TEAM_ID: ${{ inputs.postman-team-id }}
         POSTMAN_BRANCH_DECISION: ${{ steps.branch_decision.outputs.branch-decision }}
@@ -831,15 +652,15 @@ runs:
         current-ref: ${{ inputs.current-ref }}
         committer-name: ${{ inputs.committer-name }}
         committer-email: ${{ inputs.committer-email }}
-        postman-api-key: ${{ steps.branch_decision.outputs.tier != 'gated' && inputs.postman-api-key || '' }}
-        postman-access-token: ${{ steps.branch_decision.outputs.tier != 'gated' && inputs.postman-access-token || '' }}
+        postman-api-key: ${{ inputs.postman-api-key }}
+        postman-access-token: ${{ inputs.postman-access-token }}
         credential-preflight: ${{ inputs.credential-preflight }}
         branch-strategy: ${{ inputs.branch-strategy }}
         canonical-branch: ${{ inputs.canonical-branch }}
         channels: ${{ inputs.channels }}
         preview-ttl: ${{ inputs.preview-ttl }}
-        github-token: ${{ steps.branch_decision.outputs.tier != 'gated' && inputs.github-token || '' }}
-        gh-fallback-token: ${{ steps.branch_decision.outputs.tier != 'gated' && inputs.gh-fallback-token || '' }}
+        github-token: ${{ inputs.github-token }}
+        gh-fallback-token: ${{ inputs.gh-fallback-token }}
         org-mode: ${{ inputs.org-mode }}
         integration-backend: ${{ inputs.integration-backend }}
         postman-region: ${{ inputs.postman-region }}
@@ -862,7 +683,7 @@ runs:
       # `postman login --with-api-key`, which has no access-token login path. When
       # postman-api-key is absent (access-token-primary runs), skip the tests with
       # a warning instead of failing the run.
-      if: ${{ steps.branch_decision.outputs.tier != 'gated' && inputs.onboarding-scope == 'full' && steps.bootstrap.outputs.collections-json != '' && inputs.skip-built-in-tests != 'true' && inputs.postman-api-key == '' }}
+      if: ${{ inputs.onboarding-scope == 'full' && steps.bootstrap.outputs.collections-json != '' && inputs.skip-built-in-tests != 'true' && inputs.postman-api-key == '' }}
       shell: bash
       env:
         POSTMAN_TEAM_ID: ${{ inputs.postman-team-id }}
@@ -870,7 +691,7 @@ runs:
         echo "::warning::Skipping built-in smoke and contract tests: no postman-api-key was provided. The Postman CLI (postman login --with-api-key, then postman collection run) has no access-token login, so these tests require a PMAK. Provide postman-api-key to enable them, or set skip-built-in-tests: true to silence this warning."
     - id: install_postman_cli_windows
       name: Install Postman CLI on Windows
-      if: ${{ steps.branch_decision.outputs.tier != 'gated' && inputs.onboarding-scope == 'full' && runner.os == 'Windows' && steps.bootstrap.outputs.collections-json != '' && inputs.skip-built-in-tests != 'true' && inputs.postman-api-key != '' }}
+      if: ${{ inputs.onboarding-scope == 'full' && runner.os == 'Windows' && steps.bootstrap.outputs.collections-json != '' && inputs.skip-built-in-tests != 'true' && inputs.postman-api-key != '' }}
       shell: pwsh
       env:
         POSTMAN_TEAM_ID: ${{ inputs.postman-team-id }}
@@ -886,12 +707,12 @@ runs:
         }
     - id: run_tests_junit
       name: Run smoke and contract collections with JUnit output
-      if: ${{ steps.branch_decision.outputs.tier != 'gated' && inputs.onboarding-scope == 'full' && steps.bootstrap.outputs.collections-json != '' && inputs.skip-built-in-tests != 'true' && inputs.postman-api-key != '' }}
+      if: ${{ inputs.onboarding-scope == 'full' && steps.bootstrap.outputs.collections-json != '' && inputs.skip-built-in-tests != 'true' && inputs.postman-api-key != '' }}
       shell: bash
       continue-on-error: true
       env:
         POSTMAN_TEAM_ID: ${{ inputs.postman-team-id }}
-        POSTMAN_API_KEY: ${{ steps.branch_decision.outputs.tier != 'gated' && inputs.postman-api-key || '' }}
+        POSTMAN_API_KEY: ${{ inputs.postman-api-key }}
         POSTMAN_REGION: ${{ inputs.postman-region }}
         PROJECT_NAME: ${{ inputs.project-name }}
         COLLECTIONS_JSON: ${{ steps.bootstrap.outputs.collections-json }}
@@ -987,7 +808,7 @@ runs:
         fi
     - id: upload_junit_artifact
       name: Upload Postman JUnit results
-      if: always() && steps.branch_decision.outputs.tier != 'gated' && inputs.onboarding-scope == 'full' && inputs.skip-built-in-tests != 'true'
+      if: always() && inputs.onboarding-scope == 'full' && inputs.skip-built-in-tests != 'true'
       env:
         POSTMAN_TEAM_ID: ${{ inputs.postman-team-id }}
       uses: actions/upload-artifact@v7.0.1
@@ -998,7 +819,7 @@ runs:
     - id: insights_onboarding
       if: inputs.onboarding-scope == 'full' && inputs.enable-insights == 'true' && steps.branch_decision.outputs.tier != 'gated'
       name: Onboard Postman Insights
-      uses: postman-cs/postman-insights-onboarding-action@v2.5.2
+      uses: postman-cs/postman-insights-onboarding-action@v2.5.1
       env:
         POSTMAN_TEAM_ID: ${{ inputs.postman-team-id }}
         POSTMAN_BRANCH_DECISION: ${{ steps.branch_decision.outputs.branch-decision }}
@@ -1008,13 +829,13 @@ runs:
         environment-id: ${{ fromJSON(steps.repo_sync.outputs.environment-uids-json)[fromJSON(inputs.environments-json)[0]] }}
         system-environment-id: ${{ fromJSON(inputs.system-env-map-json)[fromJSON(inputs.environments-json)[0]] }}
         cluster-name: ${{ inputs.cluster-name }}
-        postman-api-key: ${{ steps.branch_decision.outputs.tier != 'gated' && inputs.insights-postman-api-key || '' }}
-        postman-access-token: ${{ steps.branch_decision.outputs.tier != 'gated' && inputs.insights-postman-access-token || '' }}
+        postman-api-key: ${{ inputs.insights-postman-api-key }}
+        postman-access-token: ${{ inputs.insights-postman-access-token }}
         credential-preflight: ${{ inputs.credential-preflight }}
         branch-strategy: ${{ inputs.branch-strategy }}
         canonical-branch: ${{ inputs.canonical-branch }}
         channels: ${{ inputs.channels }}
         postman-team-id: ${{ inputs.postman-team-id }}
-        github-token: ${{ steps.branch_decision.outputs.tier != 'gated' && inputs.github-token || '' }}
+        github-token: ${{ inputs.github-token }}
         postman-region: ${{ inputs.postman-region }}
         postman-stack: ${{ inputs.postman-stack }}

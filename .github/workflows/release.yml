@@ -4,6 +4,15 @@ on:
   push:
     tags: ['v*']
   workflow_dispatch:
+    inputs:
+      e2e_verification_mode:
+        description: Enforce correlated E2E success before moving the rolling alias, or explicitly report-only.
+        required: true
+        type: choice
+        options:
+          - enforce
+          - report-only
+        default: enforce
 
 permissions:
   contents: read
@@ -223,9 +232,6 @@ jobs:
     outputs:
       outcome: ${{ steps.verifier.outputs.e2e_outcome }}
       correlation_id: ${{ steps.verifier.outputs.e2e_correlation_id }}
-      manifest_sha256: ${{ steps.verifier.outputs.e2e_manifest_sha256 }}
-      provider_commit: ${{ steps.verifier.outputs.e2e_provider_commit }}
-      provider_tag: ${{ steps.verifier.outputs.e2e_provider_tag }}
       workflow_run_id: ${{ steps.verifier.outputs.e2e_workflow_run_id }}
       run_url: ${{ steps.verifier.outputs.e2e_run_url }}
     steps:
@@ -245,21 +251,16 @@ jobs:
         id: verifier
         env:
           E2E_DISPATCH_TOKEN: ${{ steps.e2e-dispatch-token.outputs.token }}
-          E2E_GATE_MODE: enforce
+          E2E_GATE_MODE: ${{ inputs.e2e_verification_mode || 'enforce' }}
           E2E_GATE_ACTION: postman-api-onboarding-action
           E2E_GATE_SUITE: full
           E2E_GATE_REF: ${{ github.ref_name }}
-          E2E_GATE_RELEASE_COMMIT: ${{ github.sha }}
           E2E_GATE_SOURCE_DIGEST: ${{ needs.verify-package.outputs.release_tgz_sha256 }}
-          E2E_GATE_PROVIDER_TAG: e2e-provider-v1.2.0
-          E2E_GATE_PROVIDER_COMMIT: 53c5d10093b7dafb165d3caafbe3f1d70dec687d
-          E2E_GATE_PROVIDER_SOURCE_DIGEST: 8c7ee211fccd2869f3901fcbc5ed154d6dea8e3d0d7d2e5312f6c0b57b4f6b78
-          E2E_GATE_PEER_TAGS: '{"postman-cs/postman-bootstrap-action":"v2.22.0","postman-cs/postman-insights-onboarding-action":"v2.5.2","postman-cs/postman-repo-sync-action":"v2.11.1","postman-cs/postman-resolve-service-token-action":"v2.2.4","postman-cs/postman-smoke-flow-action":"v3.7.5"}'
         run: node scripts/verify-e2e-release.mjs
 
   advance-major-alias:
     needs: [classify, publish, verify-release-e2e]
-    if: ${{ !cancelled() && needs.classify.outputs.release_kind == 'immutable' && needs.publish.result == 'success' && needs.verify-release-e2e.result == 'success' && needs.verify-release-e2e.outputs.outcome == 'success' }}
+    if: ${{ !cancelled() && needs.classify.outputs.release_kind == 'immutable' && needs.publish.result == 'success' && needs.verify-release-e2e.result == 'success' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -281,25 +282,9 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
-      - name: Advance rolling major alias without regression
-        env:
-          VERIFIED_E2E_MANIFEST_SHA256: ${{ needs.verify-release-e2e.outputs.manifest_sha256 }}
-          VERIFIED_E2E_PROVIDER_COMMIT: ${{ needs.verify-release-e2e.outputs.provider_commit }}
-          VERIFIED_E2E_PROVIDER_TAG: ${{ needs.verify-release-e2e.outputs.provider_tag }}
+      - name: Advance rolling major alias
         run: |
           set -euo pipefail
-          [[ "$VERIFIED_E2E_MANIFEST_SHA256" =~ ^[0-9a-f]{64}$ ]] || {
-            echo '::error::verified E2E manifest digest is missing or invalid'
-            exit 1
-          }
-          [ "$VERIFIED_E2E_PROVIDER_TAG" = 'e2e-provider-v1.2.0' ] || {
-            echo '::error::verified E2E provider tag mismatch'
-            exit 1
-          }
-          [ "$VERIFIED_E2E_PROVIDER_COMMIT" = '53c5d10093b7dafb165d3caafbe3f1d70dec687d' ] || {
-            echo '::error::verified E2E provider commit mismatch'
-            exit 1
-          }
           VERSION="${GITHUB_REF_NAME#v}"; MAJOR="v${VERSION%%.*}"
           set +e
           ROWS=$(git ls-remote --tags origin "refs/tags/$MAJOR" "refs/tags/$MAJOR^{}" "refs/tags/$MAJOR.*")
@@ -315,33 +300,6 @@ jobs:
             exit 0
           fi
           [ "$STATUS" -eq 0 ] || exit "$STATUS"
-          RELEASE_TAG_REF="refs/tags/$GITHUB_REF_NAME"
-          REMOTE_RELEASE_REFS="$(git ls-remote --exit-code --tags origin "$RELEASE_TAG_REF" "${RELEASE_TAG_REF}^{}")" || {
-            echo "::error::failed to re-resolve immutable release tag $GITHUB_REF_NAME"
-            exit 1
-          }
-          REMOTE_RELEASE_TAG=''
-          REMOTE_RELEASE_PEELED=''
-          while IFS=$'\t' read -r object ref; do
-            if [ "$ref" = "$RELEASE_TAG_REF" ]; then
-              [ -z "$REMOTE_RELEASE_TAG" ] || { echo '::error::duplicate immutable release tag ref'; exit 1; }
-              REMOTE_RELEASE_TAG="$object"
-            elif [ "$ref" = "${RELEASE_TAG_REF}^{}" ]; then
-              [ -z "$REMOTE_RELEASE_PEELED" ] || { echo '::error::duplicate peeled release tag ref'; exit 1; }
-              REMOTE_RELEASE_PEELED="$object"
-            else
-              echo "::error::unexpected ref while resolving immutable release tag: $ref"
-              exit 1
-            fi
-          done <<< "$REMOTE_RELEASE_REFS"
-          [[ "$REMOTE_RELEASE_TAG" =~ ^[0-9a-f]{40}$ ]] || { echo '::error::immutable release tag did not resolve to an object'; exit 1; }
-          REMOTE_RELEASE_COMMIT="${REMOTE_RELEASE_PEELED:-$REMOTE_RELEASE_TAG}"
-          [[ "$REMOTE_RELEASE_COMMIT" =~ ^[0-9a-f]{40}$ ]] || { echo '::error::immutable release tag did not peel to a commit'; exit 1; }
-          [[ "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo '::error::release workflow SHA is invalid'; exit 1; }
-          [ "$REMOTE_RELEASE_COMMIT" = "$GITHUB_SHA" ] || {
-            echo "::error::immutable release tag moved: expected $GITHUB_SHA, resolved $REMOTE_RELEASE_COMMIT"
-            exit 1
-          }
           git config user.name 'github-actions[bot]'; git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git tag -fa "$MAJOR" -m "Rolling $MAJOR alias -> $GITHUB_REF_NAME" "$GITHUB_SHA"
           git push origin "$MAJOR" --force

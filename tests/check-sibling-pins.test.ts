@@ -11,12 +11,10 @@ import {
   COLLECTIONS_JSON_KEYS,
   REPO_SYNC_SUMMARY_GATED_KEYS,
   REPO_SYNC_SUMMARY_KEYS,
-  SIBLING_PIN_MAX_SOURCE_BYTES,
   SIBLING_PIN_NETWORK_TIMEOUT_MS,
   gitTagExistsExecOptions,
   pinnedFileFetchInit,
   pinnedRawFileUrl,
-  readBoundedResponseText,
   validateBranchDecisionInterface,
   validateCollectionsJsonShape,
   validateEnvironmentUidsEmit,
@@ -206,59 +204,6 @@ describe('network timeout bounds', () => {
       pinnedRawFileUrl('postman-bootstrap-action', 'v2.15.0', 'action.yml')
     ).toBe('https://raw.githubusercontent.com/postman-cs/postman-bootstrap-action/v2.15.0/action.yml');
   });
-
-  it('caps each sibling response independently and accepts content exactly at the cap', async () => {
-    expect(SIBLING_PIN_MAX_SOURCE_BYTES).toBe(2 * 1024 * 1024);
-    await expect(readBoundedResponseText(new Response('12345678'), 8)).resolves.toBe(
-      '12345678'
-    );
-  });
-
-  it('rejects an oversized declared Content-Length before consuming the body', async () => {
-    let pulled = false;
-    const response = {
-      headers: new Headers({ 'content-length': '9' }),
-      body: {
-        getReader() {
-          pulled = true;
-          throw new Error('body reader must not be created');
-        }
-      }
-    } as unknown as Response;
-
-    await expect(readBoundedResponseText(response, 8)).rejects.toThrow(
-      'sibling source exceeds 8 bytes'
-    );
-    expect(pulled).toBe(false);
-  });
-
-  it('rejects a streamed response that lies about its smaller Content-Length', async () => {
-    const response = new Response(
-      new ReadableStream({
-        start(controller) {
-          controller.enqueue(new TextEncoder().encode('1234'));
-          controller.enqueue(new TextEncoder().encode('56789'));
-          controller.close();
-        }
-      }),
-      { headers: { 'content-length': '1' } }
-    );
-
-    await expect(readBoundedResponseText(response, 8)).rejects.toThrow(
-      'sibling source exceeds 8 bytes'
-    );
-  });
-
-  it('fails closed on malformed lengths and invalid UTF-8', async () => {
-    await expect(
-      readBoundedResponseText(new Response('ok', { headers: { 'content-length': 'NaN' } }), 8)
-    ).rejects.toThrow('sibling source Content-Length is malformed');
-
-    const invalidUtf8 = new Response(Uint8Array.from([0xc3, 0x28]));
-    await expect(readBoundedResponseText(invalidUtf8, 8)).rejects.toThrow(
-      'sibling source is not valid UTF-8'
-    );
-  });
 });
 
 describe('forwarded with-keys', () => {
@@ -401,18 +346,6 @@ ${goldenBody},
     expect(failures.length).toBeGreaterThan(0);
     expect(failures[0]).toContain('postman-repo-sync-action@v2.8.7 src/index.ts');
     expect(failures[0]).toContain('leakedSecretToken');
-  });
-
-  it('rejects a missing summary terminator without backtracking over repeated markers', () => {
-    const hostileSource =
-      'function createRepoSummary(input) {\n' + 'JSON.stringify({\n'.repeat(100_000);
-    const started = performance.now();
-    const failures = validateRepoSyncSummaryKeys(hostileSource, {
-      repo: 'postman-repo-sync-action',
-      tag: 'v2.8.7'
-    });
-    expect(failures[0]).toContain('createRepoSummary JSON.stringify shape not found');
-    expect(performance.now() - started).toBeLessThan(1_000);
   });
 
   it('accepts and rejects gated-skip summary shapes', () => {

@@ -83,12 +83,7 @@ jobs:
             if [ "${result[$n]}" -eq 0 ]; then echo "gate:$n=pass"; else echo "gate:$n=fail"; fail=1; fi
           done
           for n in "${names[@]}"; do
-            echo "::group::$n"
-            stop_token="$(node -p "require('node:crypto').randomUUID()")"
-            echo "::stop-commands::$stop_token"
-            cat "$n.log"
-            echo "::$stop_token::"
-            echo "::endgroup::"
+            echo "::group::$n"; cat "$n.log"; echo "::endgroup::"
           done
           exit $fail
 
