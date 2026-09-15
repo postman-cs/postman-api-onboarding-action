@@ -42,6 +42,7 @@ function runValidation(env: Record<string, string>): { status: number; stderr: s
         WORKING_DIRECTORY: '',
         POSTMAN_STACK: 'prod',
         POSTMAN_REGION: 'us',
+        COLLECTION_UPDATE_STRATEGY: 'whole',
         CREDENTIAL_PREFLIGHT: 'warn',
         REPO_WRITE_MODE: 'commit-and-push',
         POSTMAN_API_KEY: 'PMAK-test',
@@ -96,6 +97,7 @@ describe('composite first-step input validation', () => {
     const validateStep = steps[1];
     expect(validateStep?.id).toBe('validate_postman_stack');
     expect(validateStep?.env?.REPO_WRITE_MODE).toBe('${{ inputs.repo-write-mode }}');
+    expect(validateStep?.env?.COLLECTION_UPDATE_STRATEGY).toBe('${{ inputs.collection-update-strategy }}');
     expect(validateStep?.env?.WORKING_DIRECTORY).toBe('${{ inputs.working-directory }}');
     expect(validateStep?.env?.POSTMAN_API_KEY).toBe('${{ inputs.postman-api-key }}');
     expect(validateStep?.env?.POSTMAN_ACCESS_TOKEN).toBe('${{ inputs.postman-access-token }}');
@@ -213,6 +215,10 @@ describe('composite first-step input validation', () => {
     expect(result.status).toBe(0);
   }, 20_000);
 
+  it.each(['auto', 'whole'])('accepts collection-update-strategy=%s', (strategy) => {
+    expect(runValidation({ COLLECTION_UPDATE_STRATEGY: strategy }).status).toBe(0);
+  }, 20_000);
+
   it.each([
     {
       envKey: 'POSTMAN_STACK',
@@ -241,6 +247,13 @@ describe('composite first-step input validation', () => {
       attempted: 'Attempted repo-write-mode validation failed',
       accepted: 'Accepted values: none, commit-only, commit-and-push',
       remediation: 'Set the repo-write-mode input to one of those values'
+    },
+    {
+      envKey: 'COLLECTION_UPDATE_STRATEGY',
+      value: 'delta',
+      attempted: 'Attempted collection-update-strategy validation failed',
+      accepted: 'Accepted values: auto, whole',
+      remediation: 'Set the collection-update-strategy input to one of those values'
     },
     {
       envKey: 'ONBOARDING_SCOPE',

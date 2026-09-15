@@ -87,7 +87,7 @@ describe('postman-api-onboarding-action composite contract', () => {
   describe('Phase 1: Documentation & Metadata', () => {
     it('action.yml name matches the marketplace listing title', () => {
       const manifest = loadManifest();
-      expect(manifest.name).toBe('Postman API Onboarding');
+      expect(manifest.name).toBe('Postman Enterprise Automation: API Onboarding');
     });
 
     it('package.json name matches repository name', () => {
@@ -98,7 +98,7 @@ describe('postman-api-onboarding-action composite contract', () => {
     it('description carries the suite suffix, not beta', () => {
       const manifest = loadManifest();
       const pkg = loadPackageJson();
-      expect(manifest.description).toContain('Part of the Postman API Onboarding suite');
+      expect(manifest.description).toContain('Part of the Postman Enterprise Automation Suite');
       expect(manifest.description).not.toContain('beta');
       expect(String(pkg.description)).toContain('Postman API onboarding');
       expect(String(pkg.description)).not.toContain('customer preview');
@@ -230,6 +230,7 @@ describe('postman-api-onboarding-action composite contract', () => {
         'onboarding-scope',
         'sync-examples',
         'collection-sync-mode',
+        'collection-update-strategy',
         'spec-sync-mode',
         'release-label',
         'monitor-id',
@@ -409,6 +410,27 @@ describe('postman-api-onboarding-action composite contract', () => {
       );
     });
 
+    it('defaults collection-update-strategy to whole, accepts auto or whole, and forwards it to bootstrap', () => {
+      const manifest = loadManifest();
+      const validation = manifest.runs.steps.find((step) => step.id === 'validate_postman_stack');
+      const bootstrap = manifest.runs.steps.find((step) => step.id === 'bootstrap');
+      const strategyCase = validation?.run?.match(
+        /case "\$COLLECTION_UPDATE_STRATEGY" in[\s\S]*?esac/
+      )?.[0];
+
+      expect(manifest.inputs['collection-update-strategy']).toMatchObject({
+        required: false,
+        default: 'whole'
+      });
+      expect(validation?.env?.COLLECTION_UPDATE_STRATEGY).toBe(
+        '${{ inputs.collection-update-strategy }}'
+      );
+      expect(strategyCase).toContain('auto|whole');
+      expect(bootstrap?.with?.['collection-update-strategy']).toBe(
+        '${{ inputs.collection-update-strategy }}'
+      );
+    });
+
     it('has the complete expected output set', () => {
       const manifest = loadManifest();
       expect(Object.keys(manifest.outputs)).toEqual([
@@ -466,12 +488,12 @@ describe('postman-api-onboarding-action composite contract', () => {
       const insightsStep = steps.find((step) => step.id === 'insights_onboarding');
 
       expect(validateStep?.shell).toBe('bash');
-      expect(bootstrapStep?.uses).toBe('postman-cs/postman-bootstrap-action@v2.20.0');
-      expect(repoSyncStep?.uses).toBe('postman-cs/postman-repo-sync-action@v2.10.1');
+      expect(bootstrapStep?.uses).toBe('postman-cs/postman-bootstrap-action@v2.21.0');
+      expect(repoSyncStep?.uses).toBe('postman-cs/postman-repo-sync-action@v2.10.2');
       expect(junitStep?.shell).toBe('bash');
       expect(uploadStep?.uses).toBe('actions/upload-artifact@v7.0.1');
-      expect(smokeFlowStep?.uses).toBe('postman-cs/postman-smoke-flow-action@v3.7.2');
-      expect(insightsStep?.uses).toBe('postman-cs/postman-insights-onboarding-action@v2.5.0');
+      expect(smokeFlowStep?.uses).toBe('postman-cs/postman-smoke-flow-action@v3.7.3');
+      expect(insightsStep?.uses).toBe('postman-cs/postman-insights-onboarding-action@v2.5.1');
       for (const step of [bootstrapStep, repoSyncStep, smokeFlowStep, insightsStep]) {
         expect(step?.uses).not.toMatch(/@(main|v0)$/);
       }
@@ -728,16 +750,16 @@ describe('postman-api-onboarding-action composite contract', () => {
         "${{ inputs.spec-url == '' && inputs.spec-files-json || '' }}"
       );
       // Sibling pins stay on the current immutable tags.
-      expect(bootstrapStep?.uses).toBe('postman-cs/postman-bootstrap-action@v2.20.0');
+      expect(bootstrapStep?.uses).toBe('postman-cs/postman-bootstrap-action@v2.21.0');
       expect(
         manifest.runs.steps.find((step) => step.id === 'repo_sync')?.uses
-      ).toBe('postman-cs/postman-repo-sync-action@v2.10.1');
+      ).toBe('postman-cs/postman-repo-sync-action@v2.10.2');
       expect(
         manifest.runs.steps.find((step) => step.id === 'smoke_flow')?.uses
-      ).toBe('postman-cs/postman-smoke-flow-action@v3.7.2');
+      ).toBe('postman-cs/postman-smoke-flow-action@v3.7.3');
       expect(
         manifest.runs.steps.find((step) => step.id === 'insights_onboarding')?.uses
-      ).toBe('postman-cs/postman-insights-onboarding-action@v2.5.0');
+      ).toBe('postman-cs/postman-insights-onboarding-action@v2.5.1');
     });
 
     it('surfaces final outputs from phase steps', () => {

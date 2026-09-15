@@ -9,6 +9,7 @@
 - Collection artifacts are exported in the Postman Collection v3 multi-file YAML directory structure (produced during the repo-sync step).
 - Workspace-to-repository linking supports both GitHub and GitLab (cloud and self-hosted) URLs.
 - `credential-preflight` accepts `warn` and `enforce` only; there is no public opt-out mode.
+- `collection-update-strategy` accepts `auto` or `whole`, defaults to `whole`, and is forwarded unchanged to bootstrap.
 
 ## Output mapping
 
@@ -40,4 +41,4 @@ These are distinct from `insights-status`, which carries the domain result from 
 
 ## Spec source resolution
 
-Provide exactly one of `spec-url` (HTTPS URL) or `spec-path` (repo-relative path to a checked-out file). When reusing an existing `spec-id`, the bootstrap step still updates the Spec Hub asset from whichever source you pass.
+Provide exactly one of `spec-url` (HTTPS URL) or `spec-path` (path to a checked-out file, relative to `working-directory` when set, otherwise the repository root). For `services/payments/openapi.yaml`, set `working-directory: services/payments` and `spec-path: openapi.yaml`; don't repeat the service prefix. When reusing an existing `spec-id`, the bootstrap step still updates the Spec Hub asset from whichever source you pass.

@@ -77,10 +77,10 @@ rewrite an immutable tag or force-push.
 
 The composite action currently depends on:
 
-- `postman-cs/postman-bootstrap-action@v2.20.0`
-- `postman-cs/postman-repo-sync-action@v2.10.1`
-- `postman-cs/postman-smoke-flow-action@v3.7.2` when `flow-path` or `flow-mode` is set
-- `postman-cs/postman-insights-onboarding-action@v2.5.0` when Insights is enabled
+- `postman-cs/postman-bootstrap-action@v2.21.0`
+- `postman-cs/postman-repo-sync-action@v2.10.2`
+- `postman-cs/postman-smoke-flow-action@v3.7.3` when `flow-path` or `flow-mode` is set
+- `postman-cs/postman-insights-onboarding-action@v2.5.1` when Insights is enabled
 
 Because these are immutable sibling pins, a consumer who pins `postman-api-onboarding-action` to an immutable tag gets a reproducible lower-level action set at runtime.
 
@@ -91,15 +91,14 @@ tag of each pin's recorded major. It runs on a `sibling-release` repository
 dispatch from sibling Release runs, on a daily cron backstop, and on manual
 dispatch. `scripts/advance-pins.mjs` rewrites every pin literal (manifest,
 contract tests, README, this file), then the workflow validates the result with
-`scripts/check-sibling-pins.mjs` and the full test suite before pushing to
-`main`, where Auto Release cuts the composite release. Majors never advance
-automatically; crossing a major stays a reviewed change. The push authenticates
-as the `postman-suite-pin-bot` GitHub App (org-owned, installed on the suite
-repos), which mints a one-hour installation token per run. The direct
-`HEAD:main` push attempts only when that App token is minted and non-empty, so
-a `GITHUB_TOKEN` push that would silently bypass Auto Release cannot land
-unreleased on `main`. When the App token is absent or the direct push fails, the
-workflow falls back to a ready-to-review pull request opened with `github.token`.
+`scripts/check-sibling-pins.mjs` and the full test suite. It commits the result
+to a uniquely named non-default branch, pushes that branch, and opens a pull
+request targeting `main`; CI runs against the branch before review and merge.
+Only merging that pull request may land the pin advance on `main`, whose merge
+then triggers Auto Release to cut the composite release. The workflow must never
+write directly to the default branch, and no alternate path may bypass the
+branch, pull-request, CI, and merge sequence. Majors never advance automatically;
+crossing a major stays a reviewed change.
 
 ### Composite release rule
 
