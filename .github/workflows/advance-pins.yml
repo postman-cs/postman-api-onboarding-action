@@ -1,19 +1,20 @@
 name: Advance Sibling Pins
 
 # Advances the immutable sibling pins in action.yml (and their mirrored
-# literals in the contract tests, README, and RELEASE_POLICY) to the newest
-# released tag of each pin's recorded major, then hands the commit to Auto
-# Release, which cuts the composite release. Majors never move here: crossing
-# a major boundary stays a reviewed change per RELEASE_POLICY.md.
+# literals in the contract tests, README, and RELEASE_POLICY) only to the exact
+# immutable tag selected by each sibling's promoted rolling major alias. The
+# selector also binds that tag and commit to its non-draft GitHub Release
+# manifest before editing. Publication without alias promotion is ineligible.
 #
 # Triggers: sibling repos dispatch `sibling-release` after a successful
 # Release run (via the postman-suite-pin-bot App); a daily cron backstop
 # covers missed or token-less dispatches; manual dispatch for on-demand runs.
 #
-# The postman-suite-pin-bot GitHub App mints a one-hour installation token
-# scoped to this repo so the pull request this workflow opens can trigger CI.
-# This workflow never writes the default branch: every pin advance lands
-# through a reviewed pull request, and CI is dispatched explicitly for it.
+# The postman-suite-pin-bot GitHub App mints separate one-hour installation
+# tokens: a contents-read token scoped only to the four sibling repositories,
+# and a write token scoped only to this composite repository. This workflow
+# never writes the default branch: every pin advance lands through a reviewed
+# pull request, and CI is dispatched explicitly for it.
 on:
   repository_dispatch:
     types: [sibling-release]
@@ -32,24 +33,27 @@ jobs:
   advance:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
-      pull-requests: write
-      actions: write
+      contents: read
     steps:
-      - name: Mint repo-scoped App token
-        id: app-token
-        continue-on-error: true
+      - name: Mint sibling release read token
+        id: sibling-read-token
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
           app-id: ${{ secrets.SUITE_PIN_BOT_APP_ID }}
           private-key: ${{ secrets.SUITE_PIN_BOT_PRIVATE_KEY }}
           owner: postman-cs
-          repositories: postman-api-onboarding-action
+          repositories: |
+            postman-bootstrap-action
+            postman-insights-onboarding-action
+            postman-repo-sync-action
+            postman-smoke-flow-action
+          permission-contents: read
 
       - uses: actions/checkout@v7
         with:
           ref: main
-          token: ${{ steps.app-token.outputs.token || github.token }}
+          token: ${{ github.token }}
+          persist-credentials: false
 
       - uses: actions/setup-node@v7
         with:
@@ -59,6 +63,8 @@ jobs:
 
       - name: Advance pins
         id: advance
+        env:
+          GH_TOKEN: ${{ steps.sibling-read-token.outputs.token }}
         run: |
           set -euo pipefail
           node scripts/advance-pins.mjs
@@ -71,32 +77,58 @@ jobs:
 
       - name: Validate advanced pins
         if: steps.advance.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ steps.sibling-read-token.outputs.token }}
         run: |
           set -euo pipefail
+          node scripts/advance-pins.mjs --check
           node scripts/check-sibling-pins.mjs
           npm test
+
+      - name: Mint composite write token
+        if: steps.advance.outputs.changed == 'true'
+        id: composite-write-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ secrets.SUITE_PIN_BOT_APP_ID }}
+          private-key: ${{ secrets.SUITE_PIN_BOT_PRIVATE_KEY }}
+          owner: postman-cs
+          repositories: postman-api-onboarding-action
+          permission-contents: write
+          permission-pull-requests: write
+          permission-actions: write
+          # release.yml carries pin literals; pushing it needs the workflows scope.
+          permission-workflows: write
 
       - name: Commit and open pull request
         if: steps.advance.outputs.changed == 'true'
         env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token || github.token }}
+          GH_TOKEN: ${{ steps.composite-write-token.outputs.token }}
         run: |
           set -euo pipefail
           git config user.name "postman-suite-pin-bot[bot]"
           git config user.email "311553872+postman-suite-pin-bot[bot]@users.noreply.github.com"
-          git add action.yml tests/contract.test.ts RELEASE_POLICY.md README.md
-          git commit -m "fix(deps): advance sibling pins to the latest released tags"
+          git add \
+            action.yml \
+            .github/workflows/release.yml \
+            scripts/verify-e2e-release.test.mjs \
+            tests/contract.test.ts \
+            tests/release-workflow.test.ts \
+            RELEASE_POLICY.md \
+            README.md
+          git commit -m "fix(deps): advance sibling pins to promoted releases"
           # Pin advances always land through a reviewed pull request. This
           # workflow has no default-branch write path: a direct push to main
           # would bypass branch protection and raise the
           # GitHub_Multiple_Protected_Branch_Policy_Override alarm.
           BRANCH="chore/advance-sibling-pins-$(date -u +%Y%m%d%H%M%S)"
+          gh auth setup-git
           git push origin "HEAD:refs/heads/${BRANCH}"
           gh pr create \
             --base main \
             --head "$BRANCH" \
-            --title "fix(deps): advance sibling pins to the latest released tags" \
-            --body "Automated sibling pin advance. Opened by advance-pins.yml; merging it lets Auto Release cut the composite release."
+            --title "fix(deps): advance sibling pins to promoted releases" \
+            --body "Automated sibling pin advance to exact rolling-alias targets with verified GitHub Release manifests. Opened by advance-pins.yml; merging it lets Auto Release cut the composite release."
           # CI is dispatched explicitly because GITHUB_TOKEN-created pull
           # requests do not emit pull_request runs.
           gh workflow run ci.yml --ref "$BRANCH"
