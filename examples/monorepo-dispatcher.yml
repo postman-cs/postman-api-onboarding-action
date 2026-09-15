@@ -41,6 +41,10 @@ jobs:
 
           record_service() {
             local service=$1 relative=$2 skip_onboard=$3
+            if (( ${#service} > 100 )) || [[ ! "$service" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
+              echo "Unsupported service directory name; use 1-100 letters, digits, dots, underscores, or hyphens." >&2
+              exit 1
+            fi
             [ -d "services/$service" ] || return 0
             printf '%s\n' "$service" >> "$COLLECTION_SERVICES"
             if [[ "$relative" != postman/* && "$relative" != .postman/* && "$skip_onboard" != true ]]; then
@@ -52,8 +56,7 @@ jobs:
             for service_dir in services/*; do
               [ -d "$service_dir" ] || continue
               service=${service_dir#services/}
-              printf '%s\n' "$service" >> "$CODE_SERVICES"
-              printf '%s\n' "$service" >> "$COLLECTION_SERVICES"
+              record_service "$service" openapi.yaml false
             done
           else
             SKIP_ONBOARD=false
@@ -160,7 +163,7 @@ jobs:
         run: |
           ruby <<'RUBY'
           require 'yaml'
-          config = YAML.load_file('.postman/resources.yaml') || {}
+          config = YAML.safe_load(File.read('.postman/resources.yaml'), aliases: false) || {}
           cloud = config.fetch('canonical', config.fetch('cloudResources', {}))
           collections = cloud.fetch('collections', {})
           environments = cloud.fetch('environments', {})
@@ -172,19 +175,26 @@ jobs:
           missing << 'contract collection' unless contract
           missing << 'environment' unless environment
           abort("Missing Postman resource IDs in .postman/resources.yaml: #{missing.join(', ')}") unless missing.empty?
+          values = { 'POSTMAN_SMOKE_COLLECTION_UID' => smoke, 'POSTMAN_CONTRACT_COLLECTION_UID' => contract, 'POSTMAN_ENVIRONMENT_UID' => environment }
+          # Keep every env-file record single-line and constrain it to the
+          # public Postman UID shape used by collections and environments.
+          # Reject instead of normalizing so a malformed tracked receipt can
+          # never name a different cloud asset than the one under review.
+          uid_pattern = /\A[A-Za-z0-9][A-Za-z0-9._-]{0,255}\z/
+          abort('Postman resource IDs must be 1-256 safe ASCII identifier characters') unless values.values.all? { |value| value.is_a?(String) && value.match?(uid_pattern) }
           File.open(ENV.fetch('GITHUB_ENV'), 'a') do |file|
-            file.puts("POSTMAN_SMOKE_COLLECTION_UID=#{smoke}")
-            file.puts("POSTMAN_CONTRACT_COLLECTION_UID=#{contract}")
-            file.puts("POSTMAN_ENVIRONMENT_UID=#{environment}")
+            values.each { |name, value| file.puts("#{name}=#{value}") }
           end
           RUBY
       - name: Run service collections
         working-directory: services/${{ matrix.service }}
+        env:
+          SERVICE_NAME: ${{ matrix.service }}
         run: |
           set -euo pipefail
           run_collection() {
             local label=$1 uid=$2 result
-            echo "::group::${{ matrix.service }} $label collection"
+            echo "::group::$SERVICE_NAME $label collection"
             set +e
             postman collection run "$uid" -e "$POSTMAN_ENVIRONMENT_UID" --report-events
             result=$?

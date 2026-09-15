@@ -102,6 +102,15 @@ describe('CI workflow contract', () => {
     expect(runGates).toContain('--to "${{ github.event.pull_request.head.sha }}"');
     expect(runGates).toContain('gate:$n=pass');
     expect(runGates).toContain('gate:$n=fail');
+    expect(runGates).toContain("require('node:crypto').randomUUID()");
+    expect(runGates).toContain('::stop-commands::$stop_token');
+    expect(runGates).toContain('::$stop_token::');
+    expect(runGates.indexOf('::stop-commands::$stop_token')).toBeLessThan(
+      runGates.indexOf('cat "$n.log"')
+    );
+    expect(runGates.indexOf('cat "$n.log"')).toBeLessThan(
+      runGates.indexOf('::$stop_token::')
+    );
     expect(runGates).toContain('exit $fail');
   });
 

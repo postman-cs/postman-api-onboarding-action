@@ -88,16 +88,38 @@ jobs:
 
       - pwsh: |
           $ErrorActionPreference = 'Stop'
+          $versionByParameter = [ordered]@{
+            resolveVersion = $env:RESOLVE_VERSION
+            bootstrapVersion = $env:BOOTSTRAP_VERSION
+            smokeFlowVersion = $env:SMOKE_FLOW_VERSION
+            repoSyncVersion = $env:REPO_SYNC_VERSION
+            insightsVersion = $env:INSIGHTS_VERSION
+          }
+          # Exact SemVer only. In particular, reject npm tags/ranges and the
+          # URL, Git, and file specs that npm otherwise accepts after `name@`.
+          $semverPattern = '\A(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-((0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)(\.(0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*))*))?(\+([0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*))?\z'
+          foreach ($entry in $versionByParameter.GetEnumerator()) {
+            $value = [string]$entry.Value
+            if ($value.Length -gt 128 -or $value -cnotmatch $semverPattern) {
+              throw "Invalid exact SemVer for $($entry.Key)."
+            }
+          }
           $packages = @(
-            '@postman-cs/onboarding-resolve-service-token@${{ parameters.resolveVersion }}',
-            '@postman-cs/onboarding-bootstrap@${{ parameters.bootstrapVersion }}',
-            '@postman-cs/onboarding-smoke-flow@${{ parameters.smokeFlowVersion }}',
-            '@postman-cs/onboarding-repo-sync@${{ parameters.repoSyncVersion }}',
-            '@postman-cs/onboarding-insights@${{ parameters.insightsVersion }}'
+            "@postman-cs/onboarding-resolve-service-token@$env:RESOLVE_VERSION",
+            "@postman-cs/onboarding-bootstrap@$env:BOOTSTRAP_VERSION",
+            "@postman-cs/onboarding-smoke-flow@$env:SMOKE_FLOW_VERSION",
+            "@postman-cs/onboarding-repo-sync@$env:REPO_SYNC_VERSION",
+            "@postman-cs/onboarding-insights@$env:INSIGHTS_VERSION"
           )
           & npm install --global @packages --no-audit --no-fund
           if ($LASTEXITCODE -ne 0) { throw "Onboarding CLI install failed with exit code $LASTEXITCODE" }
         displayName: Install pinned Postman onboarding CLIs
+        env:
+          RESOLVE_VERSION: ${{ parameters.resolveVersion }}
+          BOOTSTRAP_VERSION: ${{ parameters.bootstrapVersion }}
+          SMOKE_FLOW_VERSION: ${{ parameters.smokeFlowVersion }}
+          REPO_SYNC_VERSION: ${{ parameters.repoSyncVersion }}
+          INSIGHTS_VERSION: ${{ parameters.insightsVersion }}
 
       - pwsh: |
           $ErrorActionPreference = 'Stop'

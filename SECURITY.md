@@ -30,6 +30,6 @@ You should receive an acknowledgement within five business days. Please include 
 
 ## Scope Notes
 
-- This action handles Postman API keys and access tokens. Both are masked in logs by the action itself; never echo them in your own workflow steps.
+- This action registers all four Postman API-key and access-token inputs with GitHub's log masker in its first step. Store static credentials in GitHub Actions secrets, and ensure any action that produces a dynamic token masks it before setting its output; the supported `postman-resolve-service-token-action` does so. Never echo credentials in your own workflow steps.
 - This composite action chains sibling actions. If the issue appears only when the composite action wires those steps together, report it here. If it is isolated to a lower-level action, mention that action in the report.
 - Reports about secrets exposed in your own workflow configuration are out of scope for a code fix. Rotate the credential in Postman immediately.
