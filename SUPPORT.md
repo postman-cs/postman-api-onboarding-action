@@ -1,6 +1,6 @@
 # Support
 
-Use this repository for issues with the composite Postman API Onboarding action: workflow wiring, input and output behavior, phase outcomes, marketplace documentation, and the end-to-end GitHub Actions path.
+Use this repository for issues with the composite Postman Enterprise Automation: API Onboarding action: workflow wiring, input and output behavior, phase outcomes, marketplace documentation, and the end-to-end GitHub Actions path.
 
 ## Where to Get Help
 

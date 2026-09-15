@@ -87,7 +87,7 @@ describe('postman-api-onboarding-action composite contract', () => {
   describe('Phase 1: Documentation & Metadata', () => {
     it('action.yml name matches the marketplace listing title', () => {
       const manifest = loadManifest();
-      expect(manifest.name).toBe('Postman API Onboarding');
+      expect(manifest.name).toBe('Postman Enterprise Automation: API Onboarding');
     });
 
     it('package.json name matches repository name', () => {
@@ -98,7 +98,7 @@ describe('postman-api-onboarding-action composite contract', () => {
     it('description carries the suite suffix, not beta', () => {
       const manifest = loadManifest();
       const pkg = loadPackageJson();
-      expect(manifest.description).toContain('Part of the Postman API Onboarding suite');
+      expect(manifest.description).toContain('Part of the Postman Enterprise Automation Suite');
       expect(manifest.description).not.toContain('beta');
       expect(String(pkg.description)).toContain('Postman API onboarding');
       expect(String(pkg.description)).not.toContain('customer preview');
@@ -230,6 +230,7 @@ describe('postman-api-onboarding-action composite contract', () => {
         'onboarding-scope',
         'sync-examples',
         'collection-sync-mode',
+        'collection-update-strategy',
         'spec-sync-mode',
         'release-label',
         'monitor-id',
@@ -406,6 +407,27 @@ describe('postman-api-onboarding-action composite contract', () => {
       });
       expect(bootstrapStep?.with?.['preserve-oas30-type-null']).toBe(
         '${{ inputs.preserve-oas30-type-null }}'
+      );
+    });
+
+    it('defaults collection-update-strategy to whole, accepts auto or whole, and forwards it to bootstrap', () => {
+      const manifest = loadManifest();
+      const validation = manifest.runs.steps.find((step) => step.id === 'validate_postman_stack');
+      const bootstrap = manifest.runs.steps.find((step) => step.id === 'bootstrap');
+      const strategyCase = validation?.run?.match(
+        /case "\$COLLECTION_UPDATE_STRATEGY" in[\s\S]*?esac/
+      )?.[0];
+
+      expect(manifest.inputs['collection-update-strategy']).toMatchObject({
+        required: false,
+        default: 'whole'
+      });
+      expect(validation?.env?.COLLECTION_UPDATE_STRATEGY).toBe(
+        '${{ inputs.collection-update-strategy }}'
+      );
+      expect(strategyCase).toContain('auto|whole');
+      expect(bootstrap?.with?.['collection-update-strategy']).toBe(
+        '${{ inputs.collection-update-strategy }}'
       );
     });
 

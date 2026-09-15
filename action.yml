@@ -1,5 +1,5 @@
-name: Postman API Onboarding
-description: 'Full Postman onboarding in one step: workspace bootstrap, repo sync, and optional Insights linking. Part of the Postman API Onboarding suite.'
+name: 'Postman Enterprise Automation: API Onboarding'
+description: 'Full Postman onboarding in one step: workspace bootstrap, repo sync, and optional Insights linking. Part of the Postman Enterprise Automation Suite.'
 author: Postman
 branding:
   icon: send
@@ -36,6 +36,10 @@ inputs:
     description: Collection lifecycle policy (refresh or version). Default refresh ensures tracked collections stay in sync with the spec.
     required: false
     default: refresh
+  collection-update-strategy:
+    description: Collection update strategy (auto or whole). Default whole preserves full collection updates.
+    required: false
+    default: whole
   spec-sync-mode:
     description: Spec lifecycle policy (update or version).
     required: false
@@ -643,6 +647,7 @@ runs:
         POSTMAN_REGION: ${{ inputs.postman-region }}
         POSTMAN_STACK: ${{ inputs.postman-stack }}
         WORKING_DIRECTORY: ${{ inputs.working-directory }}
+        COLLECTION_UPDATE_STRATEGY: ${{ inputs.collection-update-strategy }}
         SPEC_PATH: ${{ inputs.spec-path }}
         CREDENTIAL_PREFLIGHT: ${{ inputs.credential-preflight }}
         REPO_WRITE_MODE: ${{ inputs.repo-write-mode }}
@@ -698,6 +703,13 @@ runs:
             exit 1
             ;;
         esac
+        case "$COLLECTION_UPDATE_STRATEGY" in
+          auto|whole) ;;
+          *)
+            echo "::error::Attempted collection-update-strategy validation failed: the provided value is unsupported. Accepted values: auto, whole. Set the collection-update-strategy input to one of those values."
+            exit 1
+            ;;
+        esac
         if [ "$BRANCH_TIER" != "gated" ] && [ -z "$POSTMAN_API_KEY" ] && [ -z "$POSTMAN_ACCESS_TOKEN" ]; then
           echo "::error::Attempted onboarding credential validation failed: neither postman-api-key nor postman-access-token was supplied. Provide one of those inputs and rerun."
           exit 1
@@ -736,6 +748,7 @@ runs:
         onboarding-scope: ${{ inputs.onboarding-scope }}
         sync-examples: ${{ inputs.sync-examples }}
         collection-sync-mode: ${{ inputs.collection-sync-mode }}
+        collection-update-strategy: ${{ inputs.collection-update-strategy }}
         spec-sync-mode: ${{ inputs.spec-sync-mode }}
         release-label: ${{ inputs.release-label }}
         domain: ${{ inputs.domain }}

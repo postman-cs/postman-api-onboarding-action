@@ -29,6 +29,10 @@ const advanceWorkflow = readFileSync(
 ).replace(/\r\n/g, '\n');
 const actionManifest = readFileSync(join(repoRoot, 'action.yml'), 'utf8');
 const contractTests = readFileSync(join(repoRoot, 'tests/contract.test.ts'), 'utf8');
+const releasePolicy = readFileSync(join(repoRoot, 'RELEASE_POLICY.md'), 'utf8').replace(
+  /\r\n/g,
+  '\n'
+);
 const selectorSource = readFileSync(join(repoRoot, 'scripts/advance-pins.mjs'), 'utf8');
 
 const oldCommit = 'a'.repeat(40);
@@ -576,5 +580,20 @@ describe('advance-pins workflow', () => {
     expect(jobPermissions).not.toContain('pull-requests: write');
     expect(jobPermissions).not.toContain('actions: write');
     expect(advanceWorkflow).not.toContain('APP_TOKEN:');
+  });
+
+  it('documents the branch-push and pull-request-only release path', () => {
+    const automaticPinAdvance = releasePolicy.match(
+      /### Automatic pin advance\n\n(?<section>[\s\S]*?)\n### Composite release rule/
+    )?.groups?.section;
+    const normalizedPolicy = automaticPinAdvance?.replace(/\s+/g, ' ').trim();
+    expect(normalizedPolicy).toBeDefined();
+    expect(normalizedPolicy).toContain('promoted rolling major alias');
+    expect(normalizedPolicy).toContain('release-manifest.json');
+    expect(normalizedPolicy).toContain('pushes only a topic branch');
+    expect(normalizedPolicy).toContain('opens a pull request');
+    expect(normalizedPolicy).toContain('never writes `main` directly');
+    expect(normalizedPolicy).toContain('Majors never advance automatically');
+    expect(normalizedPolicy).not.toMatch(/HEAD:main/);
   });
 });

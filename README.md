@@ -1,8 +1,8 @@
-# Postman API Onboarding
+# Postman Enterprise Automation: API Onboarding
 
 [![CI](https://github.com/postman-cs/postman-api-onboarding-action/actions/workflows/ci.yml/badge.svg)](https://github.com/postman-cs/postman-api-onboarding-action/actions/workflows/ci.yml) [![Release](https://img.shields.io/github/v/release/postman-cs/postman-api-onboarding-action?sort=semver)](https://github.com/postman-cs/postman-api-onboarding-action/releases) [![npm](https://img.shields.io/npm/v/%40postman-cs%2Fonboarding-api)](https://www.npmjs.com/package/@postman-cs/onboarding-api) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-Canonical entrypoint for the Postman API Onboarding suite. Use this composite action when a GitHub repository needs the full onboarding path: workspace bootstrap, OpenAPI upload, collection generation, repository artifact sync, built-in smoke and contract runs, and optional Postman Insights linking.
+Canonical entrypoint for the Postman Enterprise Automation Suite. Use this composite action when a GitHub repository needs the full onboarding path: workspace bootstrap, OpenAPI upload, collection generation, repository artifact sync, built-in smoke and contract runs, and optional Postman Insights linking.
 
 > **The pipeline leaves executable, standards-grounded tests behind, not just assets.** Bootstrap injects spec-derived contract assertions into the `[Contract]` collection, the Smoke collection carries generated smoke scripts, and repo-sync writes a CI workflow that reruns both with the Postman CLI on every push, pull request, and schedule. Full inventories: [Generated assertions](https://github.com/postman-cs/postman-bootstrap-action/blob/main/docs/generated-assertions.md), [Smoke generated tests](https://github.com/postman-cs/postman-smoke-flow-action/blob/main/docs/generated-tests.md), and [Contract Enforcement Layers](https://github.com/postman-cs/postman-bootstrap-action/blob/main/docs/contract-enforcement-layers.md).
 
@@ -76,7 +76,7 @@ The built-in smoke and contract runs are warning-only. A successful onboarding s
 
 | Scenario | Start with | Why |
 | --- | --- | --- |
-| Full GitHub onboarding from an OpenAPI spec | [Postman API Onboarding](https://github.com/postman-cs/postman-api-onboarding-action) | Canonical suite entrypoint. Chains bootstrap, repo sync, tests, and optional Insights. |
+| Full GitHub onboarding from an OpenAPI spec | [Postman Enterprise Automation: API Onboarding](https://github.com/postman-cs/postman-api-onboarding-action) | Canonical suite entrypoint. Chains bootstrap, repo sync, tests, and optional Insights. |
 | Mint an access token and resolve team ID | [Postman Onboarding: Service Token](https://github.com/postman-cs/postman-resolve-service-token-action) | Primary credential path for this composite action. Run it before onboarding. |
 | Discover an OpenAPI spec from AWS | [Postman Onboarding: AWS Spec Discovery](https://github.com/postman-cs/postman-aws-spec-discovery-action) | Produces a spec URL or artifact that can feed this composite action. |
 | Provision only the Postman workspace and collections | [Postman Onboarding: Workspace Bootstrap](https://github.com/postman-cs/postman-bootstrap-action) | Lower-level action for custom pipelines that do not want repo sync. |
@@ -294,6 +294,7 @@ The hook only attaches `x-api-key` for `*.mock.pstmn.io` hosts, so it stays iner
 | `onboarding-scope` | Onboarding scope. Use full for the complete pipeline or spec-only for workspace/spec onboarding without generated assets. | no | `full` |
 | `sync-examples` | Whether linked spec/collection relations should enable example syncing. | no | `true` |
 | `collection-sync-mode` | Collection lifecycle policy (refresh or version). Default refresh ensures tracked collections stay in sync with the spec. | no | `refresh` |
+| `collection-update-strategy` | Collection update strategy (auto or whole). Default whole preserves full collection updates. | no | `whole` |
 | `spec-sync-mode` | Spec lifecycle policy (update or version). | no | `update` |
 | `release-label` | Optional release label for versioned specs and collections. When omitted during versioned sync, derived from GitHub tag or branch metadata. | no |  |
 | `monitor-id` | Existing smoke monitor ID. When set, the action validates and reuses this monitor instead of creating a new one. | no |  |
@@ -399,7 +400,7 @@ Tables are generated from `action.yml` by `npm run docs:tables`.
 
 ## How it works
 
-This is a composite action, the primary partner-facing entrypoint of the Postman onboarding suite. It chains up to four sibling actions in order:
+This is a composite action, the primary partner-facing entrypoint of the Postman Enterprise Automation Suite. It chains up to four sibling actions in order:
 
 1. **Bootstrap** (`postman-cs/postman-bootstrap-action`) creates or reuses the workspace, uploads the spec to [Spec Hub](https://learning.postman.com/docs/design-apis/specifications/overview/), and [generates](https://learning.postman.com/docs/design-apis/specifications/generate-collections/) baseline, smoke, and contract collections.
 2. **Smoke flow** (`postman-cs/postman-smoke-flow-action`, when `flow-path` or `flow-mode` is set) reshapes the canonical Smoke collection before repo sync and the built-in test run: from the `flow.yaml` manifest at the effective flow path (`flow-path` or `postman/flow.yaml`) when one exists, otherwise derived deterministically from the spec under `flow-mode: auto` and persisted to that path. Repo sync then commits the manifest with the rest of the `postman/` tree and exports the post-reshape Smoke collection, so run 2 takes the curated path from the committed file; `derived-flow-path` reports where the manifest landed.
