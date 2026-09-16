@@ -95,6 +95,12 @@ describe('postman-api-onboarding-action composite contract', () => {
       expect(pkg.name).toBe('@postman-cs/onboarding-api');
     });
 
+    it('keeps the Marketplace description within GitHub limits', () => {
+      const manifest = loadManifest();
+      expect(manifest.description.length).toBeGreaterThan(0);
+      expect(manifest.description.length).toBeLessThanOrEqual(125);
+    });
+
     it('description carries the suite suffix, not beta', () => {
       const manifest = loadManifest();
       const pkg = loadPackageJson();
