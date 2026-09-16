@@ -489,11 +489,11 @@ describe('postman-api-onboarding-action composite contract', () => {
 
       expect(validateStep?.shell).toBe('bash');
       expect(bootstrapStep?.uses).toBe('postman-cs/postman-bootstrap-action@v2.22.0');
-      expect(repoSyncStep?.uses).toBe('postman-cs/postman-repo-sync-action@v2.11.1');
+      expect(repoSyncStep?.uses).toBe('postman-cs/postman-repo-sync-action@v2.11.2');
       expect(junitStep?.shell).toBe('bash');
       expect(uploadStep?.uses).toBe('actions/upload-artifact@v7.0.1');
-      expect(smokeFlowStep?.uses).toBe('postman-cs/postman-smoke-flow-action@v3.7.5');
-      expect(insightsStep?.uses).toBe('postman-cs/postman-insights-onboarding-action@v2.5.2');
+      expect(smokeFlowStep?.uses).toBe('postman-cs/postman-smoke-flow-action@v3.7.7');
+      expect(insightsStep?.uses).toBe('postman-cs/postman-insights-onboarding-action@v2.5.3');
       for (const step of [bootstrapStep, repoSyncStep, smokeFlowStep, insightsStep]) {
         expect(step?.uses).not.toMatch(/@(main|v0)$/);
       }
@@ -760,13 +760,13 @@ describe('postman-api-onboarding-action composite contract', () => {
       expect(bootstrapStep?.uses).toBe('postman-cs/postman-bootstrap-action@v2.22.0');
       expect(
         manifest.runs.steps.find((step) => step.id === 'repo_sync')?.uses
-      ).toBe('postman-cs/postman-repo-sync-action@v2.11.1');
+      ).toBe('postman-cs/postman-repo-sync-action@v2.11.2');
       expect(
         manifest.runs.steps.find((step) => step.id === 'smoke_flow')?.uses
-      ).toBe('postman-cs/postman-smoke-flow-action@v3.7.5');
+      ).toBe('postman-cs/postman-smoke-flow-action@v3.7.7');
       expect(
         manifest.runs.steps.find((step) => step.id === 'insights_onboarding')?.uses
-      ).toBe('postman-cs/postman-insights-onboarding-action@v2.5.2');
+      ).toBe('postman-cs/postman-insights-onboarding-action@v2.5.3');
     });
 
     it('surfaces final outputs from phase steps', () => {
