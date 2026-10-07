@@ -291,6 +291,7 @@ describe('postman-api-onboarding-action composite contract', () => {
         'flow-path',
         'flow-mode',
         'flow-allow-delete',
+        'flow-derive-scope',
         'persist-derived-flow',
         'enable-insights',
         'skip-built-in-tests',
@@ -619,6 +620,8 @@ describe('postman-api-onboarding-action composite contract', () => {
       expect(smokeFlow?.with?.['flow-allow-delete']).toBe('${{ inputs.flow-allow-delete }}');
       expect(manifest.inputs['flow-mode']?.default).toBe('');
       expect(manifest.inputs['flow-allow-delete']?.default).toBe('false');
+      expect(smokeFlow?.with?.['flow-derive-scope']).toBe('${{ inputs.flow-derive-scope }}');
+      expect(manifest.inputs['flow-derive-scope']?.default).toBe('full');
       expect(smokeFlow?.with?.['workspace-id']).toBe('${{ steps.bootstrap.outputs.workspace-id }}');
       expect(smokeFlow?.with?.['spec-id']).toBe('${{ steps.bootstrap.outputs.spec-id }}');
       expect(smokeFlow?.with?.['smoke-collection-id']).toBe(

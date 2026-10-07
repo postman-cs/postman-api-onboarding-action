@@ -261,6 +261,16 @@ inputs:
       manifests. Defaults to false.
     required: false
     default: 'false'
+  flow-derive-scope:
+    description: |
+      Scope for smoke flows derived under flow-mode auto. full (default)
+      chains create -> list -> read -> update from create-response
+      identifiers. read-only derives GET operations only and feeds item-path
+      identifiers from the first item of the owning resource's list
+      response, so no POST, PUT, PATCH, or DELETE is sent. Forwarded to
+      postman-cs/postman-smoke-flow-action; ignored for curated manifests.
+    required: false
+    default: 'full'
   persist-derived-flow:
     description: |
       Whether a freshly derived smoke flow is written to the effective flow
@@ -801,6 +811,7 @@ runs:
         flow-path: ${{ inputs.flow-path }}
         flow-mode: ${{ inputs.flow-mode == '' && 'auto' || inputs.flow-mode }}
         flow-allow-delete: ${{ inputs.flow-allow-delete }}
+        flow-derive-scope: ${{ inputs.flow-derive-scope }}
         persist-derived-flow: ${{ inputs.persist-derived-flow }}
         spec-path: ${{ inputs.spec-path }}
         postman-api-key: ${{ steps.branch_decision.outputs.tier != 'gated' && inputs.postman-api-key || '' }}
