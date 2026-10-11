@@ -498,7 +498,7 @@ describe('advance-pins workflow', () => {
     const validate = advanceWorkflow.indexOf('node scripts/check-sibling-pins.mjs');
     const promotionCheck = advanceWorkflow.indexOf('node scripts/advance-pins.mjs --check');
     const fullTests = advanceWorkflow.indexOf('npm test');
-    const branchPush = advanceWorkflow.indexOf('git push origin "HEAD:refs/heads/${BRANCH}"');
+    const branchPush = advanceWorkflow.indexOf('git push --force origin "HEAD:refs/heads/${BRANCH}"');
     const prCreate = advanceWorkflow.indexOf('gh pr create');
     expect(validate).toBeGreaterThan(-1);
     expect(promotionCheck).toBeGreaterThan(-1);
@@ -543,10 +543,13 @@ describe('advance-pins workflow', () => {
     }
   });
 
-  it('always lands a pin advance through a branch push plus pull request', () => {
-    expect(advanceWorkflow).toContain('BRANCH="chore/advance-sibling-pins-');
-    expect(advanceWorkflow).toContain('git push origin "HEAD:refs/heads/${BRANCH}"');
-    expect(advanceWorkflow).toContain('gh pr create');
+  it('always lands a pin advance through one reused branch and pull request', () => {
+    // A fixed branch, force-updated each run, keeps exactly one current pin PR.
+    expect(advanceWorkflow).toContain('BRANCH="chore/advance-sibling-pins"');
+    expect(advanceWorkflow).toContain('git push --force origin "HEAD:refs/heads/${BRANCH}"');
+    const lookup = advanceWorkflow.indexOf('gh pr list --head "$BRANCH" --state open');
+    expect(lookup).toBeGreaterThan(-1);
+    expect(lookup).toBeLessThan(advanceWorkflow.indexOf('gh pr create'));
     expect(advanceWorkflow).toContain('--base main');
     expect(advanceWorkflow).toContain('gh workflow run ci.yml');
     // No conditional gate can route the advance around the pull request.
