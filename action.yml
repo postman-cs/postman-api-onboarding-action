@@ -728,7 +728,7 @@ runs:
     - id: bootstrap
       name: Bootstrap Postman Assets
       if: ${{ steps.branch_decision.outputs.tier != 'gated' }}
-      uses: postman-cs/postman-bootstrap-action@v2.23.3
+      uses: postman-cs/postman-bootstrap-action@v2.23.4
       env:
         POSTMAN_TEAM_ID: ${{ inputs.postman-team-id }}
         POSTMAN_BRANCH_DECISION: ${{ steps.branch_decision.outputs.branch-decision }}
@@ -813,7 +813,7 @@ runs:
     - id: repo_sync
       name: Sync Repository and Workspace
       if: ${{ steps.branch_decision.outputs.tier != 'gated' }}
-      uses: postman-cs/postman-repo-sync-action@v2.11.2
+      uses: postman-cs/postman-repo-sync-action@v3.0.0
       env:
         POSTMAN_TEAM_ID: ${{ inputs.postman-team-id }}
         POSTMAN_BRANCH_DECISION: ${{ steps.branch_decision.outputs.branch-decision }}
