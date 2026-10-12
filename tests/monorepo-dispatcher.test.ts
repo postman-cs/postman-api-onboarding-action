@@ -422,7 +422,9 @@ describe('monorepo dispatcher example', () => {
     const { result, githubEnv } = runResourceResolver(resources);
 
     expect(result.status, `${result.stdout}${result.stderr}`).toBe(0);
-    expect(githubEnv).toContain('POSTMAN_ENVIRONMENT_UID=12345678-ffffffff-bbbb-cccc-dddd-eeeeeeeeeeee\n');
+    expect(githubEnv.trim().split(/\r?\n/)).toContain(
+      'POSTMAN_ENVIRONMENT_UID=12345678-ffffffff-bbbb-cccc-dddd-eeeeeeeeeeee'
+    );
   });
 
   it('accepts owner-prefixed Postman UIDs and writes exactly three records', () => {
