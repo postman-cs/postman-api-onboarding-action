@@ -406,6 +406,25 @@ describe('monorepo dispatcher example', () => {
     expect(githubEnv).toBe('EXISTING=preserved\n');
   });
 
+  it('picks the prod environment from repo-sync v3 YAML names over earlier environments', () => {
+    const resources = JSON.stringify({
+      canonical: {
+        collections: {
+          '[Smoke] orders': '12345678-aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
+          '[Contract] orders': '12345678-11111111-2222-3333-4444-555555555555',
+        },
+        environments: {
+          '../postman/environments/orders - stage.environment.yaml': '12345678-00000000-bbbb-cccc-dddd-eeeeeeeeeeee',
+          '../postman/environments/orders - prod.environment.yaml': '12345678-ffffffff-bbbb-cccc-dddd-eeeeeeeeeeee',
+        },
+      },
+    });
+    const { result, githubEnv } = runResourceResolver(resources);
+
+    expect(result.status, `${result.stdout}${result.stderr}`).toBe(0);
+    expect(githubEnv).toContain('POSTMAN_ENVIRONMENT_UID=12345678-ffffffff-bbbb-cccc-dddd-eeeeeeeeeeee\n');
+  });
+
   it('accepts owner-prefixed Postman UIDs and writes exactly three records', () => {
     const resources = JSON.stringify({
       canonical: {
