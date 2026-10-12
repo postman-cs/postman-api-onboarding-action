@@ -101,7 +101,7 @@ outputs:
       }
     },
     'postman-repo-sync-action': {
-      tag: 'v2.7.1',
+      tag: 'v3.0.1',
       tagExists: true,
       actionYmlText:
         overrides.repoSyncAction ??
@@ -169,7 +169,7 @@ runs:
       with:
         workspace-id: \${{ steps.bootstrap.outputs.workspace-id }}
     - id: repo_sync
-      uses: postman-cs/postman-repo-sync-action@v2.7.1
+      uses: postman-cs/postman-repo-sync-action@v3.0.1
       with:
         environment-uids-json: '{}'
         branch-decision: '{}'
@@ -513,7 +513,7 @@ fs.writeFileSync(out, "collections-json=" + JSON.stringify({ nope: 1 }));`
       })
     });
     expect(
-      failures.some((failure) => failure.includes('postman-repo-sync-action@v2.7.1 src/index.ts'))
+      failures.some((failure) => failure.includes('postman-repo-sync-action@v3.0.1 src/index.ts'))
     ).toBe(true);
     expect(
       failures.some((failure) =>

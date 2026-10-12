@@ -169,7 +169,8 @@ jobs:
           environments = cloud.fetch('environments', {})
           smoke = collections.find { |path, _| path.include?('[Smoke]') }&.last
           contract = collections.find { |path, _| path.include?('[Contract]') }&.last
-          environment = environments.find { |path, _| path.end_with?('/prod.postman_environment.json') }&.last || environments.values.first
+          # repo-sync v3 names files '<project> - prod.environment.yaml'; v2 wrote 'prod.postman_environment.json'.
+          environment = environments.find { |path, _| path.end_with?(' - prod.environment.yaml', '/prod.postman_environment.json') }&.last || environments.values.first
           missing = []
           missing << 'smoke collection' unless smoke
           missing << 'contract collection' unless contract
