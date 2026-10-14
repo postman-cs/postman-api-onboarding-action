@@ -122,14 +122,18 @@ jobs:
           # workflow has no default-branch write path: a direct push to main
           # would bypass branch protection and raise the
           # GitHub_Multiple_Protected_Branch_Policy_Override alarm.
-          BRANCH="chore/advance-sibling-pins-$(date -u +%Y%m%d%H%M%S)"
+          # One fixed branch, force-updated from main each run, so there is only
+          # ever one current pin PR instead of one per day.
+          BRANCH="chore/advance-sibling-pins"
           gh auth setup-git
-          git push origin "HEAD:refs/heads/${BRANCH}"
-          gh pr create \
-            --base main \
-            --head "$BRANCH" \
-            --title "fix(deps): advance sibling pins to promoted releases" \
-            --body "Automated sibling pin advance to exact rolling-alias targets with verified GitHub Release manifests. Opened by advance-pins.yml; merging it lets Auto Release cut the composite release."
+          git push --force origin "HEAD:refs/heads/${BRANCH}"
+          if [ -z "$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number')" ]; then
+            gh pr create \
+              --base main \
+              --head "$BRANCH" \
+              --title "fix(deps): advance sibling pins to promoted releases" \
+              --body "Automated sibling pin advance to exact rolling-alias targets with verified GitHub Release manifests. Opened by advance-pins.yml; merging it lets Auto Release cut the composite release."
+          fi
           # CI is dispatched explicitly because GITHUB_TOKEN-created pull
           # requests do not emit pull_request runs.
           gh workflow run ci.yml --ref "$BRANCH"

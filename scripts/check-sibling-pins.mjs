@@ -10,13 +10,13 @@ import { parse } from 'yaml';
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 // Siblings are pinned to reviewed immutable tags of the major recorded here.
-// Majors diverge across the suite (smoke-flow shipped v3 while the other
-// siblings remain on v2), so each expected major is committed beside its pin.
+// Majors diverge across the suite (smoke-flow and repo-sync are on v3, the
+// other siblings on v2), so each expected major is committed beside its pin.
 // Release eligibility must depend only on committed content, not on a mutable
 // "latest tag" query that can change after the composite commit is reviewed.
 export const REQUIRED_PINS = [
   { repo: 'postman-bootstrap-action', stepId: 'bootstrap', major: 2 },
-  { repo: 'postman-repo-sync-action', stepId: 'repo_sync', major: 2 },
+  { repo: 'postman-repo-sync-action', stepId: 'repo_sync', major: 3 },
   { repo: 'postman-smoke-flow-action', stepId: 'smoke_flow', major: 3 },
   { repo: 'postman-insights-onboarding-action', stepId: 'insights_onboarding', major: 2 }
 ];
