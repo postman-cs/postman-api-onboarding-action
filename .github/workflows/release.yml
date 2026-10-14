@@ -23,6 +23,8 @@ jobs:
       npm_publish: ${{ steps.release_tag.outputs.npm_publish }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
@@ -62,6 +64,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          persist-credentials: false
           fetch-depth: 1
       - uses: actions/setup-node@v7
         with:
@@ -234,6 +237,8 @@ jobs:
       run_url: ${{ steps.verifier.outputs.e2e_run_url }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
