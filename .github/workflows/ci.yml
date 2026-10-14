@@ -19,6 +19,7 @@ concurrency:
 jobs:
   gate:
     runs-on: ubuntu-latest
+    timeout-minutes: 8
     permissions:
       contents: read
       pull-requests: read
@@ -95,6 +96,7 @@ jobs:
   windows:
     name: Windows gate
     runs-on: windows-latest
+    timeout-minutes: 8
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
