@@ -15,6 +15,7 @@ concurrency:
 jobs:
   classify:
     runs-on: ubuntu-latest
+    timeout-minutes: 3
     permissions:
       contents: read
     outputs:
@@ -22,6 +23,8 @@ jobs:
       npm_publish: ${{ steps.release_tag.outputs.npm_publish }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
@@ -53,6 +56,7 @@ jobs:
     needs: classify
     if: needs.classify.outputs.release_kind == 'immutable'
     runs-on: ubuntu-latest
+    timeout-minutes: 8
     permissions:
       contents: read
     outputs:
@@ -60,6 +64,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          persist-credentials: false
           fetch-depth: 1
       - uses: actions/setup-node@v7
         with:
@@ -106,6 +111,7 @@ jobs:
     needs: [classify, verify-package]
     if: needs.classify.outputs.release_kind == 'immutable'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       contents: write
       id-token: write
@@ -218,6 +224,7 @@ jobs:
     needs: [classify, verify-package, publish]
     if: ${{ !cancelled() && needs.classify.outputs.release_kind == 'immutable' && needs.publish.result == 'success' }}
     runs-on: ubuntu-latest
+    timeout-minutes: 35
     permissions:
       contents: read
     outputs:
@@ -230,6 +237,8 @@ jobs:
       run_url: ${{ steps.verifier.outputs.e2e_run_url }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
@@ -254,13 +263,14 @@ jobs:
           E2E_GATE_PROVIDER_TAG: e2e-provider-v1.2.0
           E2E_GATE_PROVIDER_COMMIT: 53c5d10093b7dafb165d3caafbe3f1d70dec687d
           E2E_GATE_PROVIDER_SOURCE_DIGEST: 8c7ee211fccd2869f3901fcbc5ed154d6dea8e3d0d7d2e5312f6c0b57b4f6b78
-          E2E_GATE_PEER_TAGS: '{"postman-cs/postman-bootstrap-action":"v2.23.3","postman-cs/postman-insights-onboarding-action":"v2.5.3","postman-cs/postman-repo-sync-action":"v2.11.2","postman-cs/postman-resolve-service-token-action":"v2.2.4","postman-cs/postman-smoke-flow-action":"v3.8.0"}'
+          E2E_GATE_PEER_TAGS: '{"postman-cs/postman-bootstrap-action":"v2.23.3","postman-cs/postman-insights-onboarding-action":"v2.5.3","postman-cs/postman-repo-sync-action":"v3.0.1","postman-cs/postman-resolve-service-token-action":"v2.2.4","postman-cs/postman-smoke-flow-action":"v3.8.0"}'
         run: node scripts/verify-e2e-release.mjs
 
   advance-major-alias:
     needs: [classify, publish, verify-release-e2e]
     if: ${{ !cancelled() && needs.classify.outputs.release_kind == 'immutable' && needs.publish.result == 'success' && needs.verify-release-e2e.result == 'success' && needs.verify-release-e2e.outputs.outcome == 'success' }}
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     permissions:
       contents: read
     steps:
