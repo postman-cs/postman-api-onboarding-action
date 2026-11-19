@@ -40,6 +40,18 @@ inputs:
     description: Collection update strategy (auto or whole). Default whole preserves full collection updates.
     required: false
     default: whole
+  folder-strategy:
+    description: Folder organization strategy for generated collections (Paths or Tags). Forwarded to postman-cs/postman-bootstrap-action.
+    required: false
+    default: Paths
+  nested-folder-hierarchy:
+    description: When folder-strategy is Tags, enables nested folder hierarchy for generated collections. Forwarded to postman-cs/postman-bootstrap-action.
+    required: false
+    default: 'false'
+  request-name-source:
+    description: Determines how requests are named in generated collections (Fallback or URL). Forwarded to postman-cs/postman-bootstrap-action.
+    required: false
+    default: Fallback
   spec-sync-mode:
     description: Spec lifecycle policy (update or version).
     required: false
@@ -759,6 +771,9 @@ runs:
         sync-examples: ${{ inputs.sync-examples }}
         collection-sync-mode: ${{ inputs.collection-sync-mode }}
         collection-update-strategy: ${{ inputs.collection-update-strategy }}
+        folder-strategy: ${{ inputs.folder-strategy }}
+        nested-folder-hierarchy: ${{ inputs.nested-folder-hierarchy }}
+        request-name-source: ${{ inputs.request-name-source }}
         spec-sync-mode: ${{ inputs.spec-sync-mode }}
         release-label: ${{ inputs.release-label }}
         domain: ${{ inputs.domain }}

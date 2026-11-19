@@ -237,6 +237,9 @@ describe('postman-api-onboarding-action composite contract', () => {
         'sync-examples',
         'collection-sync-mode',
         'collection-update-strategy',
+        'folder-strategy',
+        'nested-folder-hierarchy',
+        'request-name-source',
         'spec-sync-mode',
         'release-label',
         'monitor-id',
@@ -436,6 +439,29 @@ describe('postman-api-onboarding-action composite contract', () => {
       expect(bootstrap?.with?.['collection-update-strategy']).toBe(
         '${{ inputs.collection-update-strategy }}'
       );
+    });
+
+    it('forwards folder-strategy, nested-folder-hierarchy, and request-name-source to bootstrap with matching defaults', () => {
+      const manifest = loadManifest();
+      const bootstrap = manifest.runs.steps.find((step) => step.id === 'bootstrap');
+
+      expect(manifest.inputs['folder-strategy']).toMatchObject({
+        required: false,
+        default: 'Paths'
+      });
+      expect(manifest.inputs['nested-folder-hierarchy']).toMatchObject({
+        required: false,
+        default: 'false'
+      });
+      expect(manifest.inputs['request-name-source']).toMatchObject({
+        required: false,
+        default: 'Fallback'
+      });
+      expect(bootstrap?.with?.['folder-strategy']).toBe('${{ inputs.folder-strategy }}');
+      expect(bootstrap?.with?.['nested-folder-hierarchy']).toBe(
+        '${{ inputs.nested-folder-hierarchy }}'
+      );
+      expect(bootstrap?.with?.['request-name-source']).toBe('${{ inputs.request-name-source }}');
     });
 
     it('has the complete expected output set', () => {

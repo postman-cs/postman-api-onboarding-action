@@ -10,6 +10,7 @@
 - Workspace-to-repository linking supports both GitHub and GitLab (cloud and self-hosted) URLs.
 - `credential-preflight` accepts `warn` and `enforce` only; there is no public opt-out mode.
 - `collection-update-strategy` accepts `auto` or `whole`, defaults to `whole`, and is forwarded unchanged to bootstrap.
+- `folder-strategy` (default `Paths`), `nested-folder-hierarchy` (default `false`), and `request-name-source` (default `Fallback`) are forwarded unchanged to bootstrap for generated collection layout and naming.
 
 ## Output mapping
 
