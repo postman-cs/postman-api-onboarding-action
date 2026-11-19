@@ -295,6 +295,9 @@ The hook only attaches `x-api-key` for `*.mock.pstmn.io` hosts, so it stays iner
 | `sync-examples` | Whether linked spec/collection relations should enable example syncing. | no | `true` |
 | `collection-sync-mode` | Collection lifecycle policy (refresh or version). Default refresh ensures tracked collections stay in sync with the spec. | no | `refresh` |
 | `collection-update-strategy` | Collection update strategy (auto or whole). Default whole preserves full collection updates. | no | `whole` |
+| `folder-strategy` | Folder organization strategy for generated collections (Paths or Tags). Forwarded to postman-cs/postman-bootstrap-action. | no | `Paths` |
+| `nested-folder-hierarchy` | When folder-strategy is Tags, enables nested folder hierarchy for generated collections. Forwarded to postman-cs/postman-bootstrap-action. | no | `false` |
+| `request-name-source` | Determines how requests are named in generated collections (Fallback or URL). Forwarded to postman-cs/postman-bootstrap-action. | no | `Fallback` |
 | `spec-sync-mode` | Spec lifecycle policy (update or version). | no | `update` |
 | `release-label` | Optional release label for versioned specs and collections. When omitted during versioned sync, derived from GitHub tag or branch metadata. | no |  |
 | `monitor-id` | Existing smoke monitor ID. When set, the action validates and reuses this monitor instead of creating a new one. | no |  |
