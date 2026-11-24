@@ -25,6 +25,7 @@ type Decision = {
     sameRepository: boolean;
     eventEligible: boolean;
     headBranch?: string;
+    refKind?: string;
   };
 };
 
@@ -71,6 +72,14 @@ function nestedPrEvent(
   eventRepository: Repository = repository()
 ): Record<string, unknown> {
   return { repository: eventRepository, [eventName]: { pull_requests: requests } };
+}
+
+function releaseEvent(
+  action: string,
+  release: Record<string, unknown> = { tag_name: 'v1.2.3', draft: false },
+  eventRepository: Repository = repository()
+): Record<string, unknown> {
+  return { repository: eventRepository, action, release };
 }
 
 function decide(
@@ -359,6 +368,102 @@ describe('branch decision event trust boundary', () => {
       sameRepository: true,
       eventEligible: true
     });
+  });
+
+  const releaseTagRef = { ref: 'refs/tags/v1.2.3', refName: 'v1.2.3' };
+
+  it.each(['published', 'released', 'prereleased'])(
+    'treats a %s release like a push of its tag under legacy',
+    (action) => {
+      const decision = decide({
+        eventName: 'release',
+        event: releaseEvent(action),
+        strategy: 'legacy',
+        ...releaseTagRef
+      }).decision;
+      expect(decision.tier).toBe('legacy');
+      expect(decision.reason).toContain('trusted release event');
+      expect(decision.identity).toMatchObject({
+        eventName: 'release',
+        refKind: 'tag',
+        isPrContext: false,
+        isForkPr: false,
+        sameRepository: true,
+        eventEligible: true
+      });
+    }
+  );
+
+  it.each(['legacy', 'publish-gate', 'preview'] as const)(
+    'gives a published release the same tier as a push of the same tag under %s',
+    (strategy) => {
+      const release = decide({
+        eventName: 'release',
+        event: releaseEvent('published'),
+        strategy,
+        ...releaseTagRef
+      }).decision;
+      const tagPush = decide({ eventName: 'push', strategy, ...releaseTagRef }).decision;
+      expect(release.tier).toBe(tagPush.tier);
+      expect(release.identity.refKind).toBe('tag');
+      expect(release.identity.eventEligible).toBe(true);
+    }
+  );
+
+  it.each(['created', 'edited', 'deleted', 'unpublished', ''])(
+    'gates release activity "%s" under legacy',
+    (action) => {
+      const decision = decide({
+        eventName: 'release',
+        event: releaseEvent(action),
+        strategy: 'legacy',
+        ...releaseTagRef
+      }).decision;
+      expect(decision.tier).toBe('gated');
+      expect(decision.reason).toContain('not credential-eligible');
+      expect(decision.identity).toMatchObject({ eventEligible: false, sameRepository: false });
+    }
+  );
+
+  it.each([
+    {
+      name: 'a draft release',
+      event: releaseEvent('published', { tag_name: 'v1.2.3', draft: true }),
+      ref: releaseTagRef
+    },
+    {
+      name: 'a release whose tag does not match GITHUB_REF',
+      event: releaseEvent('published', { tag_name: 'v9.9.9', draft: false }),
+      ref: releaseTagRef
+    },
+    {
+      name: 'a release without a tag name',
+      event: releaseEvent('published', { draft: false }),
+      ref: releaseTagRef
+    },
+    {
+      name: 'a release on a branch ref',
+      event: releaseEvent('published'),
+      ref: { ref: 'refs/heads/main', refName: 'main' }
+    },
+    {
+      name: 'a release from a different repository',
+      event: releaseEvent(
+        'published',
+        { tag_name: 'v1.2.3', draft: false },
+        repository({ id: 404, full_name: 'other/repository' })
+      ),
+      ref: releaseTagRef
+    },
+    {
+      name: 'a release carrying a PR marker',
+      event: { ...releaseEvent('published'), pull_request: pullRequest() },
+      ref: releaseTagRef
+    }
+  ])('gates $name under legacy', ({ event, ref }) => {
+    const decision = decide({ eventName: 'release', event, strategy: 'legacy', ...ref }).decision;
+    expect(decision.tier).toBe('gated');
+    expect(decision.identity.eventEligible).toBe(false);
   });
 
   it('gates a trusted non-PR event carrying an inconsistent PR head ref', () => {

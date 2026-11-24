@@ -474,6 +474,9 @@ runs:
         ]);
         const nestedPrEvents = new Set(['workflow_run', 'check_run', 'check_suite']);
         const trustedNonPrEvents = new Set(['push', 'schedule', 'workflow_dispatch']);
+        // A published release is trusted like a push of its tag: same repository,
+        // non-draft, and GITHUB_REF must be that release's tag. Other activities fail closed.
+        const trustedReleaseActions = new Set(['published', 'released', 'prereleased']);
 
         const strategy = clean(process.env.BRANCH_STRATEGY) || 'legacy';
         if (!['legacy', 'publish-gate', 'preview'].includes(strategy)) throw new Error('CONTRACT_BRANCH_STRATEGY_INVALID: expected legacy, publish-gate, or preview');
@@ -541,6 +544,22 @@ runs:
             sameRepository = true;
             headBranch = rawRef?.startsWith('refs/heads/') ? rawRef.slice(11) : undefined;
             eventReason = `trusted non-PR event ${eventName}`;
+          }
+        } else if (eventName === 'release') {
+          const releaseAction = clean(event.action);
+          const releaseTag = clean(event.release?.tag_name);
+          if (isPrContext) {
+            eventReason = 'event release unexpectedly carries pull-request metadata';
+          } else if (!releaseAction || !trustedReleaseActions.has(releaseAction)) {
+            eventReason = `release activity ${releaseAction ?? 'missing'} is not credential-eligible`;
+          } else if (event.release?.draft === true) {
+            eventReason = 'draft release is not credential-eligible';
+          } else if (!releaseTag || rawRef !== `refs/tags/${releaseTag}`) {
+            eventReason = 'release tag does not match GITHUB_REF; release is not credential-eligible';
+          } else {
+            eventEligible = true;
+            sameRepository = true;
+            eventReason = `trusted release event (${releaseAction})`;
           }
         } else if (directPrEvents.has(eventName)) {
           isPrContext = true;

@@ -9,6 +9,7 @@
 - Collection artifacts are exported in the Postman Collection v3 multi-file YAML directory structure (produced during the repo-sync step).
 - Workspace-to-repository linking supports both GitHub and GitLab (cloud and self-hosted) URLs.
 - `credential-preflight` accepts `warn` and `enforce` only; there is no public opt-out mode.
+- Credential-eligible non-PR events are `push`, `schedule`, `workflow_dispatch`, and `release` (`published`, `released`, or `prereleased`; non-draft; `GITHUB_REF` equal to the release tag). A qualifying release gets the same branch decision as a push of its tag; all other events and release activities fail closed.
 - `collection-update-strategy` accepts `auto` or `whole`, defaults to `whole`, and is forwarded unchanged to bootstrap.
 - `folder-strategy` (default `Paths`), `nested-folder-hierarchy` (default `false`), and `request-name-source` (default `Fallback`) are forwarded unchanged to bootstrap for generated collection layout and naming.
 
