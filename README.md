@@ -428,6 +428,8 @@ flowchart TB
 
 Between repo sync and Insights, the action runs the generated smoke and contract collections with the [Postman CLI](https://learning.postman.com/docs/postman-cli/postman-cli-collections/) and uploads [JUnit results](https://learning.postman.com/docs/postman-cli/postman-cli-reporters/) as a workflow artifact (skippable via `skip-built-in-tests`). Inputs are backend-neutral and kebab-case. Full contract details, output mapping, and phase outcome semantics are in [docs/contract.md](docs/contract.md).
 
+**Supported triggers.** Credential-bearing steps run only on trusted events: `push` (branch or tag), `schedule`, `workflow_dispatch`, same-repository pull-request events, and `release` when the activity is `published`, `released`, or `prereleased`, the release is not a draft, and `GITHUB_REF` is the release's tag. A qualifying release is decided exactly like a push of its tag. Every other event, including other release activities, fails closed: secret-bearing steps are skipped and `sync-status` reports `skipped-branch-gate`.
+
 Running outside GitHub Actions (GitLab CI, Bitbucket Pipelines, Azure DevOps)? The bootstrap and repo-sync CLIs cover that: see [docs/non-github-ci.md](docs/non-github-ci.md).
 
 Releases use immutable `v3.x.y` tags with `v3` as the rolling release channel; pin an immutable tag for reproducibility. See [RELEASE_POLICY.md](RELEASE_POLICY.md).

@@ -66,8 +66,12 @@ The v3 composite exposes `branch-strategy`, `canonical-branch`, `channels`, and
 `preview-ttl`, resolves one credential-free `POSTMAN_BRANCH_DECISION` before
 any secret-bearing step, and surfaces `sync-status` and `spec-version-url`.
 Direct and nested PR-derived events are credential-eligible only after positive
-same-repository ID and name proof. Unknown, malformed, fork, and unsupported
-events fail closed under every strategy, including legacy. Every gated-path
+same-repository ID and name proof. Trusted non-PR events are `push`, `schedule`,
+`workflow_dispatch`, and `release` limited to the `published`, `released`, and
+`prereleased` activities of a non-draft release whose tag equals `GITHUB_REF`;
+a qualifying release is decided exactly like a push of that tag. Unknown,
+malformed, fork, and unsupported events, including every other release
+activity, fail closed under every strategy, including legacy. Every gated-path
 child and secret-bearing step is skipped. There are no public migration knobs.
 
 The branch-aware v3 contract and bottom-up v3 child releases are shipped. This
